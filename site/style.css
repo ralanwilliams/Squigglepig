@@ -1,0 +1,70 @@
+/* Shared by index.html and join.html. Colors follow src/theme/tokens.ts. System
+   fonts only: nothing on these pages loads from a third party. */
+:root {
+  color-scheme: light dark;
+  --bg: #4ecdc4;
+  --card: #ffffff;
+  --text: #212529;
+  --muted: #5f6b70;
+  --inset: #eef4f5;
+  --button: #1a535c;
+  --button-text: #f5f5f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1f23;
+    --card: #14353b;
+    --text: #e8f1f2;
+    --muted: #9db4b8;
+    --inset: #0f2a2f;
+    --button: #1f5f69;
+    --button-text: #f5f5f5;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card);
+  border-radius: 18px;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+.logo { width: 120px; height: 120px; }
+h1 { font-size: 1.4rem; margin: 12px 0 4px; }
+p { margin: 8px 0; color: var(--muted); }
+.code {
+  margin: 16px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--inset);
+}
+.code small { display: block; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); font-size: 0.7rem; }
+.code strong { font-size: 2.2rem; letter-spacing: 0.2em; }
+.button {
+  display: block;
+  margin: 16px 0 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--button);
+  color: var(--button-text);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+.button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+.note { font-size: 0.85rem; }
+[hidden] { display: none !important; }

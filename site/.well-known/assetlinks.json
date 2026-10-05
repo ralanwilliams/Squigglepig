@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.squigglepig.app",
+      "sha256_cert_fingerprints": [
+        "6D:39:56:16:28:C2:67:41:56:63:68:0F:52:50:EA:9A:B1:B3:94:91:AA:D5:E1:11:78:0A:BE:D8:47:7E:74:A6",
+        "14:63:90:56:F7:D2:C2:92:BE:CE:CF:8D:88:E8:0B:09:AA:D7:9D:17:81:51:F4:68:F1:A0:AC:E0:2B:31:B7:D4"
+      ]
+    }
+  }
+]

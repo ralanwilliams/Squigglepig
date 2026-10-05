@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { IMAGES } from '../src/assets/assets';
 import { useGame, MIN_PLAYERS } from '../src/state/GameContext';
+import { roomLink } from '../src/lib/links';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
@@ -36,6 +37,14 @@ export default function Lobby() {
   const [target, setTarget] = useState(5);
 
   const bump = (delta: number) => setTarget((t) => Math.min(20, Math.max(1, t + delta)));
+
+  // Hands the link to the system share sheet (SMS, Signal, Messenger, …). The
+  // code rides along in the text so it still works where the link doesn't open
+  // the app. Dismissing the sheet resolves normally; only a real failure throws.
+  const shareRoom = () => {
+    Share.share({ message: `Join my Squigglepig game! ${roomLink(room)} (room code ${room})` }).catch(() => {});
+  };
+
   const canStart = players.length >= MIN_PLAYERS;
   const connected = status === 'connected';
 
@@ -184,6 +193,7 @@ export default function Lobby() {
         </View>
       </View>
 
+      <PigButton name="Share Room Link" onPress={shareRoom} />
       <DevPanel />
       <LeaveButton />
     </View>
