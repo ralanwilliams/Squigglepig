@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Join a Squigglepig game</title>
+  <meta name="description" content="You've been invited to a game of Squigglepig.">
+  <link rel="icon" href="/logo.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Fallback for https://squigglepig.app/join?room=ABCD. With the app installed
+       and the domain verified, the OS opens the app instead and this page never
+       shows. It does show inside in-app browsers (Messenger, Instagram) that
+       won't hand links to apps, hence the squigglepig:// button. -->
+  <main>
+    <img class="logo" src="/logo.png" alt="Squigglepig">
+    <h1>You're invited to Squigglepig!</h1>
+
+    <div id="invite" hidden>
+      <div class="code">
+        <small>ROOM CODE</small>
+        <strong id="code"></strong>
+      </div>
+      <a class="button" id="open" href="#">Open in Squigglepig</a>
+      <p>Don't have the app? Install Squigglepig, tap <b>Join Game</b>, and enter the code above.</p>
+      <a class="button" href="https://play.google.com/store/apps/details?id=com.squigglepig.app">Get it on Google Play</a>
+      <!-- TODO: remove this note when Play closed testing ends (the link above stays). -->
+      <p class="note">Squigglepig is in closed testing, so the Play link only works if you're on the tester list.</p>
+    </div>
+
+    <p id="missing" hidden>This link is missing its room code. Ask whoever sent it for the 4-letter code, then tap <b>Join Game</b> in Squigglepig.</p>
+  </main>
+
+  <script>
+    // Only plain room codes get through; anything else is treated as missing.
+    var room = (new URLSearchParams(location.search).get('room') || '').trim().toUpperCase();
+    if (/^[A-Z0-9]{1,12}$/.test(room)) {
+      document.getElementById('code').textContent = room;
+      document.getElementById('open').href = 'squigglepig://join?room=' + room;
+      document.getElementById('invite').hidden = false;
+    } else {
+      document.getElementById('missing').hidden = false;
+    }
+  </script>
+</body>
+</html>

@@ -19,7 +19,18 @@
         "backgroundColor": "#4ECDC4",
         "foregroundImage": "./src/assets/images/logo-512X512.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "squigglepig.app", "pathPrefix": "/join" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./src/assets/images/logo-192X192.png"
@@ -46,6 +57,12 @@
       "expo-font",
       "expo-image",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9768dd83-627d-4a09-8aa3-809cce81beb5"
+      }
+    }
   }
 }
