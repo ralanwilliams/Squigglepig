@@ -4,23 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-10-05
 
 ### Added
-- 1× / 2× switch on the drawing canvas; at 2× a minimap shows the visible window
-- Two-finger slide moves the window at 2×; tapping or dragging the minimap jumps it
-- A one-time hint teaches the two-finger slide the first time 2× is switched on
-- Taps now draw dots
-
-### Changed
-- Drawings live in a fixed 400 × 300 space, so zoom and window survive rotation and strokes drawn before and after rotating line up
-- In landscape the canvas takes the full pane height and the rail shrinks to fit beside it (drawing and guessing screens alike)
-- Strokes are smoothed with quadratic curves instead of raw polylines
-- Only the stroke under the finger re-renders while drawing, so ink no longer lags on busy canvases
-- A second finger ends the current stroke instead of dragging it
-
-### Fixed
-- Rotating the phone no longer restarts the countdown on the drawing, guessing, prompt, view, and reveal screens
+- "Share Room Link" button in the lobby sends an invite through any messaging app on the phone (SMS, Signal, Messenger, etc.); the room code is included in the message too
+- Tapping a room link opens Squigglepig on the join screen with the room code and your last username filled in (Android; iOS to follow)
+- squigglepig.app invite page for anyone without the app: shows the room code, an "Open in Squigglepig" button, and a Google Play link
 
 ## [2.0.0] - 2026-09-10
 
@@ -31,6 +20,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Simplified game logic for mobile constraints (screen size, network, battery)
 
 ### Added
+- 1× / 2× switch on the drawing canvas; at 2× a minimap shows the visible window
+- Two-finger slide moves the window at 2×; tapping or dragging the minimap jumps it
+- A one-time hint teaches the two-finger slide the first time 2× is switched on
+- Taps now draw dots
 - Dark mode support across all screens
 - Real-time game state sync with Supabase
 - Proper safe-area handling for notched and edge-to-edge phones
