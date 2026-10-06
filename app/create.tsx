@@ -44,7 +44,7 @@ export default function Create() {
       focus={<Logo source={IMAGES.home} />}
       actions={
         <>
-          <PigInput placeholder="username" value={name} onChangeText={onChangeName} />
+          <PigInput placeholder="Player Name" value={name} onChangeText={onChangeName} />
           <PigButton name="Create" onPress={() => enterRoom(makeCode(), name)} />
         </>
       }
