@@ -95,7 +95,7 @@ export default function Prompts() {
       top={
         <PigInput
           style={styles.fill}
-          placeholder="a cat riding a skateboard…"
+          placeholder="A puffin drinking hot chocolate"
           value={draft}
           onChangeText={setDraft}
           onSubmitEditing={add}

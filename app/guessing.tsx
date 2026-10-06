@@ -42,7 +42,7 @@ export default function Guessing() {
       top={
         <PigInput
           style={styles.fill}
-          placeholder="your guess"
+          placeholder="Your guess"
           value={guess}
           onChangeText={setGuess}
           onSubmitEditing={handle}

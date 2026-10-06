@@ -32,7 +32,7 @@ export default function RoundOne() {
     readyView();
   };
 
-  const focus = <Logo source={IMAGES.lobby} />;
+  const focus = <Logo source={IMAGES.home} />;
 
   const actions = (
     <>

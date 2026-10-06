@@ -49,8 +49,8 @@ export default function Join() {
       focus={<Logo source={IMAGES.join} />}
       actions={
         <>
-          <PigInput placeholder="room code" value={room} onChangeText={setRoom} />
-          <PigInput placeholder="username" value={name} onChangeText={setName} />
+          <PigInput placeholder="Room Code" value={room} onChangeText={setRoom} />
+          <PigInput placeholder="Player Name" value={name} onChangeText={setName} />
           <PigButton name="Lobby" onPress={join} />
         </>
       }
