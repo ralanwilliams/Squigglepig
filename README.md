@@ -52,7 +52,13 @@ prompt's own author, so there's nothing to guess).
 3. In the dashboard copy two values (the **Connect** button at the top shows both):
    - **Project URL** — Settings → Data API (e.g. `https://abcd1234.supabase.co`)
    - **Publishable key** — Settings → API Keys (starts with `sb_publishable_...`; click **Create new API keys** if you only see the legacy anon key)
-4. Realtime is enabled by default — no tables or extra config needed for this game.
+4. Realtime is enabled by default; the game itself needs no tables.
+5. Open **SQL Editor → New query**, paste in `supabase/keepalive.sql` and click
+   **Run**. It creates a one-row table for the keep-alive workflow
+   (`.github/workflows/supabase-keepalive.yml`): free projects pause after 7 days
+   without database reads, and the game's Realtime traffic doesn't count. The
+   workflow also needs `SUPABASE_URL` and `SUPABASE_KEY` repository secrets
+   (Settings → Secrets and variables → Actions), the same values as `.env`.
 
 ### 2. Add your credentials
 ```bash

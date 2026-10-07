@@ -1,0 +1,54 @@
+# Keeps the free-tier Supabase project awake. Supabase pauses free projects
+# after 7 days without database reads, which takes multiplayer down until
+# someone restores the project by hand. The game's own traffic doesn't count:
+# it only uses Realtime, so this reads one row from the keepalive table
+# (supabase/keepalive.sql) through the REST API instead.
+#
+# Cron can't count "every 6 days" across months, so this runs on days 1, 7, 13,
+# 19, 25 and 31 of each month: never more than 6 days apart. Run it by hand
+# from the Actions tab (Run workflow) to check it works.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions),
+# the same values as EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_KEY in .env:
+#   SUPABASE_URL  https://<project>.supabase.co
+#   SUPABASE_KEY  the publishable key (sb_publishable_...)
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '0 12 */6 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read the keepalive row
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_KEY repository secrets are not set"
+            exit 1
+          fi
+
+          # curl reports 000 when it can't connect at all.
+          rm -f body.json
+          status=$(curl -s -o body.json -w '%{http_code}' --max-time 30 \
+            -H "apikey: $SUPABASE_KEY" "$SUPABASE_URL/rest/v1/keepalive?select=id&limit=1" || true)
+          echo "HTTP $status: $(cat body.json 2>/dev/null)"
+
+          if [ "$status" = "200" ] && grep -q '"id"' body.json; then
+            echo "Database read OK"
+          elif grep -q 'PGRST205' body.json 2>/dev/null; then
+            echo "::error::The keepalive table doesn't exist. Run supabase/keepalive.sql in the Supabase SQL Editor."
+            exit 1
+          elif [ "$status" = "200" ]; then
+            echo "::error::The keepalive table is empty or not readable. Run supabase/keepalive.sql in the Supabase SQL Editor."
+            exit 1
+          else
+            echo "::error::Supabase didn't answer the read (HTTP $status). The project may be paused: restore it in the Supabase dashboard."
+            exit 1
+          fi
