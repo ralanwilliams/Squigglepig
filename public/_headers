@@ -9,6 +9,9 @@
 /join*
   X-Robots-Tag: noindex
 
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+
 # The bundle and assets have a content hash in their file names, so a given URL
 # never changes and browsers can keep it. index.html isn't covered, so a new
 # deploy is picked up on the next visit.

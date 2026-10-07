@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useReducer, useRef, useState } from 'react';
-import { Animated, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { PigButton } from './PigButton';
@@ -33,6 +33,11 @@ const HINT_MS = 8000;
 const HINT_KEY = 'pan';
 // Minimap box, base dp.
 const MINIMAP = { w: 88, h: 66 };
+// A browser with a mouse (or trackpad) has no second finger to slide with; it
+// scrolls the window instead (see the wheel handler), and the hint says so.
+const SCROLLS = Platform.OS === 'web' && window.matchMedia('(pointer: fine)').matches;
+// Wheel deltas in lines (Firefox with a mouse) are converted at this many px.
+const WHEEL_LINE_PX = 16;
 
 // Serialized drawing format sent over the wire (vector, tiny, Expo Go friendly).
 export type Drawing = { w: number; h: number; strokes: string[] };
@@ -145,8 +150,9 @@ export function PigCanvas({
 
   // ---- Two-finger hint (coach mark) ---------------------------------------
   // Shown the first time the switch goes to 2×, at the bottom-left of the
-  // canvas. Fades when a two-finger slide moves the window (learned for good)
-  // or after HINT_MS (comes back on the next switch to 2×).
+  // canvas. Fades when a two-finger slide (or a scroll, in a browser) moves the
+  // window (learned for good) or after HINT_MS (comes back on the next switch
+  // to 2×).
   const [hint, setHint] = useState(false);
   const hintOpacity = useRef(new Animated.Value(0)).current;
   const learned = useRef(false);
@@ -295,6 +301,30 @@ export function PigCanvas({
     .onBegin((e) => jump(e.x, e.y))
     .onUpdate((e) => jump(e.x, e.y));
 
+  // On web a scroll over the canvas at 2× moves the window: a mouse wheel goes
+  // up and down (shift+wheel sideways), a trackpad's two-finger scroll goes
+  // anywhere, the same as two fingers on a phone. Ctrl+wheel (and a trackpad
+  // pinch, which browsers report as one) is left alone to zoom the page.
+  // Registered by hand because React's onWheel is passive and can't stop the
+  // page from scrolling.
+  const frameRef = useRef<View>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const el = frameRef.current as unknown as HTMLElement | null;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const g = geo.current;
+      if (g.zoom === 1 || e.ctrlKey) return;
+      e.preventDefault();
+      const unit = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? WHEEL_LINE_PX : 1;
+      moveWindow(win.current.x + (e.deltaX * unit) / g.scale, win.current.y + (e.deltaY * unit) / g.scale);
+      schedule();
+      panLearned();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
   // ---- Actions -------------------------------------------------------------
   const submit = () => {
     commit(false);
@@ -316,7 +346,7 @@ export function PigCanvas({
 
   const canvas = (
     <View style={styles.host} onLayout={onHostLayout}>
-      <View style={[styles.frame, { width: size.w, height: size.h, borderRadius: ui.sp(layout.imageRadius) }]}>
+      <View ref={frameRef} style={[styles.frame, { width: size.w, height: size.h, borderRadius: ui.sp(layout.imageRadius) }]}>
         <GestureDetector gesture={canvasGesture}>
           <Svg width={size.w} height={size.h} viewBox={viewBox}>
             <Committed strokes={committed.current} width={STROKE} />
@@ -409,7 +439,7 @@ export function PigCanvas({
               />
             </Svg>
             <Text style={[styles.hintText, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
-              Slide with two fingers to move around
+              {SCROLLS ? 'Scroll to move around' : 'Slide with two fingers to move around'}
             </Text>
           </Animated.View>
         ) : null}

@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - squigglepig.app landing page: "Play on the web" button and Google Play / App Store links
 - squigglepig.app invite page: "Play in your browser" button that opens the same room on the web
 - On desktop browsers the lobby's share button copies the room link instead
+- Web version can be added to the home screen (Android, iOS, desktop Chrome/Edge) with the Squigglepig icon and opens full-screen
+- Link previews: squigglepig.app, room invite links and play.squigglepig.app show the Squigglepig card in chats and social apps
+- At 2× zoom in a browser, the mouse wheel or a trackpad scroll moves around the canvas
 
 ## [2.1.1] - 2026-10-06
 
