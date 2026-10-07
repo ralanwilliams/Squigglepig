@@ -1,7 +1,8 @@
 # Squigglepig 2.0 | Draw Squiggles, Get Giggles
 
 A real-time multiplayer party game, rebuilt as a native mobile app for the
-Google Play Store and Apple App Store.
+Google Play Store and Apple App Store, with a web version built from the same
+code.
 
 It's drawing telephone: a prompt becomes a drawing becomes a guess becomes the
 next drawing, passed around the whole group. At the end each chain is revealed
@@ -29,7 +30,8 @@ prompt's own author, so there's nothing to guess).
 
 ## Built With
 
-- **Expo 57** — React Native framework for iOS and Android
+- **Expo 57** — React Native framework for iOS, Android and web
+- **react-native-web** — The same screens rendered in the browser
 - **React Native 0.86** — Cross-platform mobile UI
 - **TypeScript** — Type safety
 - **Supabase Realtime** — Real-time database, Broadcast and Presence for multiplayer sync (free tier)
@@ -71,6 +73,16 @@ To test multiplayer, open the app on two devices/emulators: one taps **Create Ga
 (shares the 4-letter code), the other taps **Join Game** and enters it.
 
 > If you change `.env`, restart with `npx expo start -c` to clear the cache.
+
+### Web
+```bash
+npm run web         # dev server in the browser (or press w in `npx expo start`)
+npm run build:web   # static single-page build in dist/
+```
+`dist/` can be served by any static host; unknown paths must fall back to
+`index.html` so routes like `/join?room=ABCD` load the app. The `EXPO_PUBLIC_`
+Supabase values are baked into the bundle at build time — the publishable key
+is meant to be public, but never put a secret key in `.env`.
 
 ### Local test tooling (optional)
 Anything in `src/dev/local/` is gitignored and only loads in dev builds. Drop a

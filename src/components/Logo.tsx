@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Image as RNImage, LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
+import { assetSize } from '../lib/assetSize';
 
 // A window into the source image, as fractions of its width/height. Used for
 // assets whose pig doesn't fill the frame (the waiting GIF has a wide teal
@@ -36,9 +37,7 @@ export function Logo({
     if (width !== box.w || height !== box.h) setBox({ w: width, h: height });
   };
 
-  const meta = RNImage.resolveAssetSource(source);
-  const srcW = meta?.width || 1;
-  const srcH = meta?.height || 1;
+  const { width: srcW, height: srcH } = assetSize(source);
 
   // Fit a frame of the window's aspect ratio into the pane (what "contain" would
   // do for a full-frame pig), then scale the image so the window fills that frame.

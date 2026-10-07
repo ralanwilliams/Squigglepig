@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Image as RNImage, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Countdown, deadlineIn } from './Countdown';
 import { FitBox } from './FitBox';
 import { IMAGES } from '../assets/assets';
+import { assetSize } from '../lib/assetSize';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
@@ -35,8 +36,8 @@ const PIG_OVERLAP = 10;
 // usable; below this the focus pane gives up height instead.
 const RAIL_MIN = 280;
 
-const pigMeta = RNImage.resolveAssetSource(IMAGES.canvasPig);
-const PIG_ASPECT = pigMeta && pigMeta.height ? pigMeta.width / pigMeta.height : 2;
+const pigSize = assetSize(IMAGES.canvasPig);
+const PIG_ASPECT = pigSize.width / pigSize.height;
 
 export function WorkStage({
   focus,
