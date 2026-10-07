@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Web version of the game at play.squigglepig.app, built from the same code as the apps
+- squigglepig.app landing page: "Play on the web" button and Google Play / App Store links
+- squigglepig.app invite page: "Play in your browser" button that opens the same room on the web
+- On desktop browsers the lobby's share button copies the room link instead
+
 ## [2.1.1] - 2026-10-06
 
 ### Changed
