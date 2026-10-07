@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, usePathname } from 'expo-router';
@@ -15,6 +16,7 @@ import { ThemeProvider, ThemeSnapshotTarget, ThemeTransition, useTheme } from '.
 import { ThemeToggleOverlay } from '../src/components/ThemeToggle';
 import { ToastOverlay } from '../src/components/Toast';
 import { playMusic, preloadSounds, stopMusic } from '../src/lib/sound';
+import { useAppFrame } from '../src/theme/responsive';
 
 // Screens with the theme playing: everything from launch up to the moment the
 // round starts. It stops on /view (the "your prompt" screen) and stays off
@@ -60,23 +62,36 @@ export default function RootLayout() {
 // the old screen away when the theme flips, and the dark-mode toggle floating
 // over every screen — in that order, so the toggle's glyph keeps morphing on
 // top while the wipe passes underneath it.
+//
+// On web all of it sits in a frame centred in the browser window, capped in
+// width so an ultrawide monitor doesn't pull the panes apart (useAppFrame);
+// the window around it shows the screen background. On native the frame is
+// simply the whole screen.
 function Shell() {
   const theme = useTheme();
+  const frame = useAppFrame();
   return (
-    <>
-      <StatusBar style={theme.name === 'dark' ? 'light' : 'dark'} />
-      <ThemeSnapshotTarget>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            animation: 'fade',
-            contentStyle: { backgroundColor: theme.background },
-          }}
-        />
-      </ThemeSnapshotTarget>
-      <ThemeTransition />
-      <ThemeToggleOverlay />
-      <ToastOverlay />
-    </>
+    <View style={[styles.window, { backgroundColor: theme.background }]}>
+      <View style={[styles.frame, Platform.OS === 'web' && { maxWidth: frame.width }]}>
+        <StatusBar style={theme.name === 'dark' ? 'light' : 'dark'} />
+        <ThemeSnapshotTarget>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'fade',
+              contentStyle: { backgroundColor: theme.background },
+            }}
+          />
+        </ThemeSnapshotTarget>
+        <ThemeTransition />
+        <ThemeToggleOverlay />
+        <ToastOverlay />
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  window: { flex: 1, alignItems: 'center' },
+  frame: { flex: 1, width: '100%' },
+});

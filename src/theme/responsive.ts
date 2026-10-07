@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +32,19 @@ export const FONT_CAP = 1.2;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+// A browser window can be any shape, and on an ultrawide monitor the two panes
+// end up at opposite edges of the screen. On web the game is laid out in a
+// frame no wider than MAX_WEB_ASPECT × its height, centred in the window
+// (app/_layout.tsx), and useUi measures that frame rather than the window.
+// Phones and tablets never reach the cap.
+const MAX_WEB_ASPECT = 16 / 9;
+
+export function useAppFrame(): { width: number; height: number } {
+  const { width, height } = useWindowDimensions();
+  if (Platform.OS !== 'web') return { width, height };
+  return { width: Math.min(width, Math.round(height * MAX_WEB_ASPECT)), height };
+}
+
 export type Ui = {
   w: number; // safe-area width (dp)
   h: number; // safe-area height (dp)
@@ -49,7 +62,7 @@ export type Ui = {
 };
 
 export function useUi(): Ui {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useAppFrame();
   const insets = useSafeAreaInsets();
   return useMemo(() => {
     const w = Math.max(1, width - insets.left - insets.right);
