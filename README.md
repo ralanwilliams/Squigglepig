@@ -83,7 +83,9 @@ npm run build:web   # static single-page build in dist/
 `index.html` so routes like `/join?room=ABCD` load the app. The `EXPO_PUBLIC_`
 Supabase values are baked into the bundle at build time — the publishable key
 is meant to be public, but never put a secret key in `.env`. Files in `public/`
-(the page template and `_headers`) are copied into `dist/`.
+(the page template, `_headers`, the web app manifest and its icons) are copied
+into `dist/`. The icons are the app logo on teal; `og-image.png` (the link
+preview card, also in `site/`) is the Play Store feature graphic.
 
 ### Local test tooling (optional)
 Anything in `src/dev/local/` is gitignored and only loads in dev builds. Drop a
