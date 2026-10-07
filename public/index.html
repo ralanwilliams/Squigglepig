@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <!-- viewport-fit=cover lets the app's safe-area insets work around notches. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Squigglepig | Draw Squiggles, Get Giggles</title>
+    <meta name="description" content="A real-time drawing telephone party game. A prompt becomes a drawing becomes a guess becomes the next drawing, passed around the whole group." />
+    <meta name="theme-color" content="#4ECDC4" />
+    <meta name="apple-mobile-web-app-title" content="Squigglepig" />
+    <!-- The `react-native-web` recommended style reset (https://necolas.github.io/react-native-web/docs/setup/#root-element),
+         plus the page behaving like an app screen rather than a document. -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+      html {
+        /* No pull-to-refresh or swipe-back navigation when a stroke runs off
+           the canvas. Browsers read this from the root element, not body. */
+        overscroll-behavior: none;
+      }
+      body {
+        overflow: hidden;
+        /* Teal before the app paints, not a white flash. */
+        background-color: #4ecdc4;
+        /* Drawing and tapping buttons mustn't select text or flash a highlight. */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      input,
+      textarea {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>Squigglepig needs JavaScript to run.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
+import { showToast } from '../src/components/Toast';
 import { IMAGES } from '../src/assets/assets';
 import { useGame, MIN_PLAYERS } from '../src/state/GameContext';
 import { roomLink } from '../src/lib/links';
@@ -25,6 +26,13 @@ const colorFor = (name: string) => {
   return AVATAR_COLORS[h];
 };
 
+// In a browser on a phone or tablet the share button opens the system share
+// sheet (navigator.share), as in the app. Desktop browsers either have no share
+// sheet or one nobody expects, so there it copies the link to paste anywhere.
+const COPY_LINK =
+  Platform.OS === 'web' &&
+  !(typeof navigator.share === 'function' && window.matchMedia('(pointer: coarse)').matches);
+
 // Lobby: the pig fills the left of the stage; on the right a single card groups
 // everything the host touches — room code, the points-to-win stepper, Start, and
 // the live roster (host = the earliest joiner, players[0]). Nothing scrolls: the
@@ -41,8 +49,17 @@ export default function Lobby() {
   // Hands the link to the system share sheet (SMS, Signal, Messenger, …). The
   // code rides along in the text so it still works where the link doesn't open
   // the app. Dismissing the sheet resolves normally; only a real failure throws.
+  // A desktop browser copies the link instead (see COPY_LINK).
   const shareRoom = () => {
-    Share.share({ message: `Join my Squigglepig game! ${roomLink(room)} (room code ${room})` }).catch(() => {});
+    const link = roomLink(room);
+    if (COPY_LINK) {
+      navigator.clipboard
+        .writeText(link)
+        .then(() => showToast('Room link copied', 2000))
+        .catch(() => showToast(`Couldn't copy — room code ${room}`, 3000));
+      return;
+    }
+    Share.share({ message: `Join my Squigglepig game! ${link} (room code ${room})` }).catch(() => {});
   };
 
   const canStart = players.length >= MIN_PLAYERS;
@@ -193,7 +210,7 @@ export default function Lobby() {
         </View>
       </View>
 
-      <PigButton name="Share Room Link" onPress={shareRoom} />
+      <PigButton name={COPY_LINK ? 'Copy Room Link' : 'Share Room Link'} onPress={shareRoom} />
       <DevPanel />
       <LeaveButton />
     </View>

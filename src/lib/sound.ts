@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { SOUNDS } from '../assets/assets';
 
@@ -61,6 +62,50 @@ const FADE_STEP_MS = 40;
 
 let fade: ReturnType<typeof setInterval> | null = null;
 let fadingTo: number | null = null; // target volume of the ramp in progress
+// Whether the current screen wants the theme on (the last call was playMusic,
+// not stopMusic). The web code below uses it to start or resume the music
+// later, once the browser allows it.
+let musicWanted = false;
+
+// Browsers refuse to start audio until the visitor has clicked, tapped or
+// typed on the page, and expo-audio's web player doesn't report the refusal:
+// it marks itself playing anyway, so playMusic would think the theme is
+// already on and never try again. So on web the theme waits for that first
+// interaction, then starts if a music screen is still showing. Tapped sound
+// effects need no wait: they start from a tap.
+const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend'] as const;
+let awaitingGesture = false;
+
+function blockedUntilGesture(): boolean {
+  if (Platform.OS !== 'web') return false;
+  // Browsers without the User Activation API (older Safari) just get a try.
+  if (navigator.userActivation?.hasBeenActive ?? true) return false;
+  if (!awaitingGesture) {
+    awaitingGesture = true;
+    const onGesture = () => {
+      // pointerdown doesn't count as an interaction on touch screens (the
+      // pointerup after it does), so wait until the browser agrees.
+      if (!navigator.userActivation?.hasBeenActive) return;
+      GESTURES.forEach((g) => window.removeEventListener(g, onGesture, true));
+      awaitingGesture = false;
+      if (musicWanted) playMusic();
+    };
+    GESTURES.forEach((g) => window.addEventListener(g, onGesture, true));
+  }
+  return true;
+}
+
+// On native the OS pauses the app (and its music) when it's backgrounded; a
+// browser tab plays on. Pause the theme while the tab is hidden and pick it up
+// where it left off when the player comes back.
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    const p = players.get(SOUNDS.theme);
+    if (!p || !musicWanted) return;
+    if (document.hidden) p.pause();
+    else if (!blockedUntilGesture()) p.play();
+  });
+}
 
 // Ramp the theme's volume to `to`, then run `done`. A ramp already in
 // progress is replaced, so a start during a fade-out simply turns around.
@@ -83,6 +128,10 @@ function rampMusic(p: AudioPlayer, to: number, done?: () => void) {
 }
 
 export function playMusic() {
+  musicWanted = true;
+  // A hidden tab starts it when it comes back (see visibilitychange above).
+  if (Platform.OS === 'web' && document.hidden) return;
+  if (blockedUntilGesture()) return;
   try {
     const p = player(SOUNDS.theme);
     p.loop = true;
@@ -101,6 +150,7 @@ export function playMusic() {
 // fading out, so several triggers can race for it (the pool filling, then the
 // route change a moment later).
 export function stopMusic() {
+  musicWanted = false;
   try {
     const p = players.get(SOUNDS.theme);
     if (!p || !p.playing || fadingTo === 0) return;
