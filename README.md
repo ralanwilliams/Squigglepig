@@ -82,13 +82,30 @@ npm run build:web   # static single-page build in dist/
 `dist/` can be served by any static host; unknown paths must fall back to
 `index.html` so routes like `/join?room=ABCD` load the app. The `EXPO_PUBLIC_`
 Supabase values are baked into the bundle at build time — the publishable key
-is meant to be public, but never put a secret key in `.env`.
+is meant to be public, but never put a secret key in `.env`. Files in `public/`
+(the page template and `_headers`) are copied into `dist/`.
 
 ### Local test tooling (optional)
 Anything in `src/dev/local/` is gitignored and only loads in dev builds. Drop a
 `.tsx` file there whose default export is a component and it appears at the
 bottom of the lobby — handy for helpers like automated "ghost" players that let
 you play a full game on one phone. Restart `npx expo start` after adding files.
+
+## Hosting (Cloudflare Pages)
+Two Pages projects deploy from this repo's `master` branch:
+
+| Domain | What | Build command | Output |
+|---|---|---|---|
+| squigglepig.app | Landing page, `/join` invite page, `.well-known/assetlinks.json` (Android App Links) | none | `site` |
+| play.squigglepig.app | The game, web build | `npm run build:web` | `dist` |
+
+The game project needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`
+set as environment variables in its Pages settings, since `.env` isn't committed.
+Node comes from `.node-version`.
+
+Room links always use `https://squigglepig.app/join?room=…` (see
+`src/lib/links.ts`): the app opens them where it's installed, and everywhere else
+the invite page offers the app, the store, or the same room on play.squigglepig.app.
 
 ## Building for the app stores (later)
 Native store binaries are produced with EAS:
