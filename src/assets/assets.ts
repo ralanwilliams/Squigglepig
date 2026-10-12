@@ -11,10 +11,7 @@ export const IMAGES = {
   winner: require('./images/squigglepig_winner.gif'),
   waiting: require('./images/squigglepig.gif'),
   canvasPig: require('./images/canvas_pig.png'),
-};
-
-export const DOCUMENTS = {
-  cv: require('./documents/Robert_Alan_Williams_Clean_CV.pdf'),
+  icon: require('./images/logo-192X192.png'), // the app icon, for the menu drawer
 };
 
 export const SOUNDS = {

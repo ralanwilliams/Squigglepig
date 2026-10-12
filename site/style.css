@@ -1,4 +1,4 @@
-/* Shared by index.html and join.html. Colors follow src/theme/tokens.ts. System
+/* Shared by every page on squigglepig.app. Colors follow src/theme/tokens.ts. System
    fonts only: nothing on these pages loads from a third party. */
 :root {
   color-scheme: light dark;
@@ -75,3 +75,37 @@ p { margin: 8px 0; color: var(--muted); }
 .stores { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
 .note { font-size: 0.85rem; }
 [hidden] { display: none !important; }
+
+/* Long-form pages (help.html, terms.html): no card. The text sits straight
+   on the screen background like the game's own screens, in the app's text /
+   link / divider colors (tokens.ts), left aligned and starting at the top. */
+body.doc {
+  align-items: flex-start;
+  --link: #0a434c;
+  --divider: rgba(33, 37, 41, 0.22);
+  --doc-muted: rgba(33, 37, 41, 0.72);
+}
+@media (prefers-color-scheme: dark) {
+  body.doc {
+    --link: #7fd8d0;
+    --divider: rgba(230, 237, 238, 0.22);
+    --doc-muted: rgba(230, 237, 238, 0.72);
+  }
+}
+main.doc { max-width: 680px; text-align: left; background: none; box-shadow: none; padding: 8px 4px; }
+.doc header { text-align: center; margin-bottom: 8px; }
+.doc .logo { width: 88px; height: 88px; }
+.doc h2 { font-size: 1.1rem; margin: 28px 0 6px; color: var(--link); }
+.doc p, .doc li { color: var(--text); }
+.doc header p, .doc .updated { color: var(--doc-muted); }
+.doc ul, .doc ol { margin: 8px 0; padding-left: 22px; }
+.doc li { margin: 4px 0; }
+.doc a { color: var(--link); font-weight: 600; }
+.doc .updated { text-align: center; font-size: 0.85rem; }
+.doc details { border-top: 1px solid var(--divider); padding: 4px 0; }
+.doc details:last-of-type { border-bottom: 1px solid var(--divider); }
+.doc summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
+.doc summary::marker { color: var(--link); }
+.doc summary:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; border-radius: 4px; }
+.doc details p, .doc details ul { margin-top: 0; }
+.doc footer { margin-top: 28px; text-align: center; color: var(--doc-muted); font-size: 0.85rem; }
