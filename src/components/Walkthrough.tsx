@@ -4,7 +4,7 @@ import { Stage } from './Stage';
 import { PigButton } from './PigButton';
 import { ChainScene, DrawScene, GatherScene, PromptsScene, ScoreScene } from './WalkthroughScenes';
 import { font, type Theme } from '../theme/tokens';
-import { useThemedStyles } from '../theme/theme';
+import { useReducedMotion, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 
 // The first-run walkthrough: five steps, each a looping animation with one
@@ -26,6 +26,7 @@ const NATIVE = Platform.OS !== 'web';
 export function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
   const last = step === LAST;
 
@@ -37,16 +38,21 @@ export function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () 
   const go = (to: number) => setStep(Math.max(0, Math.min(LAST, to)));
   const next = () => (last ? onDone() : go(step + 1));
 
-  // Each step slides in from the side it came from.
+  // Each step slides in from the side it came from (with reduced motion it
+  // just appears).
   const enter = useRef(new Animated.Value(1)).current;
   const dir = useRef(1);
   const prev = useRef(step);
   useEffect(() => {
     dir.current = step >= prev.current ? 1 : -1;
     prev.current = step;
+    if (reduced) {
+      enter.setValue(1);
+      return;
+    }
     enter.setValue(0);
     Animated.timing(enter, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: NATIVE }).start();
-  }, [step, enter]);
+  }, [step, enter, reduced]);
 
   // Swipe left / right between steps (never past the ends: finishing is a tap).
   const stepRef = useRef(step);
@@ -124,14 +130,20 @@ export function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () 
 function Dots({ step }: { step: number }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const reduced = useReducedMotion();
   const widths = useRef(STEPS.map((_, i) => new Animated.Value(i === step ? 1 : 0))).current;
   useEffect(() => {
+    if (reduced) {
+      widths.forEach((w, i) => w.setValue(i === step ? 1 : 0));
+      return;
+    }
     Animated.parallel(
       widths.map((w, i) =>
         Animated.timing(w, { toValue: i === step ? 1 : 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false })
       )
     ).start();
-  }, [step, widths]);
+  }, [step, widths, reduced]);
+
   const d = ui.sp(8);
   return (
     <View

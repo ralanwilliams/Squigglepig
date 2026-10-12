@@ -73,6 +73,8 @@ const makeStyles = (t: Theme) =>
     pill: {
       color: t.overlayText,
       backgroundColor: t.overlay,
+      borderWidth: t.edge,
+      borderColor: t.overlayBorder,
       fontFamily: font.medium,
       overflow: 'hidden',
       textAlign: 'center',

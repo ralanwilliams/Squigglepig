@@ -37,7 +37,7 @@ export function PigInput(props: TextInputProps) {
 const makeStyles = (t: Theme) => StyleSheet.create({
   input: {
     backgroundColor: t.surface,
-    borderWidth: 1,
+    borderWidth: Math.max(1, t.edge),
     borderColor: t.surfaceBorder,
     color: t.surfaceText,
     fontFamily: font.regular,

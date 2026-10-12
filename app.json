@@ -2,7 +2,7 @@
   "expo": {
     "name": "Squigglepig",
     "slug": "squigglepig",
-    "version": "2.3.0",
+    "version": "2.4.0",
     "orientation": "default",
     "scheme": "squigglepig",
     "icon": "./src/assets/images/logo-512X512.png",

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { assetSize } from '../lib/assetSize';
+import { artFor, darkInset } from '../assets/assets';
+import { useTheme } from '../theme/theme';
 
 // A window into the source image, as fractions of its width/height. Used for
 // assets whose pig doesn't fill the frame (the waiting GIF has a wide teal
@@ -21,6 +23,12 @@ const FULL: ImageWindow = { x: 0, y: 0, w: 1, h: 1 };
 // `children` are rendered inside the fitted frame (the rectangle the window
 // occupies on screen), so an absolutely-positioned child with percentage
 // offsets lands on the same part of the pig at every screen size.
+//
+// On the dark palette it shows the image's dark version (assets.ts artFor),
+// which has a teal border so the line art stands off the background. That
+// version has a transparent margin for the border; the window is moved into
+// it, so the frame (and anything in `children`) lands exactly where it does
+// in light mode and the border spills just past it.
 export function Logo({
   source,
   window = FULL,
@@ -31,36 +39,45 @@ export function Logo({
   children?: React.ReactNode;
 }) {
   const [box, setBox] = useState({ w: 0, h: 0 });
+  const art = artFor(source, useTheme().name === 'dark');
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (width !== box.w || height !== box.h) setBox({ w: width, h: height });
   };
 
-  const { width: srcW, height: srcH } = assetSize(source);
+  // The window in the shown image's own fractions (unchanged without a margin).
+  const pad = darkInset(source, art);
+  const { width: srcW, height: srcH } = assetSize(art);
+  const win: ImageWindow = {
+    x: (window.x * pad.src.width + pad.x) / srcW,
+    y: (window.y * pad.src.height + pad.y) / srcH,
+    w: (window.w * pad.src.width) / srcW,
+    h: (window.h * pad.src.height) / srcH,
+  };
 
   // Fit a frame of the window's aspect ratio into the pane (what "contain" would
   // do for a full-frame pig), then scale the image so the window fills that frame.
-  const aspect = (window.w * srcW) / (window.h * srcH);
+  const aspect = (win.w * srcW) / (win.h * srcH);
   let fw = box.w;
   let fh = fw / aspect;
   if (fh > box.h) {
     fh = box.h;
     fw = fh * aspect;
   }
-  const iw = fw / window.w;
-  const ih = fh / window.h;
+  const iw = fw / win.w;
+  const ih = fh / win.h;
 
   return (
     <View style={styles.host} onLayout={onLayout}>
       {box.w > 0 && box.h > 0 ? (
         <View style={[styles.frame, { width: Math.round(fw), height: Math.round(fh) }]}>
           <Image
-            source={source}
+            source={art}
             style={{
               position: 'absolute',
-              left: -Math.round(window.x * iw),
-              top: -Math.round(window.y * ih),
+              left: -Math.round(win.x * iw),
+              top: -Math.round(win.y * ih),
               width: Math.round(iw),
               height: Math.round(ih),
             }}

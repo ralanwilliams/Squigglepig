@@ -489,6 +489,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignItems: 'center',
     borderRadius: 999,
     backgroundColor: t.overlay,
+    borderWidth: t.edge,
+    borderColor: t.overlayBorder,
   },
   hintText: { color: t.overlayText, fontFamily: font.regular },
 });

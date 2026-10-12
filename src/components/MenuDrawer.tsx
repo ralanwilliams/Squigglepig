@@ -8,7 +8,7 @@ import { Glyph, type GlyphName } from './Glyph';
 import { showToast } from './Toast';
 import { IMAGES } from '../assets/assets';
 import { font, type Theme } from '../theme/tokens';
-import { useTheme, useThemedStyles } from '../theme/theme';
+import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
 import {
   APP_STORE_URL,
@@ -34,7 +34,10 @@ const NATIVE = Platform.OS !== 'web';
 // painted with the screen's own palette (background, text, link), so it
 // follows light / dark mode like everything else. Nothing scrolls: in two-pane
 // layouts the groups sit in two columns, and the body is a FitBox.
-// `onHowToPlay` replays the first-run walkthrough (Home owns it).
+// `onHowToPlay` replays the first-run walkthrough (Home owns it). The
+// Accessibility group holds the switches (High contrast, Reduce motion); each
+// shows what is in effect — the phone's setting until it is flipped here.
+// With reduced motion the drawer appears and goes without sliding.
 export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
   const ui = useUi();
   const theme = useTheme();
@@ -60,7 +63,7 @@ export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
   );
 }
 
-type Row = { icon: GlyphName; label: string; onPress?: () => void; trailing?: GlyphName };
+type Row = { icon: GlyphName; label: string; onPress?: () => void; trailing?: GlyphName; on?: boolean };
 
 function open(url: string) {
   return Linking.openURL(url);
@@ -85,6 +88,8 @@ function MenuDrawer({
   const styles = useThemedStyles(makeStyles);
   const frame = useAppFrame();
   const win = useWindowDimensions();
+  const { highContrast, setContrast, reducedMotion, setMotion } = useThemeMode();
+  const reduced = useReducedMotion();
 
   // Stay mounted through the closing slide; unmount once it has finished.
   const [mounted, setMounted] = useState(visible);
@@ -92,13 +97,13 @@ function MenuDrawer({
   useEffect(() => {
     if (visible) {
       setMounted(true);
-      Animated.timing(p, { toValue: 1, duration: OPEN_MS, easing: Easing.out(Easing.cubic), useNativeDriver: NATIVE }).start();
+      Animated.timing(p, { toValue: 1, duration: reduced ? 0 : OPEN_MS, easing: Easing.out(Easing.cubic), useNativeDriver: NATIVE }).start();
     } else {
-      Animated.timing(p, { toValue: 0, duration: CLOSE_MS, easing: Easing.in(Easing.cubic), useNativeDriver: NATIVE }).start(
+      Animated.timing(p, { toValue: 0, duration: reduced ? 0 : CLOSE_MS, easing: Easing.in(Easing.cubic), useNativeDriver: NATIVE }).start(
         ({ finished }) => finished && setMounted(false)
       );
     }
-  }, [visible, p]);
+  }, [visible, p, reduced]);
 
   // On web the game sits in a frame centred in the window (useAppFrame); the
   // drawer slides out of that frame's left edge, not the window's.
@@ -133,6 +138,10 @@ function MenuDrawer({
       ? []
       : [{ icon: 'star', label: 'Rate this app', onPress: rate, trailing: 'external' } as Row]),
     { icon: 'help', label: 'Help & FAQ', onPress: () => open(HELP_URL), trailing: 'external' },
+  ];
+  const accessibility: Row[] = [
+    { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },
+    { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
   ];
   const legal: Row[] = [
     { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },
@@ -224,16 +233,24 @@ function MenuDrawer({
             <>
               <FitBox style={styles.flex} align="top">
                 <View style={[styles.columns, { gap: ui.gap }]}>
-                  <View style={styles.column}>{section('Support', support)}</View>
+                  <View style={[styles.column, { gap: ui.sp(12) }]}>
+                    {section('Support', support)}
+                    {section('Accessibility', accessibility)}
+                  </View>
                   <View style={[styles.column, { gap: ui.sp(12) }]}>
                     {section('Legal', legal)}
                     {section('Developer', developer)}
                   </View>
                 </View>
               </FitBox>
-              {/* Pinned to the foot of the drawer under the (shorter) Support
-                  column, out of the flow so it costs the links no height. */}
-              <View style={[styles.footnote, { left: ui.insets.left + ui.pad, bottom: ui.insets.bottom + ui.sp(12), width: columnW }]}>
+              {/* Pinned to the foot of the drawer under the (shorter) Legal /
+                  Developer column, out of the flow so it costs the links no height. */}
+              <View
+                style={[
+                  styles.footnote,
+                  { left: ui.insets.left + ui.pad + columnW + ui.gap, bottom: ui.insets.bottom + ui.sp(12), width: columnW },
+                ]}
+              >
                 {copyright}
               </View>
             </>
@@ -242,6 +259,7 @@ function MenuDrawer({
               <FitBox style={styles.flex} align="top">
                 <View style={{ gap: ui.sp(12) }}>
                   {section('Support', support)}
+                  {section('Accessibility', accessibility)}
                   {section('Legal', legal)}
                   {section('Developer', developer)}
                 </View>
@@ -257,28 +275,62 @@ function MenuDrawer({
 }
 
 // One line of the drawer: icon, label, and a trailing glyph saying where it
-// goes (↗ leaves the app, › opens a screen). A row without an action is
-// plain text, dimmed.
+// goes (↗ leaves the app, › opens a screen) or, for a setting, a switch. A row
+// without an action is plain text in the muted color.
 function MenuRow({ row, ui, theme, styles }: { row: Row; ui: Ui; theme: Theme; styles: ReturnType<typeof makeStyles> }) {
+  const isSwitch = row.on !== undefined;
+  const ink = row.onPress ? theme.link : theme.textMuted;
   const body = (
     <>
-      <Glyph name={row.icon} size={ui.sp(22)} color={theme.link} weight={1.8} />
-      <Text style={[styles.label, { fontSize: ui.f(15) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
+      <Glyph name={row.icon} size={ui.sp(22)} color={ink} weight={1.8} />
+      <Text
+        style={[styles.label, !row.onPress && styles.staticLabel, { fontSize: ui.f(15) }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={FONT_CAP}
+      >
         {row.label}
       </Text>
+      {isSwitch ? <Toggle on={!!row.on} ui={ui} theme={theme} /> : null}
       {row.trailing ? <Glyph name={row.trailing} size={ui.sp(16)} color={theme.link} weight={2.2} /> : null}
     </>
   );
   const box = [styles.row, { minHeight: ui.sp(38), gap: ui.sp(12), paddingHorizontal: ui.sp(4) }];
-  if (!row.onPress) return <View style={[box, styles.static]}>{body}</View>;
+  if (!row.onPress) return <View style={box}>{body}</View>;
   return (
     <Pressable
-      accessibilityRole={row.trailing === 'external' ? 'link' : 'button'}
+      accessibilityRole={isSwitch ? 'switch' : row.trailing === 'external' ? 'link' : 'button'}
+      accessibilityState={isSwitch ? { checked: row.on } : undefined}
       onPress={row.onPress}
       style={({ pressed }) => [box, { opacity: pressed ? 0.6 : 1 }]}
     >
       {body}
     </Pressable>
+  );
+}
+
+// The switch on a setting row: a pill in the link color. On, it is filled with
+// the knob at the right; off, it is an outline with the knob at the left — so
+// it reads by shape and position, not by color.
+function Toggle({ on, ui, theme }: { on: boolean; ui: Ui; theme: Theme }) {
+  const w = ui.sp(38);
+  const h = ui.sp(22);
+  const knob = h - ui.sp(8);
+  return (
+    <View
+      style={{
+        width: w,
+        height: h,
+        borderRadius: h / 2,
+        borderWidth: ui.sp(2),
+        borderColor: theme.link,
+        backgroundColor: on ? theme.link : 'transparent',
+        justifyContent: 'center',
+        alignItems: on ? 'flex-end' : 'flex-start',
+        paddingHorizontal: ui.sp(2),
+      }}
+    >
+      <View style={{ width: knob, height: knob, borderRadius: knob / 2, backgroundColor: on ? theme.background : theme.link }} />
+    </View>
   );
 }
 
@@ -306,14 +358,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   identity: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   name: { color: t.text, fontFamily: font.bold, letterSpacing: 0.2 },
-  version: { color: t.text, fontFamily: font.regular, opacity: 0.72 },
+  version: { color: t.textMuted, fontFamily: font.regular },
   rule: { height: 1, backgroundColor: t.divider },
   columns: { flexDirection: 'row' },
   column: { flex: 1, minWidth: 0 },
   footnote: { position: 'absolute' },
   sectionTitle: { color: t.link, fontFamily: font.bold, letterSpacing: 1.2, textTransform: 'uppercase', paddingLeft: 4 },
   row: { flexDirection: 'row', alignItems: 'center' },
-  static: { opacity: 0.7 },
   label: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },
-  copyright: { color: t.text, fontFamily: font.regular, textAlign: 'center', opacity: 0.75 },
+  staticLabel: { color: t.textMuted },
+  copyright: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
 });
