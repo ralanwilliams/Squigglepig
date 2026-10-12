@@ -8,6 +8,12 @@ const GLYPHS = {
   menu: <Path d="M4 7h16M4 12h16M4 17h16" />,
   back: <Path d="M15 5l-7 7 7 7" />,
   close: <Path d="M6 6l12 12M18 6L6 18" />,
+  play: (
+    <>
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M10 8.5v7l6-3.5z" />
+    </>
+  ),
   feedback: <Path d="M4 5.5h16v10.5H9l-5 4zM8 9.5h8M8 12.5h5" />,
   star: <Path d="M12 3.6l2.55 5.2 5.75.83-4.16 4.05.98 5.72L12 16.7l-5.12 2.7.98-5.72L3.7 9.63l5.75-.83z" />,
   help: (

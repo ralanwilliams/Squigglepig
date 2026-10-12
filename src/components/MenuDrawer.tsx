@@ -34,7 +34,8 @@ const NATIVE = Platform.OS !== 'web';
 // painted with the screen's own palette (background, text, link), so it
 // follows light / dark mode like everything else. Nothing scrolls: in two-pane
 // layouts the groups sit in two columns, and the body is a FitBox.
-export function MenuButton() {
+// `onHowToPlay` replays the first-run walkthrough (Home owns it).
+export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
   const ui = useUi();
   const theme = useTheme();
   const [open, setOpen] = useState(false);
@@ -54,7 +55,7 @@ export function MenuButton() {
           <Glyph name="menu" size={ui.sp(26)} color={theme.link} />
         </Pressable>
       </View>
-      <MenuDrawer open={open} onClose={() => setOpen(false)} />
+      <MenuDrawer open={open} onClose={() => setOpen(false)} onHowToPlay={onHowToPlay} />
     </>
   );
 }
@@ -70,7 +71,15 @@ function rate() {
   return open(APP_STORE_URL ?? PLAY_STORE_URL);
 }
 
-function MenuDrawer({ open: visible, onClose }: { open: boolean; onClose: () => void }) {
+function MenuDrawer({
+  open: visible,
+  onClose,
+  onHowToPlay,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onHowToPlay: () => void;
+}) {
   const ui = useUi();
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -109,7 +118,15 @@ function MenuDrawer({ open: visible, onClose }: { open: boolean; onClose: () => 
     router.push('/licenses');
   };
 
+  // The walkthrough is a modal too, and iOS won't present one while another is
+  // still going away, so it opens once the drawer has slid out.
+  const howToPlay = () => {
+    onClose();
+    setTimeout(onHowToPlay, CLOSE_MS + 60);
+  };
+
   const support: Row[] = [
+    { icon: 'play', label: 'How to play', onPress: howToPlay, trailing: 'chevron' },
     { icon: 'feedback', label: 'Send feedback', onPress: feedback, trailing: 'external' },
     // No App Store listing yet, so iOS has nowhere to send a rating.
     ...(Platform.OS === 'ios' && !APP_STORE_URL
@@ -207,16 +224,16 @@ function MenuDrawer({ open: visible, onClose }: { open: boolean; onClose: () => 
             <>
               <FitBox style={styles.flex} align="top">
                 <View style={[styles.columns, { gap: ui.gap }]}>
+                  <View style={styles.column}>{section('Support', support)}</View>
                   <View style={[styles.column, { gap: ui.sp(12) }]}>
-                    {section('Support', support)}
+                    {section('Legal', legal)}
                     {section('Developer', developer)}
                   </View>
-                  <View style={styles.column}>{section('Legal', legal)}</View>
                 </View>
               </FitBox>
-              {/* Pinned to the foot of the drawer under the (shorter) Legal
+              {/* Pinned to the foot of the drawer under the (shorter) Support
                   column, out of the flow so it costs the links no height. */}
-              <View style={[styles.footnote, { right: ui.pad, bottom: ui.insets.bottom + ui.sp(12), width: columnW }]}>
+              <View style={[styles.footnote, { left: ui.insets.left + ui.pad, bottom: ui.insets.bottom + ui.sp(12), width: columnW }]}>
                 {copyright}
               </View>
             </>

@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0]
+
+### Added
+- A quick animated walkthrough of how the game works the first time Squigglepig opens; it can be skipped, and once finished or skipped it doesn't come back (app updates don't reset it)
+- How to play in the home screen menu replays the walkthrough
+
+### Removed
+- "Learn to Squiggle" on the home screen, replaced by the walkthrough
+
 ## [2.2.0]
 
 ### Added

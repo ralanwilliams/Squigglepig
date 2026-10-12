@@ -5,30 +5,42 @@ import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { Heading } from '../src/components/Heading';
 import { PigButton } from '../src/components/PigButton';
-import { HowToModal } from '../src/components/HowToModal';
 import { MenuButton } from '../src/components/MenuDrawer';
 import { SnoutSecret } from '../src/components/SnoutSecret';
+import { Walkthrough } from '../src/components/Walkthrough';
 import { IMAGES } from '../src/assets/assets';
 import { useGame } from '../src/state/GameContext';
 import { loadSession } from '../src/lib/session';
+import { markTutorialDone, tutorialDone } from '../src/lib/tutorial';
 
 // Home screen (was pages/Home.js). On launch it checks for a saved session and
 // auto-rejoins that room, so a returning player skips the username/room entry.
+// Otherwise, until the player has finished or skipped it once, the first-run
+// walkthrough opens over it (src/lib/tutorial.ts).
 export default function Home() {
   const { enterRoom } = useGame();
   const [checking, setChecking] = useState(true);
+  const [walkthrough, setWalkthrough] = useState(false);
 
   useEffect(() => {
     let active = true;
-    loadSession().then((s) => {
+    loadSession().then(async (s) => {
       if (!active) return;
-      if (s) enterRoom(s.room, s.username); // rejoins + syncs into the live round
-      else setChecking(false);
+      if (s) return enterRoom(s.room, s.username); // rejoins + syncs into the live round
+      const done = await tutorialDone();
+      if (!active) return;
+      setWalkthrough(!done);
+      setChecking(false);
     });
     return () => {
       active = false;
     };
   }, []);
+
+  const finishWalkthrough = () => {
+    markTutorialDone();
+    setWalkthrough(false);
+  };
 
   // Same Stage as the real home screen so the pig doesn't jump when the buttons
   // swap in.
@@ -50,11 +62,11 @@ export default function Home() {
           <>
             <PigButton name="Join Game" onPress={() => router.push('/join')} />
             <PigButton name="Create Game" onPress={() => router.push('/create')} />
-            <HowToModal />
           </>
         }
       />
-      <MenuButton />
+      <MenuButton onHowToPlay={() => setWalkthrough(true)} />
+      <Walkthrough visible={walkthrough} onDone={finishWalkthrough} />
     </View>
   );
 }
