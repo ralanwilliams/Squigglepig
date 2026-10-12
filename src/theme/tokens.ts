@@ -32,7 +32,7 @@ export type Theme = {
   button: string;
   buttonPressed: string;
   buttonText: string;
-  link: string; // quiet text actions: Leave game, Learn to Squiggle, stepper arrows
+  link: string; // quiet text actions: Leave game, Skip, stepper arrows, the menu glyphs
 
   placeholder: string; // input placeholder only
   success: string; // correct guess, ready dot

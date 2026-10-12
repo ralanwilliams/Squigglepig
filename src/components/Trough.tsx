@@ -31,7 +31,15 @@ const BUBBLES = [
   { cx: 165, cy: 90, r: 2.0, delay: 400, dur: 3600 },
 ];
 
-export function Trough({ count, target }: { count: number; target: number }) {
+export function Trough({
+  count,
+  target,
+  labels = true,
+}: {
+  count: number;
+  target: number;
+  labels?: boolean; // the "count / target" line and the hint under it (off in the walkthrough)
+}) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   // 0 = brim, 1 = empty (it's the fraction of the cavity the mud is shifted down by).
@@ -121,14 +129,18 @@ export function Trough({ count, target }: { count: number; target: number }) {
         <Path d="M50 41 H350" stroke="#EAC38C" strokeWidth="3" strokeLinecap="round" />
       </Svg>
 
-      <Text style={[styles.count, { fontSize: ui.f(22) }]} maxFontSizeMultiplier={FONT_CAP}>
-        {count} / {target}
-      </Text>
-      <Text style={[styles.sub, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={2}>
-        {remaining > 0
-          ? `${remaining} more and the game starts — anyone can add.`
-          : 'Trough full — starting the game!'}
-      </Text>
+      {labels ? (
+        <>
+          <Text style={[styles.count, { fontSize: ui.f(22) }]} maxFontSizeMultiplier={FONT_CAP}>
+            {count} / {target}
+          </Text>
+          <Text style={[styles.sub, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={2}>
+            {remaining > 0
+              ? `${remaining} more and the game starts — anyone can add.`
+              : 'Trough full — starting the game!'}
+          </Text>
+        </>
+      ) : null}
     </View>
   );
 }
