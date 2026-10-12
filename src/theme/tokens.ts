@@ -43,6 +43,9 @@ export type Theme = {
   // Translucent prompt chips that sit straight on the background.
   chip: string;
   chipBorder: string;
+
+  // Hairline rules drawn straight on the background (the menu drawer).
+  divider: string;
 };
 
 export const light: Theme = {
@@ -76,6 +79,8 @@ export const light: Theme = {
 
   chip: 'rgba(255,255,255,0.55)',
   chipBorder: 'rgba(255,255,255,0.7)',
+
+  divider: 'rgba(33,37,41,0.22)', // text at 22%
 };
 
 export const dark: Theme = {
@@ -109,6 +114,8 @@ export const dark: Theme = {
 
   chip: 'rgba(255,255,255,0.10)',
   chipBorder: 'rgba(255,255,255,0.18)',
+
+  divider: 'rgba(230,237,238,0.22)', // text at 22%
 };
 
 export const themes = { light, dark };

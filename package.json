@@ -1,6 +1,6 @@
 {
   "name": "squigglepig",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/roboto": "^0.4.3",
@@ -38,7 +38,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "expo export -p web"
+    "build:web": "expo export -p web",
+    "licenses": "node scripts/licenses.mjs"
   },
   "private": true
 }

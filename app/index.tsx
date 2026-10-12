@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { Heading } from '../src/components/Heading';
 import { PigButton } from '../src/components/PigButton';
 import { HowToModal } from '../src/components/HowToModal';
+import { MenuButton } from '../src/components/MenuDrawer';
 import { SnoutSecret } from '../src/components/SnoutSecret';
 import { IMAGES } from '../src/assets/assets';
 import { useGame } from '../src/state/GameContext';
@@ -37,19 +39,26 @@ export default function Home() {
   }
 
   return (
-    <Stage
-      focus={
-        <Logo source={IMAGES.home}>
-          <SnoutSecret />
-        </Logo>
-      }
-      actions={
-        <>
-          <PigButton name="Join Game" onPress={() => router.push('/join')} />
-          <PigButton name="Create Game" onPress={() => router.push('/create')} />
-          <HowToModal />
-        </>
-      }
-    />
+    <View style={styles.fill}>
+      <Stage
+        focus={
+          <Logo source={IMAGES.home}>
+            <SnoutSecret />
+          </Logo>
+        }
+        actions={
+          <>
+            <PigButton name="Join Game" onPress={() => router.push('/join')} />
+            <PigButton name="Create Game" onPress={() => router.push('/create')} />
+            <HowToModal />
+          </>
+        }
+      />
+      <MenuButton />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Squigglepig — Help &amp; FAQ</title>
+  <meta name="description" content="How to play Squigglepig, the drawing telephone party game, and answers to common questions.">
+  <link rel="icon" href="logo.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="doc">
+  <!-- https://squigglepig.app/help, linked from the app's menu ("Help & FAQ",
+       src/lib/links.ts HELP_URL). Facts here follow the game: MIN_PLAYERS and
+       the points-to-win range (src/state/GameContext.tsx, app/lobby.tsx) and
+       the stage timers (src/lib/timers.ts). Update them together. -->
+  <main class="doc">
+    <header>
+      <img class="logo" src="logo.png" alt="Squigglepig">
+      <h1>Help &amp; FAQ</h1>
+      <p>Draw squiggles. Get giggles.</p>
+    </header>
+
+    <h2>How to play</h2>
+    <ol>
+      <li>Everyone plays on their own phone, tablet or computer, in the app or at
+        <a href="https://play.squigglepig.app/">play.squigglepig.app</a>. You need at least 3 players.</li>
+      <li>One player taps <b>Create Game</b> and shares the four-letter room code (or the
+        <b>Share Room Link</b> button). Everyone else taps <b>Join Game</b> and enters it.</li>
+      <li>The host picks the points needed to win and starts the game. Everyone adds a few prompts to the trough.</li>
+      <li>Each round you're handed a prompt to <b>draw</b>, then someone else's drawing to <b>guess</b>. Your guess
+        becomes the next player's thing to draw, and so on around the group. Telephone, but with squiggles.</li>
+      <li>When a chain has been round everyone, it's revealed one step at a time. Whoever wrote the original prompt
+        judges each drawing and guess against it, and every match earns its maker a point.</li>
+      <li>The first player to reach the target score wins.</li>
+    </ol>
+
+    <h2>Questions</h2>
+
+    <details>
+      <summary>How many players do I need?</summary>
+      <p>At least 3. There's no set upper limit, but every extra player makes each chain, and each reveal, longer.</p>
+    </details>
+
+    <details>
+      <summary>Does everyone need the app?</summary>
+      <p>No. Players on the app and players in a browser at <a href="https://play.squigglepig.app/">play.squigglepig.app</a>
+        can be in the same room. In a browser you can also add Squigglepig to your home screen so it opens like an app.</p>
+    </details>
+
+    <details>
+      <summary>How do I invite people?</summary>
+      <p>After you create a game, the lobby shows the room code. Read it out, or tap <b>Share Room Link</b> to send an
+        invite through any messaging app. Anyone who taps the link lands on the join screen with the code filled in.</p>
+    </details>
+
+    <details>
+      <summary>How long does a game take?</summary>
+      <p>The host sets the points needed to win, from 1 to 20 (5 by default). Each step is on a timer: 2 minutes to
+        write prompts, 60 seconds to draw, 45 seconds to guess and 60 seconds for the judge to score each chain.</p>
+    </details>
+
+    <details>
+      <summary>How does scoring work?</summary>
+      <p>When a chain is revealed, the player who wrote its original prompt judges every drawing and guess in it. Each
+        one they mark as a match earns a point for the player who made it.</p>
+    </details>
+
+    <details>
+      <summary>What if I run out of time?</summary>
+      <p>Whatever you've drawn or typed when the timer hits zero is sent in for you, so the game keeps moving. An empty
+        canvas or guess is passed on as it is, which can make the next player's turn interesting.</p>
+    </details>
+
+    <details>
+      <summary>How do I draw fine details?</summary>
+      <p>Tap <b>2×</b> on the canvas to zoom in, then slide two fingers to move around. A small map shows which part of
+        the drawing you're looking at. In a browser, scroll with the mouse wheel or trackpad instead.</p>
+    </details>
+
+    <details>
+      <summary>My phone locked or the app closed. Can I get back in?</summary>
+      <p>Yes. Open Squigglepig again and it rejoins your room on its own, as long as the game is still running.</p>
+    </details>
+
+    <details>
+      <summary>What happens if someone leaves?</summary>
+      <p>The game doesn't wait for them; their turns are skipped and everyone else carries on. If the host leaves, the
+        player who has been in the room longest takes over as host.</p>
+    </details>
+
+    <details>
+      <summary>Is anything I draw saved?</summary>
+      <p>No. Drawings, prompts and guesses are passed between the players in your room while you play and are gone when the
+        game ends. There are no accounts. See the
+        <a href="https://sites.google.com/view/squigglepig-privacy-policy/home">privacy policy</a> for the details.</p>
+    </details>
+
+    <details>
+      <summary>Someone in my game is being inappropriate.</summary>
+      <p>Rooms are private, so only people with your room code can join. If someone is making you uncomfortable, leave
+        the room and start a new game with a new code. You can also report them to
+        <a href="mailto:alan@ralanwilliams.com?subject=Squigglepig%20report">alan@ralanwilliams.com</a>; include the room
+        code, the player's name and roughly when it happened. See the <a href="terms">terms of service</a> for what isn't allowed.</p>
+    </details>
+
+    <details>
+      <summary>Something isn't working, or I have an idea.</summary>
+      <p>Tap <b>Send feedback</b> in the app's menu (☰ on the home screen), or email
+        <a href="mailto:alan@ralanwilliams.com?subject=Squigglepig%20feedback">alan@ralanwilliams.com</a>.
+        Say which phone or browser you're using and what happened.</p>
+    </details>
+
+    <footer>
+      <a href="terms">Terms of Service</a> ·
+      <a href="https://sites.google.com/view/squigglepig-privacy-policy/home">Privacy policy</a><br>
+      © 2026 R. Alan Williams. All rights reserved.
+    </footer>
+  </main>
+</body>
+</html>

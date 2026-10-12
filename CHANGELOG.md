@@ -14,6 +14,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Web version can be added to the home screen (Android, iOS, desktop Chrome/Edge) with the Squigglepig icon and opens full-screen
 - Link previews: squigglepig.app, room invite links and play.squigglepig.app show the Squigglepig card in chats and social apps
 - At 2× zoom in a browser, the mouse wheel or a trackpad scroll moves around the canvas
+- Menu on the home screen (☰, top-left) with the app version, Send feedback, Rate this app, Help & FAQ, Privacy Policy, Terms of Service, the developer's website and the copyright line; it follows light / dark mode
+- Open-source licenses screen listing every open-source package in the app with its license type
+- squigglepig.app/help: how to play and answers to common questions
+- squigglepig.app/terms: Terms of Service
+
+### Changed
+- The snout secret's reward opens the developer's CV on ralanwilliams.com instead of saving a copy
+
+### Removed
+- The CV PDF that was bundled with the app
 
 ## [2.1.1] - 2026-10-06
 
