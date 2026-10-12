@@ -3,11 +3,11 @@ import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Countdown, deadlineIn } from './Countdown';
 import { FitBox } from './FitBox';
-import { IMAGES } from '../assets/assets';
+import { IMAGES, artFor, darkInset } from '../assets/assets';
 import { assetSize } from '../lib/assetSize';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
-import { useThemedStyles } from '../theme/theme';
+import { useTheme, useThemedStyles } from '../theme/theme';
 
 // The layout shared by the two "work" screens — drawing and guessing — so that
 // moving from one to the other doesn't feel like a jump. The rail is pinned to
@@ -58,6 +58,8 @@ export function WorkStage({
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const pigArt = artFor(IMAGES.canvasPig, useTheme().name === 'dark');
+  const pigPad = darkInset(IMAGES.canvasPig, pigArt);
 
   // The deadline is fixed here, once per screen: the rail below is rebuilt
   // (and the Countdown remounted) whenever the layout flips between one and
@@ -110,7 +112,17 @@ export function WorkStage({
     <View>
       <View style={[styles.pigRow, { paddingLeft: inset, height: rowH }]}>
         <View style={{ width: pigW, height: rowH, overflow: 'visible' }}>
-          <Image source={IMAGES.canvasPig} style={{ width: pigW, height: pigH }} contentFit="contain" />
+          <Image
+            source={pigArt}
+            style={{
+              width: pigW * (pigPad.width / pigPad.src.width),
+              height: pigH * (pigPad.height / pigPad.src.height),
+              // The dark version's margin (for its border) hangs outside the pig's box.
+              marginLeft: -pigW * (pigPad.x / pigPad.src.width),
+              marginTop: -pigH * (pigPad.y / pigPad.src.height),
+            }}
+            contentFit="fill"
+          />
         </View>
         <View style={[styles.timer, { height: rowH }]}>
           {timeLimit ? <Countdown seconds={timeLimit} until={until} onExpire={expire} size={32} /> : null}

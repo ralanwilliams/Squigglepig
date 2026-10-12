@@ -34,8 +34,8 @@ const NATIVE = Platform.OS !== 'web';
 // painted with the screen's own palette (background, text, link), so it
 // follows light / dark mode like everything else. Nothing scrolls: in two-pane
 // layouts the groups sit in two columns, and the body is a FitBox.
-// `onHowToPlay` replays the first-run walkthrough (Home owns it). The Display
-// group holds the accessibility switches (High contrast, Reduce motion); each
+// `onHowToPlay` replays the first-run walkthrough (Home owns it). The
+// Accessibility group holds the switches (High contrast, Reduce motion); each
 // shows what is in effect — the phone's setting until it is flipped here.
 // With reduced motion the drawer appears and goes without sliding.
 export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
@@ -139,7 +139,7 @@ function MenuDrawer({
       : [{ icon: 'star', label: 'Rate this app', onPress: rate, trailing: 'external' } as Row]),
     { icon: 'help', label: 'Help & FAQ', onPress: () => open(HELP_URL), trailing: 'external' },
   ];
-  const display: Row[] = [
+  const accessibility: Row[] = [
     { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },
     { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
   ];
@@ -235,7 +235,7 @@ function MenuDrawer({
                 <View style={[styles.columns, { gap: ui.gap }]}>
                   <View style={[styles.column, { gap: ui.sp(12) }]}>
                     {section('Support', support)}
-                    {section('Display', display)}
+                    {section('Accessibility', accessibility)}
                   </View>
                   <View style={[styles.column, { gap: ui.sp(12) }]}>
                     {section('Legal', legal)}
@@ -259,7 +259,7 @@ function MenuDrawer({
               <FitBox style={styles.flex} align="top">
                 <View style={{ gap: ui.sp(12) }}>
                   {section('Support', support)}
-                  {section('Display', display)}
+                  {section('Accessibility', accessibility)}
                   {section('Legal', legal)}
                   {section('Developer', developer)}
                 </View>

@@ -108,12 +108,9 @@ export function ThemeToggle({ size = 26 }: { size?: number }) {
 // Floats the toggle over every screen, in the header band's top-right corner:
 // vertically centred on a one-line title, its icon flush with the band's
 // horizontal padding. Stage reserves that corner so header text never runs
-// underneath it (whether or not the toggle is showing, so nothing shifts
-// when dark mode is unlocked).
+// underneath it.
 export function ThemeToggleOverlay() {
   const ui = useUi();
-  const { unlocked } = useThemeMode();
-  if (!unlocked) return null;
   return (
     <View
       pointerEvents="box-none"

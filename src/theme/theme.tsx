@@ -17,18 +17,12 @@ type ThemeName = 'light' | 'dark';
 //              "High contrast text", a browser's prefers-contrast: more);
 //   motion   — Reduce motion: the theme flips without the wipe, and the
 //              walkthrough, toggle glyph and trough rest on still frames.
-// Neither is locked like dark mode: high contrast works on the light palette.
 export type ContrastMode = 'system' | 'normal' | 'high';
 export type MotionMode = 'system' | 'full' | 'reduced';
 
 const STORAGE_KEY = 'squigglepig.theme';
 const CONTRAST_KEY = 'squigglepig.contrast';
 const MOTION_KEY = 'squigglepig.motion';
-// Dark mode is not ready to ship, so it is hidden until unlocked: while
-// locked the app is always light (whatever the device or a pinned mode says)
-// and the toggle is not shown. Typing "activate dark mode" as the username on
-// the create-game screen unlocks it (app/create.tsx); the unlock persists.
-const UNLOCK_KEY = 'squigglepig.theme.unlocked';
 const WIPE_MS = 700; // the sweep
 const FLIP_AT_MS = 90; // how far into the sweep the palette flips under the photo
 const EDGE = 0.18; // soft leading edge, as a share of the screen height
@@ -42,8 +36,6 @@ type ThemeCtx = {
   showing: ThemeName;
   setMode: (mode: ThemeMode) => void;
   toggle: () => void; // light <-> dark, relative to what's showing now
-  unlocked: boolean; // whether dark mode is available at all (see UNLOCK_KEY)
-  setUnlocked: (on: boolean) => void;
   contrast: ContrastMode;
   highContrast: boolean; // what is showing: the pinned setting, else the OS
   setContrast: (c: ContrastMode) => void;
@@ -111,19 +103,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const osHighContrast = useOsHighContrast();
   const osReduceMotion = useOsReduceMotion();
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const [unlocked, setUnlockedState] = useState(false);
   const [contrast, setContrastState] = useState<ContrastMode>('system');
   const [motion, setMotionState] = useState<MotionMode>('system');
   const [loaded, setLoaded] = useState(false);
 
-  // Restore the pinned mode (and the unlock) before the first frame so a
+  // Restore the pinned settings before the first frame so a
   // dark-mode player never sees a teal flash at launch (the splash screen
   // covers the wait).
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, UNLOCK_KEY, CONTRAST_KEY, MOTION_KEY])
-      .then(([[, v], [, u], [, c], [, m]]) => {
+    AsyncStorage.multiGet([STORAGE_KEY, CONTRAST_KEY, MOTION_KEY])
+      .then(([[, v], [, c], [, m]]) => {
         if (v === 'light' || v === 'dark') setModeState(v);
-        setUnlockedState(u === '1');
         if (c === 'normal' || c === 'high') setContrastState(c);
         if (m === 'full' || m === 'reduced') setMotionState(m);
       })
@@ -131,8 +121,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoaded(true));
   }, []);
 
-  const chosen: ThemeName = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
-  const name: ThemeName = unlocked ? chosen : 'light';
+  const name: ThemeName = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const highContrast = contrast === 'system' ? osHighContrast : contrast === 'high';
   const reducedMotion = motion === 'system' ? osReduceMotion : motion === 'reduced';
   const theme = themes[name][highContrast ? 'high' : 'normal'];
@@ -140,11 +129,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m);
     AsyncStorage.setItem(STORAGE_KEY, m).catch(() => {});
-  }, []);
-
-  const setUnlocked = useCallback((on: boolean) => {
-    setUnlockedState(on);
-    AsyncStorage.setItem(UNLOCK_KEY, on ? '1' : '0').catch(() => {});
   }, []);
 
   const setContrast = useCallback((c: ContrastMode) => {
@@ -203,8 +187,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       showing: pending ?? name,
       setMode,
       toggle,
-      unlocked,
-      setUnlocked,
       contrast,
       highContrast,
       setContrast,
@@ -213,7 +195,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setMotion,
     }),
     [
-      theme, mode, pending, name, setMode, toggle, unlocked, setUnlocked,
+      theme, mode, pending, name, setMode, toggle,
       contrast, highContrast, setContrast, motion, reducedMotion, setMotion,
     ]
   );
