@@ -65,11 +65,11 @@ export default function RoundOne() {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   label: {
-    color: t.accent,
+    color: t.overlayLabel,
     fontFamily: font.bold,
     textAlign: 'center',
     letterSpacing: 0.5,
   },
-  card: { backgroundColor: t.overlay },
+  card: { backgroundColor: t.overlay, borderWidth: t.edge, borderColor: t.overlayBorder },
   prompt: { color: t.overlayText, fontFamily: font.medium, textAlign: 'center' },
 });

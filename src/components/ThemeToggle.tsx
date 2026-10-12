@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Mask, Path, Rect } from 'react-native-svg';
 import { glyph } from '../theme/tokens';
-import { useThemeMode } from '../theme/theme';
+import { useReducedMotion, useThemeMode } from '../theme/theme';
 import { useUi } from '../theme/responsive';
 
 // The dark-mode switch: one amber glyph in the top-right corner. A sun with
@@ -12,7 +12,8 @@ import { useUi } from '../theme/responsive';
 // screen follows with the wipe in ThemeProvider (night rises from the bottom,
 // day comes down from the top). Same amber on both palettes, so it reads as a
 // sun and a moon rather than as text. Sized from the UI
-// scale, 44dp hit target.
+// scale, 44dp hit target. With reduced motion it jumps straight to the other
+// glyph.
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedG = Animated.createAnimatedComponent(G);
 
@@ -32,12 +33,17 @@ const NO_NATIVE = { useNativeDriver: false }; // SVG attributes can't go through
 export function ThemeToggle({ size = 26 }: { size?: number }) {
   const ui = useUi();
   const { showing, toggle } = useThemeMode();
+  const reduced = useReducedMotion();
   const dark = showing === 'dark';
 
   const t = useRef(new Animated.Value(dark ? 1 : 0)).current;
   const starA = useRef(new Animated.Value(dark ? 1 : 0)).current;
   const starB = useRef(new Animated.Value(dark ? 1 : 0)).current;
   useEffect(() => {
+    if (reduced) {
+      [t, starA, starB].forEach((v) => v.setValue(dark ? 1 : 0));
+      return;
+    }
     Animated.timing(t, { toValue: dark ? 1 : 0, duration: MORPH_MS, easing: Easing.out(Easing.cubic), ...NO_NATIVE }).start();
     // in: pop with a little overshoot, once the crescent has formed; out: a plain quick shrink
     const pop = (v: Animated.Value, delay: number) =>
@@ -46,7 +52,8 @@ export function ThemeToggle({ size = 26 }: { size?: number }) {
         : Animated.timing(v, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), ...NO_NATIVE });
     pop(starA, 300).start();
     pop(starB, 420).start();
-  }, [dark, t, starA, starB]);
+  }, [dark, reduced, t, starA, starB]);
+
 
   const disc = t.interpolate({ inputRange: [0, 1], outputRange: [5, 8.5] });
   const discX = t.interpolate({ inputRange: [0, 1], outputRange: [12, 11.5] });

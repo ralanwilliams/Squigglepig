@@ -99,7 +99,7 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
-    card: { width: '100%', backgroundColor: t.overlay },
+    card: { width: '100%', backgroundColor: t.overlay, borderWidth: t.edge, borderColor: t.overlayBorder },
     quote: { color: t.overlayLabel, fontFamily: font.bold, textAlign: 'center', letterSpacing: 0.3 },
     text: { color: t.overlayText, fontFamily: font.regular, textAlign: 'center' },
   });

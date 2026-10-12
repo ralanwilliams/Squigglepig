@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Trough } from './Trough';
-import { canvas, font, type Theme } from '../theme/tokens';
-import { useTheme, useThemedStyles } from '../theme/theme';
+import { canvas, font, verdict, type Theme } from '../theme/tokens';
+import { useReducedMotion, useTheme, useThemedStyles } from '../theme/theme';
 
 // The first-run walkthrough's illustrations (src/components/Walkthrough.tsx):
 // one looping animation per step, built from the game's own pieces (phones,
@@ -15,8 +15,8 @@ import { useTheme, useThemedStyles } from '../theme/theme';
 // its pane, so the coordinates below are the same on every device. Each scene
 // runs off ONE value, t, looping 0 → 1; every element is an interpolation of
 // it, so a scene is a timeline: 0 – 0.9 plays, 0.9 – 0.98 fades out, repeat.
-// With the OS "reduce motion" setting on, t is parked on a still frame that
-// shows the whole idea and nothing moves.
+// With reduced motion on (the OS setting, or the menu's), t is parked on a
+// still frame that shows the whole idea and nothing moves.
 
 const W = 320;
 const H = 220;
@@ -38,18 +38,9 @@ const pop = (t: T, a: number, d = 0.08) =>
 const sceneOpacity = (t: T) =>
   t.interpolate({ inputRange: [0, 0.03, 0.9, 0.98, 1], outputRange: [0, 1, 1, 0, 0] });
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduced).catch(() => {});
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
-    return () => sub.remove();
-  }, []);
-  return reduced;
-}
 
 // The scene's clock: loops 0 → 1 over `ms`, or rests on `still` when the
-// player has reduced motion turned on.
+// player has reduced motion on.
 function useLoop(ms: number, still: number) {
   const t = useRef(new Animated.Value(0)).current;
   const reduced = useReducedMotion();
@@ -399,7 +390,7 @@ const makeStyles = (t: Theme) =>
       paddingHorizontal: 8,
       borderRadius: 16,
       backgroundColor: t.surface,
-      borderWidth: 1,
+      borderWidth: Math.max(1, t.edge),
       borderColor: t.surfaceBorder,
       alignItems: 'center',
       justifyContent: 'center',
@@ -439,9 +430,10 @@ const makeStyles = (t: Theme) =>
     arrow: { width: STEP - CELL, height: 112, alignItems: 'center', justifyContent: 'flex-end' },
     judge: { position: 'absolute', left: 0, right: 0, top: 158, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
     badge: { position: 'absolute', width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-    yes: { backgroundColor: t.success },
-    no: { backgroundColor: t.danger },
-    badgeText: { color: '#fff', fontSize: 15, fontWeight: '700', lineHeight: 18 },
+    yes: { backgroundColor: verdict.yes },
+    no: { backgroundColor: verdict.no },
+    badgeText: { color: verdict.mark, fontSize: 15, fontWeight: '700', lineHeight: 18 },
+
     plus: { position: 'absolute', fontSize: 18, fontWeight: '700', color: t.accent },
     trophy: { position: 'absolute', left: 0, right: 0, top: 146, textAlign: 'center', fontSize: 46, lineHeight: 58 },
   });

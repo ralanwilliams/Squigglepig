@@ -119,12 +119,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: t.chip,
-    borderWidth: 1,
+    borderWidth: Math.max(1, t.edge),
     borderColor: t.chipBorder,
   },
   chipGhost: { backgroundColor: 'transparent', borderStyle: 'dashed' },
   chipText: { color: t.text, fontFamily: font.medium },
-  chipGhostText: { color: t.link, opacity: 0.6 },
+  chipGhostText: { color: t.textMuted },
   you: {
     color: t.accentText,
     backgroundColor: t.accent,
@@ -134,5 +134,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingVertical: 2,
     overflow: 'hidden',
   },
-  empty: { color: t.text, opacity: 0.6, fontFamily: font.regular, textAlign: 'center' },
+  empty: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
 });

@@ -37,6 +37,18 @@ const GLYPHS = {
       <Path d="M3 12h18M12 3c2.4 2.6 3.6 5.6 3.6 9s-1.2 6.4-3.6 9c-2.4-2.6-3.6-5.6-3.6-9S9.6 5.6 12 3z" />
     </>
   ),
+  contrast: (
+    <>
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M12 3v18M12 7.5h5M12 11h6.6M12 14.5h6.3M12 18h4" />
+    </>
+  ),
+  motion: (
+    <>
+      <Circle cx="16.5" cy="12" r="4.5" />
+      <Path d="M3 8.5h7M2 12h6M3 15.5h7" />
+    </>
+  ),
   chevron: <Path d="M9 6l6 6-6 6" />, // opens a screen in the app
   external: <Path d="M14 4h6v6M20 4l-8.5 8.5M18 14v6H4V6h6" />, // leaves the app
 };

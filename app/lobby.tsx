@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { PigButton } from '../src/components/PigButton';
@@ -9,13 +10,21 @@ import { IMAGES } from '../src/assets/assets';
 import { useGame, MIN_PLAYERS } from '../src/state/GameContext';
 import { roomLink } from '../src/lib/links';
 import { font, type Theme } from '../src/theme/tokens';
-import { useThemedStyles } from '../src/theme/theme';
+import { useTheme, useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
 import { DevPanel } from '../src/dev'; // local-only tooling (src/dev/local is gitignored)
 
 // A small, fixed palette for player avatars; the color is picked deterministically
-// from the name so a given player always keeps the same one.
-const AVATAR_COLORS = ['#DB7093', '#4EA8DE', '#F4A259', '#6A4C93', '#2A9D8F', '#E76F51'];
+// from the name so a given player always keeps the same one. Each carries the
+// ink its initial is drawn in — white only where white is readable (4.5:1+).
+const AVATAR_COLORS = [
+  { bg: '#DB7093', ink: '#212529' },
+  { bg: '#4EA8DE', ink: '#212529' },
+  { bg: '#F4A259', ink: '#212529' },
+  { bg: '#6A4C93', ink: '#ffffff' },
+  { bg: '#2A9D8F', ink: '#212529' },
+  { bg: '#E76F51', ink: '#212529' },
+];
 const initialOf = (name: string) => {
   const m = name.match(/[a-z0-9]/i); // skip a leading emoji/space so names like "🤖 Piggo" show a letter
   return (m ? m[0] : name.trim()[0] ?? '?').toUpperCase();
@@ -25,6 +34,34 @@ const colorFor = (name: string) => {
   for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % AVATAR_COLORS.length;
   return AVATAR_COLORS[h];
 };
+
+// The connection light beside the banner. Never color alone: connected is a
+// filled dot with a ✓, connecting a hollow ring, and a problem a filled dot
+// with a !. The mark is cut in the screen's background color.
+type Link = 'ok' | 'connecting' | 'problem';
+function StatusDot({ state, size }: { state: Link; size: number }) {
+  const t = useTheme();
+  const fill = state === 'ok' ? t.success : t.accent;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" accessibilityElementsHidden importantForAccessibility="no">
+      {state === 'connecting' ? (
+        <Circle cx="8" cy="8" r="6" fill="none" stroke={fill} strokeWidth="2.5" />
+      ) : (
+        <>
+          <Circle cx="8" cy="8" r="8" fill={fill} />
+          <Path
+            d={state === 'ok' ? 'M4.6 8.3l2.2 2.2 4.6-4.8' : 'M8 4.2v4.6M8 11.6v.1'}
+            stroke={t.background}
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </>
+      )}
+    </Svg>
+  );
+}
 
 // In a browser on a phone or tablet the share button opens the system share
 // sheet (navigator.share), as in the app. Desktop browsers either have no share
@@ -64,6 +101,7 @@ export default function Lobby() {
 
   const canStart = players.length >= MIN_PLAYERS;
   const connected = status === 'connected';
+  const link: Link = connected ? 'ok' : status === 'connecting' ? 'connecting' : 'problem';
 
   const banner =
     status === 'no-keys'
@@ -81,13 +119,7 @@ export default function Lobby() {
 
   const header = (
     <View style={[styles.headerRow, { gap: ui.sp(8) }]}>
-      <View
-        style={[
-          styles.dot,
-          { width: ui.sp(8), height: ui.sp(8), borderRadius: ui.sp(4) },
-          connected ? styles.dotOk : styles.dotWarn,
-        ]}
-      />
+      <StatusDot state={link} size={ui.sp(14)} />
       <Text
         style={[styles.status, { fontSize: ui.f(13) }, connected ? styles.ok : styles.warn]}
         maxFontSizeMultiplier={FONT_CAP}
@@ -177,10 +209,10 @@ export default function Lobby() {
               <View
                 style={[
                   styles.avatar,
-                  { width: avatar, height: avatar, borderRadius: avatar / 2, backgroundColor: colorFor(p) },
+                  { width: avatar, height: avatar, borderRadius: avatar / 2, backgroundColor: colorFor(p).bg },
                 ]}
               >
-                <Text style={[styles.avatarText, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
+                <Text style={[styles.avatarText, { fontSize: ui.f(12), color: colorFor(p).ink }]} maxFontSizeMultiplier={FONT_CAP}>
                   {initialOf(p)}
                 </Text>
               </View>
@@ -220,17 +252,18 @@ export default function Lobby() {
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  // Header: a live status dot + the connection banner.
+  // Header: a live status dot + the connection banner. The banner is in plain
+  // text colors (the pink is too light for small text on the teal); the dot
+  // and the banner's own ⚠ carry the warning.
   headerRow: { flexDirection: 'row', alignItems: 'center' },
-  dot: {},
-  dotOk: { backgroundColor: t.success },
-  dotWarn: { backgroundColor: t.accent },
   status: { flex: 1, fontFamily: font.regular },
   ok: { color: t.link },
-  warn: { color: t.accent },
+  warn: { color: t.text },
 
   card: {
     backgroundColor: t.surface,
+    borderWidth: t.edge,
+    borderColor: t.surfaceBorder,
     shadowColor: t.shadow,
     shadowOpacity: 0.16,
     shadowRadius: 16,
@@ -281,7 +314,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   playersCount: { fontFamily: font.bold, color: t.textMuted },
   playerRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: t.accentText, fontFamily: font.bold },
+  avatarText: { fontFamily: font.bold },
+
   playerName: { flex: 1, fontFamily: font.medium, color: t.surfaceText },
   hostBadge: {
     fontFamily: font.bold,

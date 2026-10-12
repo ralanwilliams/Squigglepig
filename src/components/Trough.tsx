@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { font, type Theme } from '../theme/tokens';
-import { useThemedStyles } from '../theme/theme';
+import { useReducedMotion, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 
 // The trough: a pig trough filling with mud, one step per pooled prompt. Pure
@@ -11,6 +11,8 @@ import { FONT_CAP, useUi } from '../theme/responsive';
 //   - the mud level eases to count / target
 //   - two wave layers drift in opposite directions so the surface never sits still
 //   - a few bubbles rise now and then
+// With reduced motion the mud steps straight to its level and lies flat:
+// no waves, no bubbles.
 
 const AnimatedG = Animated.createAnimatedComponent(G);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -47,18 +49,29 @@ export function Trough({
   const wave = useRef(new Animated.Value(0)).current;
   const waveBack = useRef(new Animated.Value(-80)).current;
   const bubbles = useRef(BUBBLES.map(() => new Animated.Value(0))).current;
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const fill = target > 0 ? Math.min(1, count / target) : 0;
+    if (reduced) {
+      empty.setValue(1 - fill);
+      return;
+    }
     Animated.timing(empty, {
       toValue: 1 - fill,
       duration: 800,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [count, target, empty]);
+  }, [count, target, empty, reduced]);
 
   useEffect(() => {
+    if (reduced) {
+      wave.setValue(0);
+      waveBack.setValue(-80);
+      bubbles.forEach((b) => b.setValue(0));
+      return;
+    }
     const linear = { easing: Easing.linear, useNativeDriver: false };
     const loops = [
       Animated.loop(Animated.timing(wave, { toValue: -80, duration: 2800, ...linear })),
@@ -75,7 +88,8 @@ export function Trough({
     ];
     loops.forEach((l) => l.start());
     return () => loops.forEach((l) => l.stop());
-  }, [wave, waveBack, bubbles]);
+  }, [wave, waveBack, bubbles, reduced]);
+
 
   const levelY = empty.interpolate({ inputRange: [0, 1], outputRange: [0, CAVITY_H] });
   const remaining = Math.max(0, target - count);

@@ -8,33 +8,46 @@ import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { useGame } from '../src/state/GameContext';
 import { TIMERS } from '../src/lib/timers';
-import { font, layout, type Theme } from '../src/theme/tokens';
-import { useTheme, useThemedStyles } from '../src/theme/theme';
+import { font, layout, verdict, type Theme } from '../src/theme/tokens';
+import { useReducedMotion, useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
 
 // A big ✓/✗ that springs in over a cell the moment it's ruled. Because it mounts
-// when the ruling first appears, every player's screen animates it in sync.
+// when the ruling first appears, every player's screen animates it in sync
+// (with reduced motion it is simply there). It is a solid disc with a white
+// mark in the fixed verdict colors, so it reads the same over a drawing's white
+// paper, a caption bubble or the screen, in every palette; the mark — not the
+// color — says which it is.
 function RuleBadge({ correct, size }: { correct: boolean; size: number }) {
-  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const a = useRef(new Animated.Value(0)).current;
+  const reduced = useReducedMotion();
+  const a = useRef(new Animated.Value(reduced ? 1 : 0)).current;
   useEffect(() => {
+    if (reduced) return;
     Animated.spring(a, { toValue: 1, useNativeDriver: true, friction: 5, tension: 90 }).start();
-  }, [a]);
+  }, [a, reduced]);
+  const disc = Math.round(size * 1.1);
   return (
     <Animated.View
       pointerEvents="none"
+      accessible
+      accessibilityLabel={correct ? 'Match' : 'No match'}
       style={[
         styles.badge,
         { opacity: a, transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] },
       ]}
     >
-      <Text
-        style={[styles.badgeText, { fontSize: size, lineHeight: size, color: correct ? theme.success : theme.danger }]}
-        maxFontSizeMultiplier={1}
+      <View
+        style={[
+          styles.disc,
+          { width: disc, height: disc, borderRadius: disc / 2, borderWidth: Math.max(2, Math.round(disc * 0.05)) },
+          { backgroundColor: correct ? verdict.yes : verdict.no },
+        ]}
       >
-        {correct ? '✓' : '✗'}
-      </Text>
+        <Text style={[styles.badgeText, { fontSize: size * 0.7, lineHeight: size * 0.8 }]} maxFontSizeMultiplier={1}>
+          {correct ? '✓' : '✗'}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
@@ -114,7 +127,7 @@ export default function Reveal() {
         {ruled !== undefined && <RuleBadge correct={ruled} size={badge} />}
       </View>
       <Text style={[styles.awarded, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
-        {ruled === true && frontier?.author ? `+1 ${frontier.author}` : ' '}
+        {ruled === true && frontier?.author ? `✓ +1 ${frontier.author}` : ' '}
       </Text>
     </View>
   );
@@ -205,7 +218,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   bad: { opacity: 0.5 },
   bubble: {
     backgroundColor: t.surface,
-    borderWidth: 1,
+    borderWidth: Math.max(1, t.edge),
     borderColor: t.surfaceBorder,
   },
   bubbleText: { color: t.surfaceText, fontFamily: font.medium, textAlign: 'center' },
@@ -219,17 +232,27 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  disc: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    // A white ring lifts the disc off the drawing's ink and off the screen.
+    borderColor: verdict.mark,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
   badgeText: {
+    color: verdict.mark,
     textAlign: 'center',
     textAlignVertical: 'center',
     includeFontPadding: false,
     fontFamily: font.bold,
-    // A pale halo so the badge reads over the ink of a drawing (always white paper).
-    textShadowColor: 'rgba(255,255,255,0.9)',
-    textShadowRadius: 8,
   },
   progress: { alignItems: 'center' },
-  darkCard: { backgroundColor: t.overlay },
+  darkCard: { backgroundColor: t.overlay, borderWidth: t.edge, borderColor: t.overlayBorder },
+
   label: { color: t.overlayLabel, fontFamily: font.bold, textAlign: 'center', letterSpacing: 0.5 },
   promptText: { color: t.overlayText, fontFamily: font.medium, textAlign: 'center' },
   votes: { flexDirection: 'row' },
