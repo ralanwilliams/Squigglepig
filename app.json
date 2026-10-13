@@ -10,7 +10,10 @@
     "backgroundColor": "#4ECDC4",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.squigglepig.app"
+      "bundleIdentifier": "com.squigglepig.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.squigglepig.app",
@@ -24,8 +27,17 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "https", "host": "squigglepig.app", "pathPrefix": "/join" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "https",
+              "host": "squigglepig.app",
+              "pathPrefix": "/join"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "permissions": [
