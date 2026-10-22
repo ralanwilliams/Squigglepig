@@ -49,6 +49,7 @@ const GLYPHS = {
       <Path d="M3 8.5h7M2 12h6M3 15.5h7" />
     </>
   ),
+  season: <Path d="M4 6h16v14H4zM4 10h16M8 3.5v4M16 3.5v4M12 12.6l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z" />, // a calendar with a star
   chevron: <Path d="M9 6l6 6-6 6" />, // opens a screen in the app
   external: <Path d="M14 4h6v6M20 4l-8.5 8.5M18 14v6H4V6h6" />, // leaves the app
 };

@@ -32,6 +32,11 @@ const DARK = new Map<number, number>([
   [IMAGES.canvasPig, require('./images/canvas_pig_dark.png')],
 ]);
 
+// Which artwork a source is, by its IMAGES name (seasonal skins place their
+// props by name; src/theme/skins).
+const NAMES = new Map(Object.entries(IMAGES).map(([name, mod]) => [mod as number, name as keyof typeof IMAGES]));
+export const artName = (source: number) => NAMES.get(source);
+
 // The version of an image to show on the given palette (images without a
 // dark version, like the app icon, come back unchanged).
 export const artFor = (source: number, dark: boolean): number => (dark ? DARK.get(source) ?? source : source);

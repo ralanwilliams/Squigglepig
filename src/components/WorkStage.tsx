@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Countdown, deadlineIn } from './Countdown';
 import { FitBox } from './FitBox';
+import { SkinDecor } from './SkinDecor';
 import { IMAGES, artFor, darkInset } from '../assets/assets';
 import { assetSize } from '../lib/assetSize';
 import { useUi } from '../theme/responsive';
@@ -112,6 +113,9 @@ export function WorkStage({
     <View>
       <View style={[styles.pigRow, { paddingLeft: inset, height: rowH }]}>
         <View style={{ width: pigW, height: rowH, overflow: 'visible' }}>
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: pigW, height: pigH }}>
+            <SkinDecor art="canvasPig" width={pigW} height={pigH} layer="behind" />
+          </View>
           <Image
             source={pigArt}
             style={{
@@ -123,6 +127,9 @@ export function WorkStage({
             }}
             contentFit="fill"
           />
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: pigW, height: pigH }}>
+            <SkinDecor art="canvasPig" width={pigW} height={pigH} />
+          </View>
         </View>
         <View style={[styles.timer, { height: rowH }]}>
           {timeLimit ? <Countdown seconds={timeLimit} until={until} onExpire={expire} size={32} /> : null}

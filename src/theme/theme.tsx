@@ -1,9 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, View, useColorScheme, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Easing, Platform, StyleSheet, View, useColorScheme, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { themes, type Theme } from './tokens';
+import { paletteFor, skinFor, type Birthday, type Skin } from './skins';
+import { BIRTHDAYS_KEY, fetchBirthdays, parseBirthdays } from '../lib/birthdays';
 
 // Which palette the app shows. 'system' follows the device setting (app.json
 // sets userInterfaceStyle "automatic" so we're told about it); the in-app
@@ -17,12 +19,15 @@ type ThemeName = 'light' | 'dark';
 //              "High contrast text", a browser's prefers-contrast: more);
 //   motion   — Reduce motion: the theme flips without the wipe, and the
 //              walkthrough, toggle glyph and trough rest on still frames.
+// A third, `seasonal`, is the app's own: the seasonal skin (src/theme/skins)
+// shows by date unless the player turns it off there. It is on by default.
 export type ContrastMode = 'system' | 'normal' | 'high';
 export type MotionMode = 'system' | 'full' | 'reduced';
 
 const STORAGE_KEY = 'squigglepig.theme';
 const CONTRAST_KEY = 'squigglepig.contrast';
 const MOTION_KEY = 'squigglepig.motion';
+const SEASONAL_KEY = 'squigglepig.seasonal';
 const WIPE_MS = 700; // the sweep
 const FLIP_AT_MS = 90; // how far into the sweep the palette flips under the photo
 const EDGE = 0.18; // soft leading edge, as a share of the screen height
@@ -42,6 +47,9 @@ type ThemeCtx = {
   motion: MotionMode;
   reducedMotion: boolean; // likewise
   setMotion: (m: MotionMode) => void;
+  seasonal: boolean;
+  setSeasonal: (on: boolean) => void;
+  skin: Skin | null; // the seasonal skin showing, if any
 };
 
 type Wipe = { uri: string; to: ThemeName };
@@ -98,6 +106,36 @@ function useOsReduceMotion() {
   return useOsFlag(AccessibilityInfo.isReduceMotionEnabled, 'reduceMotionChanged', '(prefers-reduced-motion: reduce)');
 }
 
+// The skin in season today: a birthday from the Supabase list, else a
+// holiday. The date is checked again, and the list fetched again, whenever
+// the app comes back to the foreground, so a phone left on the lobby
+// overnight changes with the date and a newly added birthday shows up.
+// `saved` is the list kept on the phone (read with the other settings, before
+// the first frame); a fetched list replaces it.
+function useSeasonSkin(saved: Birthday[] | null) {
+  const [today, setToday] = useState(() => new Date());
+  const [fetched, setFetched] = useState<Birthday[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    const refresh = () =>
+      fetchBirthdays().then((list) => {
+        if (live && list) setFetched(list);
+      });
+    refresh();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active') return;
+      setToday(new Date());
+      refresh();
+    });
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, []);
+  const birthdays = fetched ?? saved;
+  return useMemo(() => skinFor(today, birthdays ?? []), [today, birthdays]);
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
   const osHighContrast = useOsHighContrast();
@@ -105,17 +143,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('system');
   const [contrast, setContrastState] = useState<ContrastMode>('system');
   const [motion, setMotionState] = useState<MotionMode>('system');
+  const [seasonal, setSeasonalState] = useState(true);
+  const [savedBirthdays, setSavedBirthdays] = useState<Birthday[] | null>(null);
+  const season = useSeasonSkin(savedBirthdays);
   const [loaded, setLoaded] = useState(false);
 
   // Restore the pinned settings before the first frame so a
   // dark-mode player never sees a teal flash at launch (the splash screen
   // covers the wait).
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, CONTRAST_KEY, MOTION_KEY])
-      .then(([[, v], [, c], [, m]]) => {
+    AsyncStorage.multiGet([STORAGE_KEY, CONTRAST_KEY, MOTION_KEY, SEASONAL_KEY, BIRTHDAYS_KEY])
+      .then(([[, v], [, c], [, m], [, z], [, b]]) => {
         if (v === 'light' || v === 'dark') setModeState(v);
         if (c === 'normal' || c === 'high') setContrastState(c);
         if (m === 'full' || m === 'reduced') setMotionState(m);
+        if (z === 'off') setSeasonalState(false);
+        setSavedBirthdays(parseBirthdays(b));
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -124,7 +167,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const name: ThemeName = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const highContrast = contrast === 'system' ? osHighContrast : contrast === 'high';
   const reducedMotion = motion === 'system' ? osReduceMotion : motion === 'reduced';
-  const theme = themes[name][highContrast ? 'high' : 'normal'];
+  const skin = seasonal ? season : null;
+  const theme = paletteFor(skin, name, highContrast);
 
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m);
@@ -139,6 +183,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setMotion = useCallback((m: MotionMode) => {
     setMotionState(m);
     AsyncStorage.setItem(MOTION_KEY, m).catch(() => {});
+  }, []);
+
+  const setSeasonal = useCallback((on: boolean) => {
+    setSeasonalState(on);
+    AsyncStorage.setItem(SEASONAL_KEY, on ? 'on' : 'off').catch(() => {});
   }, []);
 
   // The transition: the OLD screen is photographed
@@ -193,10 +242,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       motion,
       reducedMotion,
       setMotion,
+      seasonal,
+      setSeasonal,
+      skin,
     }),
     [
       theme, mode, pending, name, setMode, toggle,
       contrast, highContrast, setContrast, motion, reducedMotion, setMotion,
+      seasonal, setSeasonal, skin,
     ]
   );
   const wipeValue = useMemo(() => ({ shotRef, size, setSize, wipe, onReady, onDone }), [size, wipe, onReady, onDone]);
@@ -318,6 +371,11 @@ export function useReducedMotion(): boolean {
   return ctx ? ctx.reducedMotion : os;
 }
 
+// The seasonal skin showing, if any (null outside the provider).
+export function useSkin(): Skin | null {
+  return useContext(Ctx)?.skin ?? null;
+}
+
 export function useThemeMode(): ThemeCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useThemeMode needs a <ThemeProvider> above it');
@@ -330,7 +388,8 @@ export function useThemeMode(): ThemeCtx {
 //   ...
 //   const styles = useThemedStyles(makeStyles);
 //
-// `factory` is a module-level constant and there are only four themes, so the
+// `factory` is a module-level constant and there are only a handful of
+// palettes (four, plus each skin's light and dark), each built once, so the
 // memo hits every render after the first for a given palette.
 
 export function useThemedStyles<T>(factory: (t: Theme) => T): T {
