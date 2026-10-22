@@ -21,7 +21,8 @@ export type Tier = 'common' | 'rare';
 // The kinds, in the order the Rewards screen lists them. `pick` is how an
 // owned reward is used:
 //   one — the player chooses one to wear or show (a theme, an outfit), and the
-//         inventory remembers the choice;
+//         inventory remembers the choice; `none` names the default, what
+//         shows with nothing chosen;
 //   any — every one owned is available at once (brush colors, sticker packs),
 //         chosen in the moment.
 // An outfit and a speech bubble dress the player's own pig: when they win a
@@ -29,12 +30,12 @@ export type Tier = 'common' | 'rare';
 // pig), saying what they wrote in the bubble (inventory.tsx bubbleText). No
 // bubble is free: a player without one won shows none.
 export const KINDS = {
-  theme: { label: 'Themes', glyph: 'palette', pick: 'one' },
+  theme: { label: 'Themes', glyph: 'palette', pick: 'one', none: 'Classic' },
   brush: { label: 'Brushes', glyph: 'brush', pick: 'any' },
   sticker: { label: 'Stickers', glyph: 'sticker', pick: 'any' },
-  outfit: { label: 'Outfits', glyph: 'hat', pick: 'one' },
-  bubble: { label: 'Speech bubbles', glyph: 'bubble', pick: 'one' },
-} as const satisfies Record<string, { label: string; glyph: GlyphName; pick: 'one' | 'any' }>;
+  outfit: { label: 'Outfits', glyph: 'hat', pick: 'one', none: 'No outfit' },
+  bubble: { label: 'Speech bubbles', glyph: 'bubble', pick: 'one', none: 'No bubble' },
+} as const satisfies Record<string, { label: string; glyph: GlyphName; pick: 'one' | 'any'; none?: string }>;
 
 export type Kind = keyof typeof KINDS;
 
@@ -58,8 +59,9 @@ export const BUBBLE_MAX = 24;
 // Each kind's list, without its `kind` (added below).
 type Entry<R extends Reward> = Omit<R, 'kind'>;
 
+// Each one's art is a skin in src/theme/skins (index.ts UNLOCKABLE).
 const THEMES: Entry<ThemeReward>[] = [
-  { id: 'theme.railroad', label: 'Railroad', tier: 'rare', soon: true },
+  { id: 'theme.railroad', label: 'Railroad', tier: 'rare' }, // src/theme/skins/railroad.ts
   { id: 'theme.accountant', label: 'Accountant', tier: 'rare', soon: true },
   { id: 'theme.wasteManagement', label: 'Waste Management', tier: 'rare', soon: true },
   { id: 'theme.developer', label: 'Developer', tier: 'rare', soon: true },
@@ -121,5 +123,15 @@ export const REWARDS: Reward[] = [
 const BY_ID = new Map(REWARDS.map((r) => [r.id, r]));
 
 export const rewardById = (id: string): Reward | undefined => BY_ID.get(id);
+
+// A card standing for a pick-one kind's default (KINDS `none`): what shows
+// with nothing chosen. Not a real reward: every player has it, and choosing
+// it saves no id (inventory.tsx choose(kind, null)).
+export function noneOf(kind: Kind): Reward | null {
+  const label = (KINDS[kind] as { none?: string }).none;
+  return label ? ({ id: `${kind}.none`, kind, label, tier: 'common' } as Reward) : null;
+}
+
+export const isNone = (r: Reward) => r.id === `${r.kind}.none`;
 
 export const rewardsOf = <K extends Kind>(kind: K) => REWARDS.filter((r): r is Extract<Reward, { kind: K }> => r.kind === kind);

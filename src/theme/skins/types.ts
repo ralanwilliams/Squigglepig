@@ -2,8 +2,9 @@ import type { Theme } from '../tokens';
 import type { IMAGES } from '../../assets/assets';
 import type { PropName } from './props';
 
-// A seasonal skin: a palette laid over the classic one, plus vector props drawn
-// on the pig artwork. The artwork itself, the sounds, the drawing paper and the
+// A skin: a palette laid over the classic one, plus vector props drawn on the
+// pig artwork. Most are seasonal; the rest are themes a player wins and
+// chooses (index.ts UNLOCKABLE). The artwork itself, the sounds, the drawing paper and the
 // judge's marks are never skinned — they are Squigglepig.
 
 // The roles a skin may recolor. Any it leaves out keep the classic value, so
@@ -43,7 +44,8 @@ export type Season = { from: MonthDay; to: MonthDay };
 export type Skin = {
   id: string;
   label: string; // for people: the previews' theme menu
-  season: Season | ((year: number) => Season);
+  // When a holiday skin shows. A theme a player chooses has none.
+  season?: Season | ((year: number) => Season);
   light: Palette;
   dark: Palette;
   decor: Partial<Record<ArtName, Placement[]>>;
