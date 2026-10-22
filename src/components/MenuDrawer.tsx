@@ -5,6 +5,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { FitBox } from './FitBox';
 import { Glyph, type GlyphName } from './Glyph';
+import { Switch } from './Switch';
 import { showToast } from './Toast';
 import { IMAGES } from '../assets/assets';
 import { font, type Theme } from '../theme/tokens';
@@ -38,7 +39,8 @@ const NATIVE = Platform.OS !== 'web';
 // `onHowToPlay` replays the first-run walkthrough (Home owns it). The
 // Accessibility group holds the switches (High contrast, Reduce motion,
 // Seasonal themes); the first two show what is in effect — the phone's setting
-// until it is flipped here — and Seasonal themes is on until turned off.
+// until it is flipped here — and Seasonal themes is on until turned off (the
+// Rewards screen's Themes tab has the same switch, beside the theme cards).
 // Rewards opens what the player has won (app/rewards.tsx).
 // With reduced motion the drawer appears and goes without sliding.
 export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
@@ -288,7 +290,7 @@ function MenuRow({ row, ui, theme, styles }: { row: Row; ui: Ui; theme: Theme; s
       >
         {row.label}
       </Text>
-      {isSwitch ? <Toggle on={!!row.on} ui={ui} theme={theme} /> : null}
+      {isSwitch ? <Switch on={!!row.on} ui={ui} theme={theme} /> : null}
       {row.trailing ? <Glyph name={row.trailing} size={ui.sp(16)} color={theme.link} weight={2.2} /> : null}
     </>
   );
@@ -303,32 +305,6 @@ function MenuRow({ row, ui, theme, styles }: { row: Row; ui: Ui; theme: Theme; s
     >
       {body}
     </Pressable>
-  );
-}
-
-// The switch on a setting row: a pill in the link color. On, it is filled with
-// the knob at the right; off, it is an outline with the knob at the left — so
-// it reads by shape and position, not by color.
-function Toggle({ on, ui, theme }: { on: boolean; ui: Ui; theme: Theme }) {
-  const w = ui.sp(38);
-  const h = ui.sp(22);
-  const knob = h - ui.sp(8);
-  return (
-    <View
-      style={{
-        width: w,
-        height: h,
-        borderRadius: h / 2,
-        borderWidth: ui.sp(2),
-        borderColor: theme.link,
-        backgroundColor: on ? theme.link : 'transparent',
-        justifyContent: 'center',
-        alignItems: on ? 'flex-end' : 'flex-start',
-        paddingHorizontal: ui.sp(2),
-      }}
-    >
-      <View style={{ width: knob, height: knob, borderRadius: knob / 2, backgroundColor: on ? theme.background : theme.link }} />
-    </View>
   );
 }
 

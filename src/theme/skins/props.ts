@@ -723,6 +723,74 @@ export const PROPS = {
       { d: star(50, 50, 22, 11, 8), fill: '#FFFDF0' },
     ],
   },
+
+  // Railroad (an unlockable theme)
+  // A conductor's cap: a navy crown flaring to its top, a gold-piped band, a
+  // badge, and a shiny black visor.
+  conductorCap: {
+    w: 100,
+    h: 74,
+    anchor: [50, 60],
+    shapes: [
+      { d: 'M10 14Q50 2 90 14L82 52Q50 58 18 52Z', fill: '#22325A', line: true },
+      { d: 'M22 16Q26 32 26 48L31 49Q30 32 28 14Z', fill: '#33497F' }, // highlight
+      { d: 'M18 44Q50 50 82 44L82 56Q50 62 18 56Z', fill: '#151515', line: true }, // band
+      { d: 'M18 47Q50 53 82 47L82 49Q50 55 18 49Z', fill: '#E3B23C' }, // piping
+      { d: 'M18 56Q50 62 82 56Q84 66 50 72Q16 66 18 56Z', fill: '#0F0F0F', line: true }, // visor
+      { d: 'M30 63Q50 67 70 63Q50 69 30 63Z', fill: 'rgba(255,255,255,0.25)' },
+      { d: 'M42 22h16v12l-8 5l-8-5Z', fill: '#E3B23C', line: true }, // badge
+      { d: 'M46 26h8v6l-4 2.5l-4-2.5Z', fill: '#B8862B' },
+    ],
+  },
+  // A puff of locomotive steam.
+  steam: {
+    w: 100,
+    h: 66,
+    shapes: [
+      { d: 'M16 58C6 58 4 44 14 40C12 26 28 20 36 28C40 12 62 10 68 24C80 18 94 30 86 42C96 46 94 60 82 58Z', fill: '#F2F4F6', line: true },
+      { d: 'M14 52Q50 58 88 50Q88 57 82 57L17 57Q13 56 14 52Z', fill: '#D3D9DF' }, // shade
+      { d: ellipse(42, 32, 8, 4), fill: '#FFFFFF' },
+    ],
+  },
+  // A railroad lantern with a red globe, held by its wire bail.
+  lantern: {
+    w: 100,
+    h: 104,
+    anchor: [50, 10],
+    shapes: [
+      { d: 'M36 34C36 2 64 2 64 34', fill: 'none', line: true }, // bail
+      { d: rect(44, 22, 12, 6), fill: '#3B3F45', line: true }, // vent
+      { d: 'M38 28h24l6 12H32Z', fill: '#3B3F45', line: true }, // top
+      { d: 'M36 40h28Q74 62 64 84H36Q26 62 36 40Z', fill: '#D62828', line: true }, // globe
+      { d: ellipse(50, 62, 9, 14), fill: '#FF7A45' },
+      { d: 'M50 52C55 58 56 66 50 70C44 66 45 58 50 52Z', fill: GLOW }, // flame
+      { d: 'M40 40L40 84M60 40L60 84', fill: 'none', line: true }, // guard wires
+      { d: ellipse(42, 56, 2.5, 8), fill: 'rgba(255,255,255,0.5)' }, // shine
+      { d: rect(32, 84, 36, 10), fill: '#3B3F45', line: true }, // base
+      { d: rect(28, 94, 44, 8), fill: '#2B2E33', line: true },
+    ],
+  },
+  // Lumps of coal for the trough: faceted, with a glint.
+  coalA: {
+    w: 100,
+    h: 76,
+    shapes: [
+      { d: 'M10 48L22 20L48 8L76 14L92 38L84 64L54 72L24 68Z', fill: '#26282B', line: true },
+      { d: 'M48 8L54 34L22 20Z', fill: '#3C4046' },
+      { d: 'M54 34L92 38L76 14Z', fill: '#33363B' },
+      { d: 'M30 26L40 22L36 30Z', fill: 'rgba(255,255,255,0.35)' },
+    ],
+  },
+  coalB: {
+    w: 100,
+    h: 72,
+    shapes: [
+      { d: 'M8 40L30 12L62 10L90 30L86 58L58 70L20 64Z', fill: '#2C2E31', line: true },
+      { d: 'M30 12L44 36L8 40Z', fill: '#40444A' },
+      { d: 'M44 36L62 10L90 30Z', fill: '#36393E' },
+      { d: 'M56 18L66 16L62 24Z', fill: 'rgba(255,255,255,0.35)' },
+    ],
+  },
   // The pig's own left hoof on each piece of art, traced from it (layout.ts
   // HOOVES puts each back exactly where it was): redrawn over a held prop's
   // handle so the hoof wraps round it. Solid black like the art's, no rim.

@@ -4,8 +4,9 @@ import { captureRef } from 'react-native-view-shot';
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { themes, type Theme } from './tokens';
-import { paletteFor, skinFor, type Birthday, type Skin } from './skins';
+import { UNLOCKABLE, paletteFor, skinFor, type Birthday, type Skin } from './skins';
 import { BIRTHDAYS_KEY, fetchBirthdays, parseBirthdays } from '../lib/birthdays';
+import { useInventory } from '../rewards/inventory';
 
 // Which palette the app shows. 'system' follows the device setting (app.json
 // sets userInterfaceStyle "automatic" so we're told about it); the in-app
@@ -19,8 +20,14 @@ type ThemeName = 'light' | 'dark';
 //              "High contrast text", a browser's prefers-contrast: more);
 //   motion   — Reduce motion: the theme flips without the wipe, and the
 //              walkthrough, toggle glyph and trough rest on still frames.
-// A third, `seasonal`, is the app's own: the seasonal skin (src/theme/skins)
-// shows by date unless the player turns it off there. It is on by default.
+// A third, `seasonal`, is the app's own: the seasonal skin (src/theme/skins),
+// a birthday or holiday, shows by date unless the player turns it off. It is
+// on by default, and has a switch in two places: there, and beside the theme
+// cards on the Rewards screen's Themes tab (app/rewards.tsx).
+//
+// The skin showing is, first to last: a birthday or holiday (while Seasonal
+// themes is on), else the theme the player chose from what they've won (the
+// inventory, src/rewards/inventory.tsx), else classic.
 export type ContrastMode = 'system' | 'normal' | 'high';
 export type MotionMode = 'system' | 'full' | 'reduced';
 
@@ -41,6 +48,10 @@ type ThemeCtx = {
   showing: ThemeName;
   setMode: (mode: ThemeMode) => void;
   toggle: () => void; // light <-> dark, relative to what's showing now
+  // Make a change that restyles the whole screen (choosing a theme) behind
+  // the same sweep as the light / dark switch: `apply` runs once the old
+  // screen is covered. Up like nightfall, or (the default) down like daybreak.
+  sweep: (apply: () => void, up?: boolean) => void;
   contrast: ContrastMode;
   highContrast: boolean; // what is showing: the pinned setting, else the OS
   setContrast: (c: ContrastMode) => void;
@@ -49,10 +60,12 @@ type ThemeCtx = {
   setMotion: (m: MotionMode) => void;
   seasonal: boolean;
   setSeasonal: (on: boolean) => void;
-  skin: Skin | null; // the seasonal skin showing, if any
+  skin: Skin | null; // the skin showing (seasonal or chosen), if any
 };
 
-type Wipe = { uri: string; to: ThemeName };
+// The photo of the old screen, which way it is swept away, and the change it
+// covers (run once the photo is showing).
+type Wipe = { uri: string; up: boolean; apply: () => void };
 type Size = { width: number; height: number };
 
 const Ctx = createContext<ThemeCtx | null>(null);
@@ -146,6 +159,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [seasonal, setSeasonalState] = useState(true);
   const [savedBirthdays, setSavedBirthdays] = useState<Birthday[] | null>(null);
   const season = useSeasonSkin(savedBirthdays);
+  const chosen = UNLOCKABLE[useInventory().chosen('theme') ?? ''] ?? null;
   const [loaded, setLoaded] = useState(false);
 
   // Restore the pinned settings before the first frame so a
@@ -167,7 +181,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const name: ThemeName = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const highContrast = contrast === 'system' ? osHighContrast : contrast === 'high';
   const reducedMotion = motion === 'system' ? osReduceMotion : motion === 'reduced';
-  const skin = seasonal ? season : null;
+  const skin = (seasonal ? season : null) ?? chosen;
   const theme = paletteFor(skin, name, highContrast);
 
   const setMode = useCallback((m: ThemeMode) => {
@@ -196,11 +210,33 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // up from the bottom going dark (night rises), down from the top going light
   // (day breaks). See <ThemeTransition/>; <ThemeSnapshotTarget/> marks what
   // gets photographed (the screens, not the toggle floating above them).
-  // With reduced motion there is no wipe: the palette simply flips.
+  // With reduced motion there is no wipe: the palette simply flips. Choosing
+  // a theme plays the same sweep (`sweep`).
   const shotRef = useRef<View | null>(null);
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
   const [pending, setPending] = useState<ThemeName | null>(null);
   const [wipe, setWipe] = useState<Wipe | null>(null);
+  const sweeping = useRef(false); // from the photo being taken until the sweep ends
+
+  const sweep = useCallback(
+    (apply: () => void, up = false) => {
+      // One at a time: a change made while a sweep is running just happens.
+      if (reducedMotion || sweeping.current) {
+        apply();
+        return;
+      }
+      sweeping.current = true;
+      captureRef(shotRef, { format: 'jpg', quality: 0.95, result: 'tmpfile' })
+        .then((uri) => setWipe({ uri, up, apply }))
+        .catch(() => {
+          // No photo (e.g. web): just change.
+          sweeping.current = false;
+          apply();
+          setPending(null);
+        });
+    },
+    [reducedMotion]
+  );
 
   const toggle = useCallback(() => {
     if (pending) return; // one at a time
@@ -210,21 +246,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setPending(to); // the glyph starts morphing now
-    captureRef(shotRef, { format: 'jpg', quality: 0.95, result: 'tmpfile' })
-      .then((uri) => setWipe({ uri, to }))
-      .catch(() => {
-        // No photo (e.g. web): just flip.
-        setMode(to);
-        setPending(null);
-      });
-  }, [pending, name, setMode, reducedMotion]);
+    sweep(() => setMode(to), to === 'dark');
+  }, [pending, name, setMode, reducedMotion, sweep]);
 
   // The photo is on screen and decoded (it looks identical to the live screen
-  // under it), so the palette can flip without anyone seeing it happen.
+  // under it), so the change can happen without anyone seeing it.
   const onReady = useCallback(() => {
-    if (wipe) setMode(wipe.to);
-  }, [wipe, setMode]);
+    wipe?.apply();
+  }, [wipe]);
   const onDone = useCallback(() => {
+    sweeping.current = false;
     setWipe(null);
     setPending(null);
   }, []);
@@ -236,6 +267,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       showing: pending ?? name,
       setMode,
       toggle,
+      sweep,
       contrast,
       highContrast,
       setContrast,
@@ -247,7 +279,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       skin,
     }),
     [
-      theme, mode, pending, name, setMode, toggle,
+      theme, mode, pending, name, setMode, toggle, sweep,
       contrast, highContrast, setContrast, motion, reducedMotion, setMotion,
       seasonal, setSeasonal, skin,
     ]
@@ -303,7 +335,7 @@ export function ThemeTransition() {
 
   const edge = Math.round(height * EDGE);
   const travel = height + edge;
-  const dark = wipe?.to === 'dark';
+  const up = !!wipe?.up;
 
   // Runs once the photo has decoded. The sweep starts at once; the palette
   // flips a few frames later, when the photo is certainly painted and the
@@ -322,16 +354,16 @@ export function ThemeTransition() {
 
   if (!wipe) return null;
 
-  // Going dark the body sits over the screen with the strip below it, and both
-  // move up; going light the strip is above and both move down.
-  const bodyY = p.interpolate({ inputRange: [0, 1], outputRange: dark ? [0, -travel] : [0, travel] });
-  const edgeY = p.interpolate({ inputRange: [0, 1], outputRange: dark ? [height, height - travel] : [-edge, -edge + travel] });
+  // Going up (to dark) the body sits over the screen with the strip below it,
+  // and both move up; going down the strip is above and both move down.
+  const bodyY = p.interpolate({ inputRange: [0, 1], outputRange: up ? [0, -travel] : [0, travel] });
+  const edgeY = p.interpolate({ inputRange: [0, 1], outputRange: up ? [height, height - travel] : [-edge, -edge + travel] });
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Svg width={width} height={height}>
         <Defs>
-          <LinearGradient id="wipe-edge" x1="0" y1={dark ? '0' : '1'} x2="0" y2={dark ? '1' : '0'}>
+          <LinearGradient id="wipe-edge" x1="0" y1={up ? '0' : '1'} x2="0" y2={up ? '1' : '0'}>
             <Stop offset="0" stopColor="#fff" />
             <Stop offset="1" stopColor="#000" />
           </LinearGradient>
@@ -371,7 +403,7 @@ export function useReducedMotion(): boolean {
   return ctx ? ctx.reducedMotion : os;
 }
 
-// The seasonal skin showing, if any (null outside the provider).
+// The skin showing, seasonal or chosen, if any (null outside the provider).
 export function useSkin(): Skin | null {
   return useContext(Ctx)?.skin ?? null;
 }

@@ -6,6 +6,7 @@ import { fourthOfJuly } from './fourthOfJuly';
 import { groundhogDay } from './groundhogDay';
 import { halloween } from './halloween';
 import { newYear } from './newYear';
+import { railroad } from './railroad';
 import { spring } from './spring';
 import { stPatricks } from './stPatricks';
 import { thanksgiving } from './thanksgiving';
@@ -32,8 +33,22 @@ export const SKINS: Skin[] = [
   christmas,
 ];
 
+// Themes a player wins in solo play and then chooses (src/rewards/catalog.ts),
+// by the reward's id. They have no season: the chosen one shows whenever no
+// birthday or holiday is on (or always, with Seasonal themes off). To add
+// one, write it beside railroad.ts, list it here, and take `soon` off its
+// reward in the catalog.
+export const UNLOCKABLE: Record<string, Skin> = {
+  'theme.railroad': railroad,
+};
+
+// Every skin, holidays first (the previews and their contrast check use this).
+export const ALL_SKINS: Skin[] = [...SKINS, ...Object.values(UNLOCKABLE)];
+
 // Set to a skin's id to see it out of season in a dev build ('birthday' shows
-// a cake for "Squigglepig"). Constant-folded away in release bundles.
+// a cake for "Squigglepig"; an unlockable theme shows as if in season, so
+// only while Seasonal themes is on).
+// Constant-folded away in release bundles.
 const PREVIEW: string | null = null;
 
 const md = (m: number, d: number) => m * 100 + d;
@@ -65,13 +80,13 @@ export function skinFor(date: Date, birthdays: Birthday[] = []): Skin | null {
   if (__DEV__ && PREVIEW) {
     return PREVIEW === 'birthday'
       ? birthdaySkin({ name: 'Squigglepig', month, day })
-      : (SKINS.find((s) => s.id === PREVIEW) ?? null);
+      : (ALL_SKINS.find((s) => s.id === PREVIEW) ?? null);
   }
   const bday = birthdays.find((b) => b.month === month && b.day === day);
   if (bday) return birthdaySkin(bday);
   const today = md(month, day);
   const year = date.getFullYear();
-  return SKINS.find((s) => inSeason(typeof s.season === 'function' ? s.season(year) : s.season, today)) ?? null;
+  return SKINS.find((s) => s.season && inSeason(typeof s.season === 'function' ? s.season(year) : s.season, today)) ?? null;
 }
 
 // The palette to show: classic, with the skin's colors laid over it. Built
