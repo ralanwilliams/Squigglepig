@@ -15,6 +15,7 @@ import { GameProvider } from '../src/state/GameContext';
 import { ThemeProvider, ThemeSnapshotTarget, ThemeTransition, useTheme } from '../src/theme/theme';
 import { ThemeToggleOverlay } from '../src/components/ThemeToggle';
 import { ToastOverlay } from '../src/components/Toast';
+import { TroughDropLayer } from '../src/components/TroughDrops';
 import { playMusic, preloadSounds, stopMusic } from '../src/lib/sound';
 import { useAppFrame } from '../src/theme/responsive';
 
@@ -60,9 +61,10 @@ export default function RootLayout() {
 
 // Everything that needs the resolved theme: the status bar, the navigator
 // (wrapped so the theme transition can photograph it), the wipe that sweeps
-// the old screen away when the theme flips, and the dark-mode toggle floating
-// over every screen — in that order, so the toggle's glyph keeps morphing on
-// top while the wipe passes underneath it.
+// the old screen away when the theme flips, seasonal props falling into the
+// trough from the top of the screen, and the dark-mode toggle floating over
+// every screen — in that order, so the toggle's glyph keeps morphing on top
+// while the wipe passes underneath it.
 //
 // On web all of it sits in a frame centred in the browser window, capped in
 // width so an ultrawide monitor doesn't pull the panes apart (useAppFrame);
@@ -85,6 +87,7 @@ function Shell() {
           />
         </ThemeSnapshotTarget>
         <ThemeTransition />
+        <TroughDropLayer />
         <ThemeToggleOverlay />
         <ToastOverlay />
       </View>

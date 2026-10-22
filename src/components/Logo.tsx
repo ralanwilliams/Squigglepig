@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { assetSize } from '../lib/assetSize';
-import { artFor, darkInset } from '../assets/assets';
+import { artFor, artName, darkInset } from '../assets/assets';
 import { useTheme } from '../theme/theme';
+import { SkinDecor } from './SkinDecor';
 
 // A window into the source image, as fractions of its width/height. Used for
 // assets whose pig doesn't fill the frame (the waiting GIF has a wide teal
@@ -29,6 +30,10 @@ const FULL: ImageWindow = { x: 0, y: 0, w: 1, h: 1 };
 // version has a transparent margin for the border; the window is moved into
 // it, so the frame (and anything in `children`) lands exactly where it does
 // in light mode and the border spills just past it.
+//
+// In season, the skin's props are drawn over the frame (SkinDecor), under
+// `children` so hotspots like the snout stay on top; any meant to peek out
+// from behind the pig are drawn under the image.
 export function Logo({
   source,
   window = FULL,
@@ -40,6 +45,7 @@ export function Logo({
 }) {
   const [box, setBox] = useState({ w: 0, h: 0 });
   const art = artFor(source, useTheme().name === 'dark');
+  const name = artName(source);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -72,6 +78,7 @@ export function Logo({
     <View style={styles.host} onLayout={onLayout}>
       {box.w > 0 && box.h > 0 ? (
         <View style={[styles.frame, { width: Math.round(fw), height: Math.round(fh) }]}>
+          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} layer="behind" /> : null}
           <Image
             source={art}
             style={{
@@ -83,6 +90,7 @@ export function Logo({
             }}
             contentFit="fill"
           />
+          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} /> : null}
           {children}
         </View>
       ) : null}

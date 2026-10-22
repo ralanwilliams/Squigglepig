@@ -213,7 +213,7 @@ export function PromptsScene() {
   return (
     <SceneBox t={t}>
       <View style={{ position: 'absolute', left: 40, top: 112, width: 240 }}>
-        <Trough count={reduced ? DROPS.length : landed} target={DROPS.length} labels={false} />
+        <Trough count={reduced ? DROPS.length : landed} target={DROPS.length} labels={false} fallFrom="trough" />
       </View>
       {DROPS.map((d, i) => (
         <Animated.View

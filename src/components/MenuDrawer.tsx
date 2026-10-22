@@ -35,8 +35,9 @@ const NATIVE = Platform.OS !== 'web';
 // follows light / dark mode like everything else. Nothing scrolls: in two-pane
 // layouts the groups sit in two columns, and the body is a FitBox.
 // `onHowToPlay` replays the first-run walkthrough (Home owns it). The
-// Accessibility group holds the switches (High contrast, Reduce motion); each
-// shows what is in effect — the phone's setting until it is flipped here.
+// Accessibility group holds the switches (High contrast, Reduce motion,
+// Seasonal themes); the first two show what is in effect — the phone's setting
+// until it is flipped here — and Seasonal themes is on until turned off.
 // With reduced motion the drawer appears and goes without sliding.
 export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
   const ui = useUi();
@@ -88,7 +89,7 @@ function MenuDrawer({
   const styles = useThemedStyles(makeStyles);
   const frame = useAppFrame();
   const win = useWindowDimensions();
-  const { highContrast, setContrast, reducedMotion, setMotion } = useThemeMode();
+  const { highContrast, setContrast, reducedMotion, setMotion, seasonal, setSeasonal } = useThemeMode();
   const reduced = useReducedMotion();
 
   // Stay mounted through the closing slide; unmount once it has finished.
@@ -142,6 +143,7 @@ function MenuDrawer({
   const accessibility: Row[] = [
     { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },
     { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
+    { icon: 'season', label: 'Seasonal themes', on: seasonal, onPress: () => setSeasonal(!seasonal) },
   ];
   const legal: Row[] = [
     { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },

@@ -59,6 +59,12 @@ prompt's own author, so there's nothing to guess).
    without database reads, and the game's Realtime traffic doesn't count. The
    workflow also needs `SUPABASE_URL` and `SUPABASE_KEY` repository secrets
    (Settings → Secrets and variables → Actions), the same values as `.env`.
+6. Do the same with `supabase/birthdays.sql`. It creates the `birthdays` table
+   the app reads to know whose birthday it is: on each one the app shows the
+   birthday theme with that name iced on the cake. Add, change or remove
+   birthdays in **Table Editor → birthdays** (a name of 1–24 characters, a
+   month 1–12 and a day). Phones pick up changes the next time the app opens
+   or comes back to the foreground; no app update is needed.
 
 ### 2. Add your credentials
 ```bash

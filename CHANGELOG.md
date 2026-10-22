@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Seasonal themes: the app dresses up for New Year, Groundhog Day, Valentine's Day, St. Patrick's Day, Easter, Spring, the 4th of July, Halloween, Thanksgiving and Christmas, each with its own light and dark colors and the pig dressed to match — a witch's hat, a Santa hat, bunny-white ears, Cupid's quiver and bow — with props around it (bats and a jack-o'-lantern, falling leaves and a turkey, snowflakes and a present, fireworks…). Easter and Thanksgiving follow their dates each year
+- Birthday theme: on a listed birthday the pig wears a party hat under balloons and holds up a cake with the person's name iced on top, sparklers fizzing. Birthdays are listed in a Supabase table, so adding one needs no app update
+- In a seasonal theme the trough fills with a pile instead of mud — whatever the pig is holding, presents on a birthday, painted eggs at Easter, unlit fireworks on the 4th of July, champagne at New Year, gold coins on St. Patrick's Day. Each one drops in from the top of the screen as a prompt is added and lands any which way, and when the trough is full a shower of extras fills it to the brim
+- Seasonal themes are on by default and can be switched off in the menu under Accessibility. High contrast keeps its own colors and shows only the decorations
+
 ## [2.4.0]
 
 ### Added
