@@ -13,7 +13,8 @@ import { KINDS, type Reward } from './catalog';
 // out in words as well as shown by the lock and the dimming.
 //
 // Of a kind the player picks one of (catalog.ts KINDS `pick: 'one'`), an owned
-// card can be tapped (`onPress`) to use it; the one in use is ringed.
+// card can be tapped (`onPress`) to use it; the one in use is ringed. A screen
+// showing cards for another reason (a prize on offer) passes its own `status`.
 export const TILE_W = 84; // base dp, scaled by the UI scale
 
 export function RewardTile({
@@ -21,17 +22,20 @@ export function RewardTile({
   owned,
   chosen = false,
   onPress,
+  status: statusText,
 }: {
   reward: Reward;
   owned: boolean;
   chosen?: boolean;
   onPress?: () => void;
+  status?: string;
 }) {
   const ui = useUi();
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const pickOne = KINDS[reward.kind].pick === 'one';
-  const status = reward.soon ? 'Coming soon' : !owned ? 'Locked' : !pickOne ? 'Unlocked' : chosen ? 'In use' : 'Tap to use';
+  const status =
+    statusText ?? (reward.soon ? 'Coming soon' : !owned ? 'Locked' : !pickOne ? 'Unlocked' : chosen ? 'In use' : 'Tap to use');
   const lineH = ui.f(15);
   const radius = ui.sp(12);
 
