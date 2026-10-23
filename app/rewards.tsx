@@ -6,11 +6,12 @@ import { Glyph } from '../src/components/Glyph';
 import { BackButton } from '../src/components/BackButton';
 import { Switch } from '../src/components/Switch';
 import { RewardTile } from '../src/rewards/RewardTile';
+import { KindTabs } from '../src/rewards/KindTabs';
 import { KINDS, REWARDS, isNone, noneOf, rewardsOf, type Kind } from '../src/rewards/catalog';
 import { useInventory } from '../src/rewards/inventory';
-import { UNLOCKABLE } from '../src/theme/skins';
+import { useChoose } from '../src/rewards/useChoose';
 import { font, type Theme } from '../src/theme/tokens';
-import { useSkin, useTheme, useThemeMode, useThemedStyles } from '../src/theme/theme';
+import { useTheme, useThemeMode, useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi, type Ui } from '../src/theme/responsive';
 
 // Rewards, from the menu drawer (src/components/MenuDrawer.tsx): everything
@@ -34,24 +35,18 @@ export default function Rewards() {
   const ui = useUi();
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const { owns, grant, reset, chosen, choose } = useInventory();
+  const { owns, grant, reset, chosen } = useInventory();
+  const putToUse = useChoose();
   const [kind, setKind] = useState<Kind>(KIND_LIST[0]);
   const list = rewardsOf(kind);
   const none = noneOf(kind);
   const inUse = chosen(kind);
   const cards = none && list.some((r) => !r.soon) ? [none, ...list] : list;
-  const { seasonal, setSeasonal, sweep } = useThemeMode();
-  // A birthday or holiday showing over whichever theme is chosen.
-  const showing = useSkin();
-  const covered = !!showing && showing !== (UNLOCKABLE[chosen('theme') ?? ''] ?? null);
+  const { seasonal, setSeasonal } = useThemeMode();
 
-  // Put a card to use. A new theme restyles every screen, so it arrives
-  // behind the same sweep as the light / dark switch — unless a birthday or
-  // holiday is covering it, when nothing on screen changes but the ring.
+  // Put a card to use (a theme with the sweep: useChoose).
   const use = (id: string | null) => {
-    if (id === inUse) return;
-    if (kind === 'theme' && !covered) sweep(() => choose(kind, id));
-    else choose(kind, id);
+    if (id !== inUse) putToUse(kind, id);
   };
 
   const grid = (
@@ -87,7 +82,7 @@ export default function Rewards() {
         ]}
       >
         <Glyph name="season" size={ui.sp(22)} color={theme.link} weight={1.8} />
-        <Text style={[styles.tabLabel, { fontSize: ui.f(15) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
+        <Text style={[styles.settingLabel, { fontSize: ui.f(15) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
           Seasonal themes
         </Text>
         <Switch on={seasonal} ui={ui} theme={theme} />
@@ -95,20 +90,16 @@ export default function Rewards() {
     ) : null;
 
   const tabs = (
-    <View accessibilityRole="tablist" style={{ gap: ui.sp(4) }}>
-      {KIND_LIST.map((k) => (
-        <KindTab
-          key={k}
-          kind={k}
-          owned={rewardsOf(k).filter((r) => owns(r.id)).length}
-          selected={k === kind}
-          onPress={() => setKind(k)}
-          ui={ui}
-          theme={theme}
-          styles={styles}
-        />
-      ))}
-    </View>
+    <KindTabs
+      kinds={KIND_LIST}
+      selected={kind}
+      onSelect={setKind}
+      count={(k) => {
+        const total = rewardsOf(k).length;
+        const owned = rewardsOf(k).filter((r) => owns(r.id)).length;
+        return { text: `${owned} / ${total}`, spoken: `${owned} of ${total} unlocked` };
+      }}
+    />
   );
 
   const dev = __DEV__ ? (
@@ -137,55 +128,6 @@ export default function Rewards() {
   );
 }
 
-// A tab: the kind's glyph and name, and how many of its rewards are owned.
-// The open one sits on a chip; the others are plain rows on the background.
-function KindTab({
-  kind,
-  owned,
-  selected,
-  onPress,
-  ui,
-  theme,
-  styles,
-}: {
-  kind: Kind;
-  owned: number;
-  selected: boolean;
-  onPress: () => void;
-  ui: Ui;
-  theme: Theme;
-  styles: ReturnType<typeof makeStyles>;
-}) {
-  const total = rewardsOf(kind).length;
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${KINDS[kind].label}, ${owned} of ${total} unlocked`}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tab,
-        selected && styles.tabOn,
-        {
-          minHeight: ui.sp(44),
-          gap: ui.sp(12),
-          paddingHorizontal: ui.sp(12),
-          borderRadius: ui.sp(8),
-          opacity: pressed ? 0.6 : 1,
-        },
-      ]}
-    >
-      <Glyph name={KINDS[kind].glyph} size={ui.sp(22)} color={theme.link} weight={1.8} />
-      <Text style={[styles.tabLabel, selected && styles.tabLabelOn, { fontSize: ui.f(15) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
-        {KINDS[kind].label}
-      </Text>
-      <Text style={[styles.count, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
-        {owned} / {total}
-      </Text>
-    </Pressable>
-  );
-}
-
 function DevLink({ label, onPress, ui, styles }: { label: string; onPress: () => void; ui: Ui; styles: ReturnType<typeof makeStyles> }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8} style={{ minHeight: ui.sp(36), justifyContent: 'center' }}>
@@ -199,12 +141,8 @@ function DevLink({ label, onPress, ui, styles }: { label: string; onPress: () =>
 const makeStyles = (t: Theme) => StyleSheet.create({
   fill: { flex: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  tab: { flexDirection: 'row', alignItems: 'center', borderWidth: Math.max(1, t.edge), borderColor: 'transparent' },
-  tabOn: { backgroundColor: t.chip, borderColor: t.chipBorder },
-  tabLabel: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },
-  tabLabelOn: { fontFamily: font.medium },
-  count: { color: t.textMuted, fontFamily: font.regular },
   setting: { flexDirection: 'row', alignItems: 'center' },
+  settingLabel: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },
   devRow: { flexDirection: 'row', justifyContent: 'center' },
   devLink: { color: t.accent, fontFamily: font.bold, textDecorationLine: 'underline' },
 });
