@@ -21,7 +21,8 @@ const SUMMARY = Object.entries(
 // every package that ships with the app, its version and its license type.
 // The list is generated from node_modules by `npm run licenses`
 // (scripts/licenses.mjs). The one screen in the game that scrolls: it is a
-// reference list, hundreds of rows long.
+// reference list, hundreds of rows long. Above it, the credit the trivia
+// questions' licence asks for (src/arcade/games/trivia).
 export default function Licenses() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -49,6 +50,10 @@ export default function Licenses() {
             </Text>
             <Text style={[styles.summary, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
               {SUMMARY}
+            </Text>
+            <Text style={[styles.intro, { fontSize: ui.f(13), paddingTop: ui.sp(6) }]} maxFontSizeMultiplier={FONT_CAP}>
+              Trivia questions from the Open Trivia Database (opentdb.com), used under the Creative Commons
+              Attribution-ShareAlike 4.0 licence.
             </Text>
           </View>
         }

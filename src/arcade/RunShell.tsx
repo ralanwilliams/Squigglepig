@@ -10,7 +10,6 @@ import { TextLink } from '../components/TextLink';
 import { Countdown, deadlineIn } from '../components/Countdown';
 import { showToast } from '../components/Toast';
 import { IMAGES } from '../assets/assets';
-import { useUi } from '../theme/responsive';
 import { LADDER, ROUNDS, START, nextStep, prizeFor, roundSeconds, runReducer } from './engine';
 import { PotLadder } from './PotLadder';
 import { PayoutScreen } from './PayoutScreen';
@@ -154,7 +153,6 @@ function Plain({ title, actions, back }: { title: string; actions: React.ReactNo
 const RoundCtx = createContext<{ round: number; until: number; expire: () => void; leave: () => void } | null>(null);
 
 function RoundFrame({ focus, controls, fitFocus }: { focus: React.ReactNode; controls?: React.ReactNode; fitFocus?: boolean }) {
-  const ui = useUi();
   const ctx = useContext(RoundCtx);
   if (!ctx) throw new Error('RoundFrame is drawn by RunShell');
   return (
@@ -166,9 +164,7 @@ function RoundFrame({ focus, controls, fitFocus }: { focus: React.ReactNode; con
         <>
           <Countdown seconds={roundSeconds(ctx.round)} until={ctx.until} onExpire={ctx.expire} size={32} />
           {controls}
-          <View style={{ marginTop: ui.sp(4) }}>
-            <PotLadder won={ctx.round - 1} />
-          </View>
+          <PotLadder won={ctx.round - 1} />
           <TextLink label="Leave" onPress={ctx.leave} />
         </>
       }

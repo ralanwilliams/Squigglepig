@@ -18,8 +18,7 @@ import { markTutorialDone, tutorialDone } from '../src/lib/tutorial';
 // auto-rejoins that room, so a returning player skips the username/room entry.
 // Otherwise, until the player has finished or skipped it once, the first-run
 // walkthrough opens over it (src/lib/tutorial.ts). Play Solo (app/arcade)
-// shows once there's a solo game this build offers: in development builds
-// only, until the first real game is in src/arcade/games.
+// shows whenever there's a solo game this build offers (src/arcade/games).
 export default function Home() {
   const { enterRoom } = useGame();
   const [checking, setChecking] = useState(true);
