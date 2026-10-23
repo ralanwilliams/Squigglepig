@@ -1,12 +1,13 @@
 import type React from 'react';
 import type { GlyphName } from '../../components/Glyph';
 import { bigger } from './bigger';
+import { trivia } from './trivia';
 
 // Every solo mini-game. A game supplies only what's its own: its rounds. The
 // run around them (the timer, the round count, the pot, banking, the payout)
 // is RunShell's (src/arcade/RunShell.tsx), the same for every game.
 //
-// To add a game, give it a folder beside bigger/ exporting a Game, and list it
+// To add a game, give it a folder beside trivia/ exporting a Game, and list it
 // in GAMES. The Solo button on Home and the game list (app/arcade) show
 // whatever is playable here; a `dev` game shows in development builds only.
 
@@ -37,7 +38,7 @@ export type Game<S = unknown> = {
   dev?: true; // a test game, for development builds only
 };
 
-export const GAMES: Game<any>[] = [bigger];
+export const GAMES: Game<any>[] = [trivia, bigger];
 
 // The games this build offers.
 export const PLAYABLE = GAMES.filter((g) => __DEV__ || !g.dev);
