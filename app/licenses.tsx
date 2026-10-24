@@ -1,10 +1,9 @@
 import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Heading } from '../src/components/Heading';
-import { Glyph } from '../src/components/Glyph';
+import { BackButton } from '../src/components/BackButton';
 import { font, type Theme } from '../src/theme/tokens';
-import { useTheme, useThemedStyles } from '../src/theme/theme';
+import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
 import LICENSES from '../src/assets/licenses.json';
 
@@ -22,13 +21,11 @@ const SUMMARY = Object.entries(
 // every package that ships with the app, its version and its license type.
 // The list is generated from node_modules by `npm run licenses`
 // (scripts/licenses.mjs). The one screen in the game that scrolls: it is a
-// reference list, hundreds of rows long.
+// reference list, hundreds of rows long. Above it, the credit the trivia
+// questions' licence asks for (src/arcade/games/trivia).
 export default function Licenses() {
   const ui = useUi();
-  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
-
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
   return (
     <View
@@ -40,17 +37,7 @@ export default function Licenses() {
       <View style={{ minHeight: ui.headerBand, paddingTop: ui.sp(10), paddingHorizontal: ui.pad + ui.sp(36), justifyContent: 'center' }}>
         <Heading size="h3" lines={1}>Open-source licenses</Heading>
       </View>
-      <View style={[styles.corner, { top: ui.insets.top + ui.sp(5), left: ui.insets.left + ui.pad - ui.sp(9) }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={back}
-          hitSlop={6}
-          style={({ pressed }) => [styles.hit, { width: ui.sp(44), height: ui.sp(44), opacity: pressed ? 0.6 : 1 }]}
-        >
-          <Glyph name="back" size={ui.sp(26)} color={theme.link} />
-        </Pressable>
-      </View>
+      <BackButton />
 
       <FlatList
         data={LICENSES as Pkg[]}
@@ -63,6 +50,10 @@ export default function Licenses() {
             </Text>
             <Text style={[styles.summary, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
               {SUMMARY}
+            </Text>
+            <Text style={[styles.intro, { fontSize: ui.f(13), paddingTop: ui.sp(6) }]} maxFontSizeMultiplier={FONT_CAP}>
+              Trivia questions from the Open Trivia Database (opentdb.com), used under the Creative Commons
+              Attribution-ShareAlike 4.0 licence.
             </Text>
           </View>
         }
@@ -84,8 +75,6 @@ export default function Licenses() {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: t.background },
-  corner: { position: 'absolute', zIndex: 10 },
-  hit: { alignItems: 'center', justifyContent: 'center' },
   intro: { color: t.text, fontFamily: font.regular, textAlign: 'center' },
   summary: { color: t.link, fontFamily: font.medium, textAlign: 'center' },
   rule: { height: 1, backgroundColor: t.divider },

@@ -6,6 +6,7 @@ import { useReducedMotion, useSkin, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { TROUGH_FLOOD, TROUGH_SLOTS, troughFilled } from '../theme/skins/trough';
 import { PileArt, dropEasing, showFalling, type FallingProp } from './TroughDrops';
+import { svgShift } from '../lib/svgShift';
 
 // The trough: a pig trough filling with mud, one step per pooled prompt. Pure
 // vector (react-native-svg) driven by RN's Animated, so it scales with the UI
@@ -231,9 +232,9 @@ export function Trough({
             <>
               {/* mud */}
               <G clipPath="url(#cavity)">
-                <AnimatedG translateY={levelY}>
-                  <AnimatedPath d={WAVE_BACK} fill="#5A381D" opacity={0.55} translateX={waveBack} />
-                  <AnimatedPath d={WAVE} fill="url(#mud)" translateX={wave} />
+                <AnimatedG {...svgShift('y', levelY)}>
+                  <AnimatedPath d={WAVE_BACK} fill="#5A381D" opacity={0.55} {...svgShift('x', waveBack)} />
+                  <AnimatedPath d={WAVE} fill="url(#mud)" {...svgShift('x', wave)} />
                   {BUBBLES.map((b, i) => (
                     <AnimatedCircle
                       key={i}
@@ -241,7 +242,7 @@ export function Trough({
                       cy={b.cy}
                       r={b.r}
                       fill="#B98A5F"
-                      translateY={bubbles[i].interpolate({ inputRange: [0, 1], outputRange: [34, -3] })}
+                      {...svgShift('y', bubbles[i].interpolate({ inputRange: [0, 1], outputRange: [34, -3] }))}
                       opacity={bubbles[i].interpolate({ inputRange: [0, 0.25, 0.9, 1], outputRange: [0, 0.75, 0.5, 0] })}
                     />
                   ))}
@@ -280,7 +281,7 @@ function Piled({ it, fromScreen }: { it: FallingProp; fromScreen: boolean }) {
   return fromScreen ? (
     <AnimatedG opacity={it.v.interpolate({ inputRange: [0, 0.999, 1], outputRange: [0, 0, 1] })}>{art}</AnimatedG>
   ) : (
-    <AnimatedG translateY={it.v.interpolate({ inputRange: [0, 1], outputRange: [-DROP_FROM, 0] })}>{art}</AnimatedG>
+    <AnimatedG {...svgShift('y', it.v.interpolate({ inputRange: [0, 1], outputRange: [-DROP_FROM, 0] }))}>{art}</AnimatedG>
   );
 }
 

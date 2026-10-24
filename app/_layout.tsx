@@ -12,6 +12,7 @@ import {
   Roboto_700Bold,
 } from '@expo-google-fonts/roboto';
 import { GameProvider } from '../src/state/GameContext';
+import { InventoryProvider } from '../src/rewards/inventory';
 import { ThemeProvider, ThemeSnapshotTarget, ThemeTransition, useTheme } from '../src/theme/theme';
 import { ThemeToggleOverlay } from '../src/components/ThemeToggle';
 import { ToastOverlay } from '../src/components/Toast';
@@ -20,11 +21,12 @@ import { playMusic, preloadSounds, stopMusic } from '../src/lib/sound';
 import { useAppFrame } from '../src/theme/responsive';
 
 // Screens with the theme playing: everything from launch up to the moment the
-// round starts (plus /licenses, which opens from Home's menu). It stops on
-// /view (the "your prompt" screen) and stays off through drawing, guessing,
-// reveal and the scoreboard; if a new game drops everyone back into /prompts
-// or /lobby it starts again from the top.
-const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/join', '/create', '/lobby', '/prompts', '/waiting']);
+// round starts (plus /licenses and /rewards, which open from Home's menu, and
+// the solo game list, /arcade). It stops on /view (the "your prompt" screen)
+// and stays off through drawing, guessing, reveal and the scoreboard, and
+// through a solo run (/arcade/<game>); if a new game drops everyone back into
+// /prompts or /lobby it starts again from the top.
+const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/rewards', '/arcade', '/join', '/create', '/lobby', '/prompts', '/waiting']);
 
 export default function RootLayout() {
   // Load Roboto (Bootswatch Materia's font). Render regardless so the UI is
@@ -49,11 +51,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <GameProvider>
-            <Shell />
-          </GameProvider>
-        </ThemeProvider>
+        <InventoryProvider>
+          <ThemeProvider>
+            <GameProvider>
+              <Shell />
+            </GameProvider>
+          </ThemeProvider>
+        </InventoryProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

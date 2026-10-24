@@ -4,6 +4,7 @@ import Svg, { ClipPath, Defs, G, Path } from 'react-native-svg';
 import { PROPS, type Prop, type PropName } from '../theme/skins/props';
 import { TROUGH_ITEM, troughScale, troughShaft, type TroughSlot } from '../theme/skins/trough';
 import { PropArt } from './SkinDecor';
+import { svgShift } from '../lib/svgShift';
 
 // Props falling into the trough from the top of the screen. The trough sits
 // deep inside clipped containers (FitBox), so a prop can't fall from above it
@@ -75,7 +76,7 @@ export function TroughDropLayer() {
                 {items.map((it) => (
                   <AnimatedG
                     key={it.key}
-                    translateY={it.v.interpolate({ inputRange: [0, 1], outputRange: [start - it.slot.y, 0] })}
+                    {...svgShift('y', it.v.interpolate({ inputRange: [0, 1], outputRange: [start - it.slot.y, 0] }))}
                     opacity={it.v.interpolate({ inputRange: [0, 0.999, 1], outputRange: [1, 1, 0] })}
                   >
                     <PileArt slot={it.slot} name={it.name} />

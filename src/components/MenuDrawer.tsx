@@ -5,6 +5,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { FitBox } from './FitBox';
 import { Glyph, type GlyphName } from './Glyph';
+import { Switch } from './Switch';
 import { showToast } from './Toast';
 import { IMAGES } from '../assets/assets';
 import { font, type Theme } from '../theme/tokens';
@@ -30,14 +31,17 @@ const NATIVE = Platform.OS !== 'web';
 // mirroring the dark-mode toggle in the top-right (Stage already keeps both
 // corners clear, so nothing moves to make room). It slides a drawer in from
 // the left holding the About information: the app icon, name and version,
-// then Support / Legal / Developer links and the copyright line. The drawer is
-// painted with the screen's own palette (background, text, link), so it
-// follows light / dark mode like everything else. Nothing scrolls: in two-pane
-// layouts the groups sit in two columns, and the body is a FitBox.
+// then the Support / Accessibility / Rewards / Legal / Developer groups and
+// the copyright line. The drawer is painted with the screen's own palette
+// (background, text, link), so it follows light / dark mode like everything
+// else. Nothing scrolls: in two-pane layouts the groups sit in two columns,
+// and the body is a FitBox.
 // `onHowToPlay` replays the first-run walkthrough (Home owns it). The
 // Accessibility group holds the switches (High contrast, Reduce motion,
 // Seasonal themes); the first two show what is in effect — the phone's setting
-// until it is flipped here — and Seasonal themes is on until turned off.
+// until it is flipped here — and Seasonal themes is on until turned off (the
+// Rewards screen's Themes tab has the same switch, beside the theme cards).
+// Rewards opens what the player has won (app/rewards.tsx).
 // With reduced motion the drawer appears and goes without sliding.
 export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
   const ui = useUi();
@@ -119,9 +123,9 @@ function MenuDrawer({
       onClose();
       showToast(`No email app found. Write to ${CONTACT_EMAIL}`, 4000);
     });
-  const licenses = () => {
+  const go = (path: '/licenses' | '/rewards') => () => {
     onClose();
-    router.push('/licenses');
+    router.push(path);
   };
 
   // The walkthrough is a modal too, and iOS won't present one while another is
@@ -145,10 +149,11 @@ function MenuDrawer({
     { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
     { icon: 'season', label: 'Seasonal themes', on: seasonal, onPress: () => setSeasonal(!seasonal) },
   ];
+  const rewards: Row[] = [{ icon: 'gift', label: 'Your rewards', onPress: go('/rewards'), trailing: 'chevron' }];
   const legal: Row[] = [
     { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },
     { icon: 'doc', label: 'Terms of Service', onPress: () => open(TERMS_URL), trailing: 'external' },
-    { icon: 'code', label: 'Open-source licenses', onPress: licenses, trailing: 'chevron' },
+    { icon: 'code', label: 'Open-source licenses', onPress: go('/licenses'), trailing: 'chevron' },
   ];
   const developer: Row[] = [
     { icon: 'person', label: 'Made by R. Alan Williams' },
@@ -175,8 +180,6 @@ function MenuDrawer({
   );
 
   const icon = ui.twoPane ? ui.sp(44) : ui.sp(60);
-  // Two-pane: the width of one link column (drawer less its padding and the gap).
-  const columnW = Math.round((width - (ui.insets.left + ui.pad) - ui.pad - ui.gap) / 2);
 
   return (
     <Modal visible={mounted} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
@@ -232,36 +235,31 @@ function MenuDrawer({
           <View style={styles.rule} />
 
           {ui.twoPane ? (
-            <>
-              <FitBox style={styles.flex} align="top">
-                <View style={[styles.columns, { gap: ui.gap }]}>
-                  <View style={[styles.column, { gap: ui.sp(12) }]}>
-                    {section('Support', support)}
-                    {section('Accessibility', accessibility)}
-                  </View>
-                  <View style={[styles.column, { gap: ui.sp(12) }]}>
-                    {section('Legal', legal)}
-                    {section('Developer', developer)}
-                  </View>
+            // The copyright ends the second column. It used to be pinned to
+            // the drawer's foot, out of the flow, but with Rewards in it that
+            // column is as tall as the first and the line would sit on its
+            // last link.
+            <FitBox style={styles.flex} align="top">
+              <View style={[styles.columns, { gap: ui.gap }]}>
+                <View style={[styles.column, { gap: ui.sp(12) }]}>
+                  {section('Support', support)}
+                  {section('Accessibility', accessibility)}
                 </View>
-              </FitBox>
-              {/* Pinned to the foot of the drawer under the (shorter) Legal /
-                  Developer column, out of the flow so it costs the links no height. */}
-              <View
-                style={[
-                  styles.footnote,
-                  { left: ui.insets.left + ui.pad + columnW + ui.gap, bottom: ui.insets.bottom + ui.sp(12), width: columnW },
-                ]}
-              >
-                {copyright}
+                <View style={[styles.column, { gap: ui.sp(12) }]}>
+                  {section('Rewards', rewards)}
+                  {section('Legal', legal)}
+                  {section('Developer', developer)}
+                  {copyright}
+                </View>
               </View>
-            </>
+            </FitBox>
           ) : (
             <>
               <FitBox style={styles.flex} align="top">
                 <View style={{ gap: ui.sp(12) }}>
                   {section('Support', support)}
                   {section('Accessibility', accessibility)}
+                  {section('Rewards', rewards)}
                   {section('Legal', legal)}
                   {section('Developer', developer)}
                 </View>
@@ -292,7 +290,7 @@ function MenuRow({ row, ui, theme, styles }: { row: Row; ui: Ui; theme: Theme; s
       >
         {row.label}
       </Text>
-      {isSwitch ? <Toggle on={!!row.on} ui={ui} theme={theme} /> : null}
+      {isSwitch ? <Switch on={!!row.on} ui={ui} theme={theme} /> : null}
       {row.trailing ? <Glyph name={row.trailing} size={ui.sp(16)} color={theme.link} weight={2.2} /> : null}
     </>
   );
@@ -307,32 +305,6 @@ function MenuRow({ row, ui, theme, styles }: { row: Row; ui: Ui; theme: Theme; s
     >
       {body}
     </Pressable>
-  );
-}
-
-// The switch on a setting row: a pill in the link color. On, it is filled with
-// the knob at the right; off, it is an outline with the knob at the left — so
-// it reads by shape and position, not by color.
-function Toggle({ on, ui, theme }: { on: boolean; ui: Ui; theme: Theme }) {
-  const w = ui.sp(38);
-  const h = ui.sp(22);
-  const knob = h - ui.sp(8);
-  return (
-    <View
-      style={{
-        width: w,
-        height: h,
-        borderRadius: h / 2,
-        borderWidth: ui.sp(2),
-        borderColor: theme.link,
-        backgroundColor: on ? theme.link : 'transparent',
-        justifyContent: 'center',
-        alignItems: on ? 'flex-end' : 'flex-start',
-        paddingHorizontal: ui.sp(2),
-      }}
-    >
-      <View style={{ width: knob, height: knob, borderRadius: knob / 2, backgroundColor: on ? theme.background : theme.link }} />
-    </View>
   );
 }
 
@@ -364,7 +336,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rule: { height: 1, backgroundColor: t.divider },
   columns: { flexDirection: 'row' },
   column: { flex: 1, minWidth: 0 },
-  footnote: { position: 'absolute' },
   sectionTitle: { color: t.link, fontFamily: font.bold, letterSpacing: 1.2, textTransform: 'uppercase', paddingLeft: 4 },
   row: { flexDirection: 'row', alignItems: 'center' },
   label: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },
