@@ -30,6 +30,7 @@ import type { Game } from './games';
 // the app is in the background — the timer goes by the wall clock.
 export function RunShell({ game }: { game: Game<any> }) {
   const [run, dispatch] = useReducer(runReducer, START);
+  const seconds = game.seconds ?? roundSeconds;
   const [specs, setSpecs] = useState<unknown[] | null>(null);
   const [loading, setLoading] = useState(false);
   const starting = useRef(false); // a ref, not `loading`: two taps in one frame both see the old state
@@ -52,7 +53,7 @@ export function RunShell({ game }: { game: Game<any> }) {
       if (!live.current) return;
       if (made.length < ROUNDS) throw new Error(`${game.id}: ${made.length} of ${ROUNDS} rounds`);
       setSpecs(made);
-      dispatch({ type: 'start', until: deadlineIn(roundSeconds(1)) });
+      dispatch({ type: 'start', until: deadlineIn(seconds(1)) });
     } catch {
       if (live.current) showToast("Couldn't get the game ready. Try again.", 3000);
     } finally {
@@ -83,7 +84,7 @@ export function RunShell({ game }: { game: Game<any> }) {
     const Round = game.Round;
     const finish = (won: boolean, detail?: string) => dispatch({ type: 'result', won, detail });
     return (
-      <RoundCtx.Provider value={{ round: run.round, until: run.until, expire: () => dispatch({ type: 'result', won: false, timeout: true }), leave: done }}>
+      <RoundCtx.Provider value={{ round: run.round, seconds: seconds(run.round), until: run.until, expire: () => dispatch({ type: 'result', won: false, timeout: true }), leave: done }}>
         <Round key={run.round} spec={specs[run.round - 1]} round={run.round} onResult={finish} Frame={RoundFrame} />
       </RoundCtx.Provider>
     );
@@ -103,7 +104,7 @@ export function RunShell({ game }: { game: Game<any> }) {
                 ? `Bank the ${prize.label.toLowerCase()} prize, or risk it on round ${run.won + 1}.`
                 : `Win ${next ? next.won - run.won : 0} more to put a prize in the pot.`}
             </Heading>
-            <PigButton name="Keep going" onPress={() => dispatch({ type: 'next', until: deadlineIn(roundSeconds(run.won + 1)) })} />
+            <PigButton name="Keep going" onPress={() => dispatch({ type: 'next', until: deadlineIn(seconds(run.won + 1)) })} />
             {prize ? <PigButton name="Bank it" onPress={() => dispatch({ type: 'bank' })} /> : null}
           </>
         }
@@ -150,9 +151,19 @@ function Plain({ title, actions, back }: { title: string; actions: React.ReactNo
 // its own rather than one made inside RunShell, so it keeps its identity from
 // render to render and the round's content isn't remounted; the run reaches
 // it through RoundCtx.
-const RoundCtx = createContext<{ round: number; until: number; expire: () => void; leave: () => void } | null>(null);
+const RoundCtx = createContext<{ round: number; seconds: number; until: number; expire: () => void; leave: () => void } | null>(null);
 
-function RoundFrame({ focus, controls, fitFocus }: { focus: React.ReactNode; controls?: React.ReactNode; fitFocus?: boolean }) {
+function RoundFrame({
+  focus,
+  controls,
+  fitFocus,
+  onExpire,
+}: {
+  focus: React.ReactNode;
+  controls?: React.ReactNode;
+  fitFocus?: boolean;
+  onExpire?: () => void;
+}) {
   const ctx = useContext(RoundCtx);
   if (!ctx) throw new Error('RoundFrame is drawn by RunShell');
   return (
@@ -162,7 +173,7 @@ function RoundFrame({ focus, controls, fitFocus }: { focus: React.ReactNode; con
       fitFocus={fitFocus}
       actions={
         <>
-          <Countdown seconds={roundSeconds(ctx.round)} until={ctx.until} onExpire={ctx.expire} size={32} />
+          <Countdown seconds={ctx.seconds} until={ctx.until} onExpire={onExpire ?? ctx.expire} size={32} />
           {controls}
           <PotLadder won={ctx.round - 1} />
           <TextLink label="Leave" onPress={ctx.leave} />

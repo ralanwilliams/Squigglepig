@@ -10,7 +10,7 @@
 export const ROUNDS = 10;
 
 // Seconds for round n (1-based): 23 for the first, two fewer each round, never
-// under 6.
+// under 6. A game can set its own (games/index.ts Game.seconds).
 export const roundSeconds = (n: number) => Math.max(6, 25 - 2 * n);
 
 // What a banked pot pays: a common reward, a rare one, or the pick of every

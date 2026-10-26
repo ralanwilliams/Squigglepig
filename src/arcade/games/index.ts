@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { GlyphName } from '../../components/Glyph';
 import { bigger } from './bigger';
+import { memory } from './memory';
 import { trivia } from './trivia';
 
 // Every solo mini-game. A game supplies only what's its own: its rounds. The
@@ -14,8 +15,15 @@ import { trivia } from './trivia';
 // What a round is drawn into: Stage's two panes, with the timer, round count
 // and pot added by the run. `focus` is the art pane (the question, the
 // picture), `controls` the rail (the answers). `fitFocus` scales a focus that
-// can grow too tall, as Stage's does.
-export type Frame = (props: { focus: React.ReactNode; controls?: React.ReactNode; fitFocus?: boolean }) => React.ReactElement;
+// can grow too tall, as Stage's does. `onExpire`, if given, is called when the
+// clock runs out instead of the round being lost on time: the round settles
+// itself (calls onResult), as a drawing is scored on what's there.
+export type Frame = (props: {
+  focus: React.ReactNode;
+  controls?: React.ReactNode;
+  fitFocus?: boolean;
+  onExpire?: () => void;
+}) => React.ReactElement;
 
 export type RoundProps<S> = {
   spec: S; // this round's puzzle, from makeRun
@@ -35,10 +43,13 @@ export type Game<S = unknown> = {
   // (a question list); the intro waits for it.
   makeRun: () => S[] | Promise<S[]>;
   Round: React.ComponentType<RoundProps<S>>;
+  // Seconds for round n (1-based), for a game whose rounds need longer than
+  // the engine's roundSeconds.
+  seconds?: (round: number) => number;
   dev?: true; // a test game, for development builds only
 };
 
-export const GAMES: Game<any>[] = [trivia, bigger];
+export const GAMES: Game<any>[] = [trivia, memory, bigger];
 
 // The games this build offers.
 export const PLAYABLE = GAMES.filter((g) => __DEV__ || !g.dev);
