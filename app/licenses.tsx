@@ -21,8 +21,9 @@ const SUMMARY = Object.entries(
 // every package that ships with the app, its version and its license type.
 // The list is generated from node_modules by `npm run licenses`
 // (scripts/licenses.mjs). The one screen in the game that scrolls: it is a
-// reference list, hundreds of rows long. Above it, the credit the trivia
-// questions' licence asks for (src/arcade/games/trivia).
+// reference list, hundreds of rows long. Above it, the credits the trivia
+// questions' and the memory drawings' licences ask for (src/arcade/games/trivia,
+// src/arcade/games/memory).
 export default function Licenses() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -54,6 +55,10 @@ export default function Licenses() {
             <Text style={[styles.intro, { fontSize: ui.f(13), paddingTop: ui.sp(6) }]} maxFontSizeMultiplier={FONT_CAP}>
               Trivia questions from the Open Trivia Database (opentdb.com), used under the Creative Commons
               Attribution-ShareAlike 4.0 licence.
+            </Text>
+            <Text style={[styles.intro, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
+              Draw from memory drawings from the Quick, Draw! dataset by Google (quickdraw.withgoogle.com), used under the
+              Creative Commons Attribution 4.0 licence.
             </Text>
           </View>
         }
