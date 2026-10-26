@@ -1,11 +1,13 @@
 import { themes, type Theme } from '../tokens';
 import { birthday, type Birthday } from './birthday';
+import { bobby } from './bobby';
 import { christmas } from './christmas';
 import { easter } from './easter';
 import { fourthOfJuly } from './fourthOfJuly';
 import { groundhogDay } from './groundhogDay';
 import { halloween } from './halloween';
 import { newYear } from './newYear';
+import { paul } from './paul';
 import { railroad } from './railroad';
 import { spring } from './spring';
 import { stPatricks } from './stPatricks';
@@ -40,6 +42,8 @@ export const SKINS: Skin[] = [
 // reward in the catalog.
 export const UNLOCKABLE: Record<string, Skin> = {
   'theme.railroad': railroad,
+  'theme.paul': paul,
+  'theme.bobby': bobby,
 };
 
 // Every skin, holidays first (the previews and their contrast check use this).

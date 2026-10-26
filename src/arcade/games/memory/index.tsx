@@ -8,13 +8,15 @@ import { useUi } from '../../../theme/responsive';
 import { ROUNDS } from '../../engine';
 import type { Game, RoundProps } from '../index';
 import { DrawPad } from './DrawPad';
+import { ScoreReveal } from './ScoreReveal';
 import { similarity } from './score';
 import PACK from './pack.json';
 
 // Draw from memory: a drawing is shown for a moment, then hidden, and the
 // player draws it on a blank pad. Done (or the clock running out) scores the
 // drawing against the one shown (score.ts), and the round is won at the
-// round's pass mark or better.
+// round's pass mark or better. Before the run moves on, ScoreReveal.tsx shows
+// how it went: the one shown over theirs, and the score against the mark.
 //
 // The drawings are doodles from Google's Quick, Draw! (CC BY 4.0, credited on
 // app/licenses.tsx), chosen and converted by scripts/quickdraw.mts. The pack
@@ -64,11 +66,32 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
   strokesRef.current = strokes;
   const shown = useMemo(() => JSON.stringify({ ...SPACE, strokes: spec.strokes }), [spec]);
 
-  // Scored on what's drawn, whether Done was pressed or the clock ran out.
+  // Scored on what's drawn, whether Done was pressed or the clock ran out;
+  // the reveal then ends the round (ScoreReveal.tsx onContinue).
+  const [result, setResult] = useState<{ score: number; at: number } | null>(null);
+  const scored = useRef(false);
   const done = () => {
-    const score = similarity(strokesRef.current, spec.strokes);
-    onResult(score >= spec.pass, `It was ${article(spec.word)} ${spec.word}. Your drawing matched ${score}%; it needed ${spec.pass}%.`);
+    if (scored.current) return;
+    scored.current = true;
+    setResult({ score: similarity(strokesRef.current, spec.strokes), at: Date.now() });
   };
+
+  if (result) {
+    const answer = `${article(spec.word)} ${spec.word}`;
+    const { score, at } = result;
+    return (
+      <ScoreReveal
+        Frame={Frame}
+        shown={spec.strokes}
+        drawn={strokes}
+        score={score}
+        pass={spec.pass}
+        answer={answer}
+        at={at}
+        onContinue={() => onResult(score >= spec.pass, `It was ${answer}. Your drawing matched ${score}%; it needed ${spec.pass}%.`)}
+      />
+    );
+  }
 
   if (looking) {
     return <Frame onExpire={done} focus={<DrawingImage data={shown} />} controls={<Heading>Remember this!</Heading>} />;

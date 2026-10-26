@@ -38,13 +38,16 @@ export const nextStep = (won: number) => LADDER.find((s) => s.won > won) ?? null
 export type Run =
   | { phase: 'ready' } // the game's intro, before round 1
   | { phase: 'round'; round: number; until: number } // playing round `round` until `until` (epoch ms)
-  | { phase: 'between'; won: number } // won `won` rounds so far: bank, or keep going
+  // Won `won` rounds so far, the last one at `at` (epoch ms) with its clock
+  // set to `until`: bank, or keep going. The round's screen stays up, its
+  // clock stopped where it was answered.
+  | { phase: 'between'; won: number; until: number; at: number }
   | { phase: 'lost'; won: number; timeout: boolean; detail?: string } // the pot is gone
   | { phase: 'payout'; won: number; prize: Prize }; // banked: choose the prize
 
 export type RunAction =
   | { type: 'start'; until: number } // into round 1
-  | { type: 'result'; won: boolean; timeout?: boolean; detail?: string } // the round in play is over
+  | { type: 'result'; won: boolean; at: number; timeout?: boolean; detail?: string } // the round in play is over, at `at`
   | { type: 'next'; until: number } // keep going: into the next round
   | { type: 'bank' } // take what's in the pot
   | { type: 'restart' }; // back to the intro, for another run
@@ -61,7 +64,7 @@ export function runReducer(run: Run, action: RunAction): Run {
       const won = run.round - 1;
       if (!action.won) return { phase: 'lost', won, timeout: !!action.timeout, detail: action.detail };
       if (run.round === ROUNDS) return { phase: 'payout', won: ROUNDS, prize: 'any' };
-      return { phase: 'between', won: run.round };
+      return { phase: 'between', won: run.round, until: run.until, at: action.at };
     }
     case 'next':
       return run.phase === 'between' ? { phase: 'round', round: run.won + 1, until: action.until } : run;

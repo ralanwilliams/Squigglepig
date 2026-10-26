@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 import { Stage } from '../components/Stage';
 import { Heading } from '../components/Heading';
 import { PigButton } from '../components/PigButton';
-import { BackButton } from '../components/BackButton';
 import { RewardTile } from '../rewards/RewardTile';
 import { KindTabs } from '../rewards/KindTabs';
 import { KINDS, type Kind, type Reward } from '../rewards/catalog';
@@ -22,7 +21,7 @@ import { offers } from './payout';
 // and then. With nothing left to give, it says so.
 export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain: () => void; onDone: () => void }) {
   const ui = useUi();
-  const { owned, grant, chosen } = useInventory();
+  const { owned, grant, uses } = useInventory();
   const putToUse = useChoose();
   // Drawn once: the offer doesn't reshuffle as the screen re-renders.
   const [list] = useState(() => offers(prize, owned));
@@ -45,10 +44,10 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
 
   if (taken) {
     const wearable = KINDS[taken.kind].pick === 'one' && !taken.soon;
-    const inUse = chosen(taken.kind) === taken.id;
+    const inUse = uses(taken.id);
     const use = () => putToUse(taken.kind, taken.id);
     return (
-      <Screen title="It's yours!">
+      <Screen>
         <View style={[styles.center, { transform: [{ scale: 1.5 }] }]}>
           {/* Not tappable here (Use it is the button), so it says so itself. */}
           <RewardTile reward={taken} owned chosen={inUse} status={inUse ? 'In use' : 'New!'} />
@@ -65,7 +64,7 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
 
   if (!list.length) {
     return (
-      <Screen title="You've won everything!" back>
+      <Screen>
         <View />
         <>
           <Heading>There's nothing left to win. More rewards are on the way.</Heading>
@@ -78,7 +77,7 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
 
   const shown = prize === 'any' ? list.filter((r) => r.kind === kind) : list;
   return (
-    <Screen title={prize === 'any' ? 'Pick any reward' : 'Pick your prize'} fitFocus>
+    <Screen fitFocus>
       <View style={[styles.grid, { gap: ui.sp(10) }]}>
         {shown.map((r) => (
           <RewardTile key={r.id} reward={r} owned status="Tap to take" onPress={() => take(r)} />
@@ -102,19 +101,13 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
   );
 }
 
-// Stage with a title, the first child as the focus and the second as the
-// rail. `back` adds the corner ‹ (only where leaving loses nothing).
-function Screen({ title, children, fitFocus, back }: { title: string; children: [React.ReactNode, React.ReactNode]; fitFocus?: boolean; back?: boolean }) {
-  return (
-    <View style={styles.fill}>
-      <Stage header={<Heading size="h3" lines={1}>{title}</Heading>} focus={children[0]} actions={children[1]} fitFocus={fitFocus} />
-      {back ? <BackButton /> : null}
-    </View>
-  );
+// Stage, untitled and with no back arrow, like every screen, with the first
+// child as the focus and the second as the rail.
+function Screen({ children, fitFocus }: { children: [React.ReactNode, React.ReactNode]; fitFocus?: boolean }) {
+  return <Stage focus={children[0]} actions={children[1]} fitFocus={fitFocus} />;
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
   center: { alignItems: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
 });

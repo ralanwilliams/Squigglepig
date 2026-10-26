@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { font, type Theme } from '../../../theme/tokens';
+import { font, verdict, type Theme } from '../../../theme/tokens';
 import { useThemedStyles } from '../../../theme/theme';
 import { FONT_CAP, useUi } from '../../../theme/responsive';
 import { playSound } from '../../../lib/sound';
@@ -13,6 +13,11 @@ import { questionsForRun } from './store';
 // first, hard ones last (questions.ts PLAN). The questions come from the Open
 // Trivia Database, kept on the phone between runs, with a pack of our own for
 // when it can't be reached (store.ts).
+//
+// Once an answer is picked the answers lock and say how it went: the right
+// one green with a ✓, a wrong pick red with a ✗ (the verdict colors, told
+// apart by the mark), the rest faded. A right answer leaves the question up
+// with the run's choice under it (keep going, or bank it: RunShell.tsx).
 
 type Spec = { text: string; category: string; answers: string[]; correct: number };
 
@@ -23,7 +28,13 @@ async function makeRun(): Promise<Spec[]> {
 function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const pick = (i: number) => onResult(i === spec.correct, `The answer was ${spec.answers[spec.correct]}.`);
+  const [picked, setPicked] = useState<number | null>(null);
+  const pick = (i: number) => {
+    if (picked !== null) return;
+    setPicked(i);
+    onResult(i === spec.correct, `The answer was ${spec.answers[spec.correct]}.`);
+  };
+  const mark = (i: number) => (picked === null ? undefined : i === spec.correct ? 'right' : i === picked ? 'wrong' : 'other');
   return (
     <Frame
       fitFocus
@@ -44,7 +55,7 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
           {[0, 2].map((row) => (
             <View key={row} style={[styles.row, { gap: ui.sp(10) }]}>
               {spec.answers.slice(row, row + 2).map((answer, k) => (
-                <Answer key={row + k} label={answer} onPress={() => pick(row + k)} />
+                <Answer key={row + k} label={answer} mark={mark(row + k)} onPress={() => pick(row + k)} />
               ))}
             </View>
           ))}
@@ -56,24 +67,38 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
 
 // One answer: a card-like button (a surface, not PigButton's uppercase single
 // line), since answers can run to a few words.
-function Answer({ label, onPress }: { label: string; onPress: () => void }) {
+// Once one is picked (`mark` set) none can be pressed again.
+function Answer({ label, mark, onPress }: { label: string; mark?: 'right' | 'wrong' | 'other'; onPress: () => void }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const press = () => {
     playSound(SOUNDS.grunt);
     onPress();
   };
+  const sign = mark === 'right' ? '✓ ' : mark === 'wrong' ? '✗ ' : '';
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={mark === 'right' ? `${label}, the right answer` : mark === 'wrong' ? `${label}, wrong` : label}
+      accessibilityState={{ disabled: !!mark }}
+      disabled={!!mark}
       onPress={press}
       style={({ pressed }) => [
         styles.answer,
         pressed && styles.pressed,
+        mark === 'right' && styles.right,
+        mark === 'wrong' && styles.wrong,
+        mark === 'other' && styles.other,
         { minHeight: ui.sp(44), paddingVertical: ui.sp(6), paddingHorizontal: ui.sp(10), borderRadius: ui.sp(8) },
       ]}
     >
-      <Text style={[styles.answerText, { fontSize: ui.f(15) }]} numberOfLines={2} adjustsFontSizeToFit maxFontSizeMultiplier={FONT_CAP}>
+      <Text
+        style={[styles.answerText, (mark === 'right' || mark === 'wrong') && styles.markedText, { fontSize: ui.f(15) }]}
+        numberOfLines={2}
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={FONT_CAP}
+      >
+        {sign}
         {label}
       </Text>
     </Pressable>
@@ -93,7 +118,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderColor: t.surfaceBorder,
   },
   pressed: { backgroundColor: t.surfaceInset },
+  right: { backgroundColor: verdict.yes, borderColor: verdict.yes },
+  wrong: { backgroundColor: verdict.no, borderColor: verdict.no },
+  other: { opacity: 0.5 },
   answerText: { color: t.surfaceText, fontFamily: font.medium, textAlign: 'center' },
+  markedText: { color: verdict.mark, fontFamily: font.bold },
 });
 
 export const trivia: Game<Spec> = {

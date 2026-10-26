@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PigButton } from '../../../components/PigButton';
 import { Heading } from '../../../components/Heading';
@@ -26,7 +26,14 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const big = Math.max(spec.left, spec.right);
-  const pick = (n: number) => onResult(n === big, `${big} was bigger`);
+  // Once picked the buttons stop answering: a won round stays up under the
+  // run's choice (RunShell.tsx).
+  const [picked, setPicked] = useState(false);
+  const pick = (n: number) => {
+    if (picked) return;
+    setPicked(true);
+    onResult(n === big, `${big} was bigger`);
+  };
   return (
     <Frame
       focus={

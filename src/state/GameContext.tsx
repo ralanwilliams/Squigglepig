@@ -5,7 +5,7 @@ import { supabase, supabaseReady } from '../lib/supabase';
 import { TIMERS, HOST_GRACE } from '../lib/timers';
 import { saveSession, clearSession } from '../lib/session';
 import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
-import { cleanAvatar, useMyAvatar, type Avatar } from '../avatar/avatar';
+import { cleanAvatar, useMyAvatar, wireAvatar, type Avatar } from '../avatar/avatar';
 
 // ---- Game model: the "telephone" chain (a Telestrations booklet) ----
 //
@@ -717,7 +717,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (s === 'SUBSCRIBED') {
         setStatus('connected');
         setStatusDetail('');
-        channel.track({ username: user, joinedAt: joinedAtRef.current, avatar: myAvatarRef.current });
+        channel.track({ username: user, joinedAt: joinedAtRef.current, avatar: wireAvatar(myAvatarRef.current) });
         channel.send({ type: 'broadcast', event: 'request-state', payload: { username: user } });
       } else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') {
         setStatus('error');
@@ -756,10 +756,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setPrev(null);
   };
 
-  // A new outfit or bubble while in a room goes out at once.
+  // A change to the pig (an outfit, a bubble, a theme part) while in a room
+  // goes out at once.
   useEffect(() => {
     if (status !== 'connected' || !channelRef.current) return;
-    channelRef.current.track({ username: usernameRef.current, joinedAt: joinedAtRef.current, avatar: myAvatar });
+    channelRef.current.track({ username: usernameRef.current, joinedAt: joinedAtRef.current, avatar: wireAvatar(myAvatar) });
   }, [myAvatar]);
 
   const startGame = (t: number) => {

@@ -18,11 +18,14 @@ import { trivia } from './trivia';
 // can grow too tall, as Stage's does. `onExpire`, if given, is called when the
 // clock runs out instead of the round being lost on time: the round settles
 // itself (calls onResult), as a drawing is scored on what's there.
+// `stoppedAt` (epoch ms) stops the clock there, for a round that's been
+// answered but is still showing how it went before it calls onResult.
 export type Frame = (props: {
   focus: React.ReactNode;
   controls?: React.ReactNode;
   fitFocus?: boolean;
   onExpire?: () => void;
+  stoppedAt?: number;
 }) => React.ReactElement;
 
 export type RoundProps<S> = {

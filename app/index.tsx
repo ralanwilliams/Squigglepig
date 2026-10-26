@@ -62,8 +62,8 @@ export default function Home() {
         }
         actions={
           <>
-            <PigButton name="Join Game" onPress={() => router.push('/join')} />
             <PigButton name="Create Game" onPress={() => router.push('/create')} />
+            <PigButton name="Join Game" onPress={() => router.push('/join')} />
             {PLAYABLE.length ? <PigButton name="Play Solo" onPress={() => router.push('/arcade')} /> : null}
           </>
         }

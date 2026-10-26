@@ -21,8 +21,9 @@ const ASPECT = SPACE.w / SPACE.h;
 const MIN_STEP = 1;
 
 // Largest 4:3 rectangle that fits in a box, as DrawingImage draws the
-// flashed drawing: the pad is the same size, in the same place.
-const fitAspect = (box: { w: number; h: number }) => {
+// flashed drawing: the pad is the same size, in the same place (and so is the
+// drawing scored, ScoreReveal.tsx).
+export const fitAspect = (box: { w: number; h: number }) => {
   if (!box.w || !box.h) return { w: 0, h: 0 };
   let w = box.w;
   let h = w / ASPECT;

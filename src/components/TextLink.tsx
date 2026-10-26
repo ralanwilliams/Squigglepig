@@ -4,9 +4,8 @@ import { font, type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 
-// A quiet text action under the buttons ("Leave", "Your rewards"): underlined
-// in the link color, like LeaveButton, but padded and hit-slopped to a full
-// 44dp target.
+// A quiet text action under the buttons ("Leave"): underlined in the link
+// color, like LeaveButton, but padded and hit-slopped to a full 44dp target.
 export function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);

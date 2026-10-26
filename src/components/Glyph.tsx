@@ -6,7 +6,6 @@ import Svg, { Circle, G, Path } from 'react-native-svg';
 // caller passes (the theme's `link`, so they follow light / dark mode).
 const GLYPHS = {
   menu: <Path d="M4 7h16M4 12h16M4 17h16" />,
-  back: <Path d="M15 5l-7 7 7 7" />,
   close: <Path d="M6 6l12 12M18 6L6 18" />,
   play: (
     <>
@@ -25,18 +24,6 @@ const GLYPHS = {
   shield: <Path d="M12 3l7 3v5.2c0 4.4-2.9 8.2-7 9.8-4.1-1.6-7-5.4-7-9.8V6zM9 12l2 2 4-4" />,
   doc: <Path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5" />,
   code: <Path d="M9 7l-5 5 5 5M15 7l5 5-5 5" />,
-  person: (
-    <>
-      <Circle cx="12" cy="8.5" r="3.5" />
-      <Path d="M5 20c.8-3.6 3.7-5.5 7-5.5s6.2 1.9 7 5.5" />
-    </>
-  ),
-  globe: (
-    <>
-      <Circle cx="12" cy="12" r="9" />
-      <Path d="M3 12h18M12 3c2.4 2.6 3.6 5.6 3.6 9s-1.2 6.4-3.6 9c-2.4-2.6-3.6-5.6-3.6-9S9.6 5.6 12 3z" />
-    </>
-  ),
   contrast: (
     <>
       <Circle cx="12" cy="12" r="9" />
@@ -50,7 +37,6 @@ const GLYPHS = {
     </>
   ),
   season: <Path d="M4 6h16v14H4zM4 10h16M8 3.5v4M16 3.5v4M12 12.6l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z" />, // a calendar with a star
-  gift: <Path d="M4 11h16v9H4zM3 7.5h18V11H3zM12 7.5V20M12 7.5C10.8 4.6 7 4.1 7 6s3.4 1.5 5 1.5zM12 7.5c1.2-2.9 5-3.4 5-1.5s-3.4 1.5-5 1.5z" />, // the Rewards screen
   lock: <Path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3" />, // a reward not yet won
   // One per kind of reward (src/rewards/catalog.ts KINDS).
   palette: (

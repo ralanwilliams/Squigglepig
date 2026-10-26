@@ -15,27 +15,38 @@ import { URGENT_AT } from '../lib/timers';
 // deadline once and pass it in; the clock then just reads it. Without `until`
 // the clock starts from `seconds` at mount, which suits a countdown that is
 // meant to restart with its parent (keyed per reveal step, say).
-const secondsLeft = (deadline: number) => Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+//
+// `stoppedAt` (epoch ms) stops the clock there: it shows what was left at that
+// moment, dimmed, and never expires — a solo round once it's answered (the
+// memory game's once Done is pressed, any game's once won). A time, not a
+// flag, so a remount while stopped shows the same.
+const secondsLeft = (deadline: number, now = Date.now()) => Math.max(0, Math.ceil((deadline - now) / 1000));
 
 export function Countdown({
   seconds,
   until,
   onExpire,
   size = 20,
+  stoppedAt,
 }: {
   seconds: number;
   until?: number;
   onExpire?: () => void;
   size?: number; // base font size, scaled by the UI scale
+  stoppedAt?: number;
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const [remaining, setRemaining] = useState(() => (until ? secondsLeft(until) : seconds));
+  const [remaining, setRemaining] = useState(() => (until ? secondsLeft(until, stoppedAt) : seconds));
   const fired = useRef(false);
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
 
   useEffect(() => {
+    if (stoppedAt) {
+      if (until) setRemaining(secondsLeft(until, stoppedAt));
+      return;
+    }
     const deadline = until ?? Date.now() + seconds * 1000;
     fired.current = false;
     const tick = () => {
@@ -50,7 +61,7 @@ export function Countdown({
     const id = setInterval(tick, 250);
     tick();
     return () => clearInterval(id);
-  }, [seconds, until]);
+  }, [seconds, until, stoppedAt]);
 
   const mm = Math.floor(remaining / 60);
   const ss = remaining % 60;
@@ -58,7 +69,7 @@ export function Countdown({
 
   return (
     <Text
-      style={[styles.text, { fontSize: ui.f(size) }, remaining <= URGENT_AT && styles.urgent]}
+      style={[styles.text, { fontSize: ui.f(size) }, remaining <= URGENT_AT && styles.urgent, !!stoppedAt && styles.stopped]}
       maxFontSizeMultiplier={FONT_CAP}
       numberOfLines={1}
     >
@@ -78,4 +89,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     color: t.text,
   },
   urgent: { color: t.accent, fontFamily: font.bold },
+  stopped: { opacity: 0.45 },
 });

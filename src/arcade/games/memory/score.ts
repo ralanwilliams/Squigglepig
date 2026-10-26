@@ -9,7 +9,8 @@
 // average, one unit from it. Where and how big it was drawn doesn't count,
 // only its shape. Then every point of each finds its nearest point in the
 // other; the mean of those distances, both ways, is how far apart the shapes
-// are, and FAR turns that into a score.
+// are, and FAR turns that into a score. `fit` lines the two up the same way
+// for the ghost the player sees after Done (ScoreReveal.tsx).
 //
 // Pure: no React, no imports, so scripts/quickdraw.mts runs it in Node to
 // choose the pack's clearest drawings.
@@ -56,9 +57,8 @@ function pathPoints(d: string): Pt[] {
   return pts.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) ? pts : [];
 }
 
-// POINTS points spread evenly along all the ink (a dot gets one), normalised
-// as above. Empty for a drawing with no ink worth measuring.
-export function cloud(strokes: string[]): Pt[] {
+// POINTS points spread evenly along all the ink (a dot gets one).
+function sample(strokes: string[]): Pt[] {
   const lines = strokes.map(pathPoints).filter((l) => l.length);
   let total = 0;
   for (const l of lines) for (let k = 1; k < l.length; k++) total += Math.hypot(l[k].x - l[k - 1].x, l[k].y - l[k - 1].y);
@@ -87,12 +87,44 @@ export function cloud(strokes: string[]): Pt[] {
       }
     }
   }
-  if (!out.length) return out;
-  const cx = out.reduce((s, p) => s + p.x, 0) / out.length;
-  const cy = out.reduce((s, p) => s + p.y, 0) / out.length;
-  const r = Math.sqrt(out.reduce((s, p) => s + (p.x - cx) ** 2 + (p.y - cy) ** 2, 0) / out.length);
-  if (r < 1e-6) return [];
-  return out.map((p) => ({ x: (p.x - cx) / r, y: (p.y - cy) / r }));
+  return out;
+}
+
+// Where a drawing's ink is centred and how far it spreads: its points' mean,
+// and their RMS distance from it. Null for one with no ink worth measuring.
+function spread(pts: Pt[]): { x: number; y: number; r: number } | null {
+  if (!pts.length) return null;
+  const x = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const y = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  const r = Math.sqrt(pts.reduce((s, p) => s + (p.x - x) ** 2 + (p.y - y) ** 2, 0) / pts.length);
+  return r < 1e-6 ? null : { x, y, r };
+}
+
+// The sampled ink, normalised as above. Empty for a drawing with no ink worth
+// measuring.
+export function cloud(strokes: string[]): Pt[] {
+  const pts = sample(strokes);
+  const at = spread(pts);
+  if (!at) return [];
+  return pts.map((p) => ({ x: (p.x - at.x) / at.r, y: (p.y - at.y) / at.r }));
+}
+
+// How to lay `shown` over `drawn` the way they were compared: move `shown`'s
+// centre of ink to the origin, scale it by k, move it to `drawn`'s. Null when
+// either has no ink to line up.
+export function fit(shown: string[], drawn: string[]): { from: Pt; to: Pt; k: number } | null {
+  const a = spread(sample(shown));
+  const b = spread(sample(drawn));
+  if (!a || !b) return null;
+  return { from: { x: a.x, y: a.y }, to: { x: b.x, y: b.y }, k: b.r / a.r };
+}
+
+// The length of one path's ink, in its own units.
+export function inkLength(d: string): number {
+  const l = pathPoints(d);
+  let total = 0;
+  for (let k = 1; k < l.length; k++) total += Math.hypot(l[k].x - l[k - 1].x, l[k].y - l[k - 1].y);
+  return total;
 }
 
 // The mean distance from each point of `a` to the nearest of `b`.

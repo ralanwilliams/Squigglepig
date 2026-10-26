@@ -77,6 +77,20 @@ export default function RootLayout() {
 function Shell() {
   const theme = useTheme();
   const frame = useAppFrame();
+
+  // On the web (a tab, or installed as a PWA) the browser's own bars and the
+  // page behind the app follow the palette too — dark mode, a holiday, a won
+  // theme: the toolbar / status bar color (theme-color) and the page's
+  // background, which shows in the strips round the app (an iPhone's status
+  // bar and home indicator) and when the page bounces. public/index.html
+  // starts them right for the OS's light or dark mode, before this runs.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', theme.background));
+    document.documentElement.style.backgroundColor = theme.background;
+    document.body.style.backgroundColor = theme.background;
+  }, [theme.background]);
+
   return (
     <View style={[styles.window, { backgroundColor: theme.background }]}>
       <View style={[styles.frame, Platform.OS === 'web' && { maxWidth: frame.width }]}>

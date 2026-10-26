@@ -7,7 +7,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Squigglepig | Draw Squiggles, Get Giggles</title>
     <meta name="description" content="A real-time drawing telephone party game. A prompt becomes a drawing becomes a guess becomes the next drawing, passed around the whole group." />
-    <meta name="theme-color" content="#4ECDC4" />
+    <!-- The browser's toolbar / status bar: classic teal, or the dark palette's
+         background in dark mode, until the app takes over (app/_layout.tsx
+         sets it from the palette showing, theme and all). -->
+    <meta name="theme-color" content="#4ECDC4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B1F23" media="(prefers-color-scheme: dark)" />
 
     <!-- Add to Home Screen: opens full-screen like the app. No service worker:
          the game is live multiplayer, so there's nothing useful to do offline. -->
@@ -15,6 +19,11 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Squigglepig" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Installed on an iPhone, the app runs up under the status bar (its
+         safe-area insets keep the content clear), so the bar shows the app's
+         own background rather than a fixed white one. iOS draws its text
+         white in this mode. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />
 
     <!-- Link previews (Messages, WhatsApp, Slack, Discord, social sites). -->
@@ -43,13 +52,20 @@
       }
       body {
         overflow: hidden;
-        /* Teal before the app paints, not a white flash. */
+        /* Teal (dark in dark mode) before the app paints, not a white flash;
+           then the app keeps it on the palette (app/_layout.tsx). */
         background-color: #4ecdc4;
         /* Drawing and tapping buttons mustn't select text or flash a highlight. */
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
         -webkit-tap-highlight-color: transparent;
+      }
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background-color: #0b1f23;
+        }
       }
       input,
       textarea {

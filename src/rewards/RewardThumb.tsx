@@ -19,8 +19,8 @@ import { KINDS, isNone, type Kind, type Reward } from './catalog';
 type Thumb<K extends Kind> = (reward: Extract<Reward, { kind: K }>, size: number, edge: string) => React.ReactNode | null;
 
 // A prop's own drawing (props.ts), fitted to the square with room for its
-// outline: an outfit, a speech bubble, a sticker.
-function propThumb(name: PropName, size: number) {
+// outline: an outfit, a speech bubble, a sticker, a theme's part on Your pig.
+export function propThumb(name: PropName, size: number) {
   const prop: Prop = PROPS[name];
   const side = Math.max(prop.w, prop.h);
   const line = side / 24;
