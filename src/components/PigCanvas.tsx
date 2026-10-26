@@ -5,7 +5,10 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { PigButton } from './PigButton';
 import { WorkStage } from './WorkStage';
 import { Strokes } from './DrawingArt';
-import { SPACE, STROKE, type Drawing } from '../lib/drawing';
+import { InkPicker } from './InkPicker';
+import { SPACE, STROKE, inkFor, type Drawing } from '../lib/drawing';
+import { rewardsOf } from '../rewards/catalog';
+import { useInventory } from '../rewards/inventory';
 import { hintLearned, markHintLearned } from '../lib/hints';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { useThemedStyles } from '../theme/theme';
@@ -59,7 +62,9 @@ const px = (n: number) => n.toFixed(1);
 // screen uses). The canvas is the largest 4:3 that fits the focus pane and
 // shows the drawing space at 1× or, through a 200 × 150 window, at 2×. One
 // finger always draws; two fingers slide the window; the minimap in the corner
-// shows where the window is and can be tapped or dragged to jump.
+// shows where the window is and can be tapped or dragged to jump. A player
+// who has won brushes picks the ink in the top-left corner (InkPicker); each
+// drawing starts in black.
 export function PigCanvas({
   onSubmit,
   timeLimit,
@@ -75,8 +80,20 @@ export function PigCanvas({
   const styles = useThemedStyles(makeStyles);
 
   // Replaced (never mutated) on each commit, so `Strokes` (memoized) sees a new
-  // identity exactly when there is something new to draw.
+  // identity exactly when there is something new to draw. `inks` runs in step
+  // with it: the brush each stroke was drawn with, null for black.
   const committed = useRef<string[]>([]);
+  const inks = useRef<(string | null)[]>([]);
+
+  // The brushes this player has won (src/rewards), the one in use, and
+  // whether the picker is open. With none won, there's no picker.
+  const { owned } = useInventory();
+  const brushes = rewardsOf('brush').filter((b) => !b.soon && owned.has(b.id));
+  const [ink, setInk] = useState<string | null>(null);
+  const inkRef = useRef(ink);
+  inkRef.current = ink;
+  const [picking, setPicking] = useState(false);
+
   // The stroke under the finger. Built as `M p0 Q p0 m1 Q p1 m2 …`: each new
   // point becomes the control of a quadratic that ends at the midpoint between
   // it and the previous point, which turns the raw polyline into a smooth curve
@@ -199,6 +216,7 @@ export function PigCanvas({
     const { x, y } = s.last;
     const d = s.moved ? `${s.d} L ${px(x)} ${px(y)}` : `${s.d} L ${px(x + 0.1)} ${px(y)}`;
     committed.current = [...committed.current, d];
+    inks.current = [...inks.current, inkRef.current];
     force();
   };
 
@@ -211,6 +229,7 @@ export function PigCanvas({
     .onBegin((e) => {
       const p = toUnits(e.x, e.y);
       live.current = { d: `M ${px(p.x)} ${px(p.y)}`, last: p, len: 0, moved: false };
+      setPicking(false); // drawing shuts the ink picker
       schedule();
     })
     .onUpdate((e) => {
@@ -301,17 +320,21 @@ export function PigCanvas({
   }, []);
 
   // ---- Actions -------------------------------------------------------------
+  // A drawing all in black goes without `inks`, exactly as before brushes.
   const submit = () => {
     commit(false);
     const data: Drawing = { w: SPACE.w, h: SPACE.h, strokes: committed.current };
+    if (inks.current.some((i) => i !== null)) data.inks = inks.current;
     onSubmit(JSON.stringify(data));
   };
   const undo = () => {
     committed.current = committed.current.slice(0, -1);
+    inks.current = inks.current.slice(0, -1);
     force();
   };
   const clear = () => {
     committed.current = [];
+    inks.current = [];
     live.current = null;
     force();
   };
@@ -324,11 +347,11 @@ export function PigCanvas({
       <View ref={frameRef} style={[styles.frame, { width: size.w, height: size.h, borderRadius: ui.sp(layout.imageRadius) }]}>
         <GestureDetector gesture={canvasGesture}>
           <Svg width={size.w} height={size.h} viewBox={viewBox}>
-            <Strokes strokes={committed.current} width={STROKE} />
+            <Strokes strokes={committed.current} inks={inks.current} width={STROKE} />
             {stroke ? (
               <Path
                 d={stroke.d}
-                stroke={paper.ink}
+                stroke={inkFor(ink)}
                 strokeWidth={STROKE}
                 fill="none"
                 strokeLinecap="round"
@@ -337,6 +360,20 @@ export function PigCanvas({
             ) : null}
           </Svg>
         </GestureDetector>
+
+        {brushes.length ? (
+          <InkPicker
+            brushes={brushes}
+            ink={ink}
+            open={picking}
+            onOpen={() => setPicking(true)}
+            onPick={(id) => {
+              setInk(id);
+              setPicking(false);
+            }}
+            ui={ui}
+          />
+        ) : null}
 
         {/* 1× / 2× switch. Both positions always visible; the lit one is current. */}
         <View
@@ -372,7 +409,7 @@ export function PigCanvas({
               style={[styles.minimap, { width: mm.w, height: mm.h, right: ui.sp(8), bottom: ui.sp(8), borderRadius: ui.sp(4) }]}
             >
               <Svg width={mm.w} height={mm.h} viewBox={`0 0 ${SPACE.w} ${SPACE.h}`}>
-                <Strokes strokes={committed.current} width={4} />
+                <Strokes strokes={committed.current} inks={inks.current} width={4} />
                 <Rect
                   x={origin.x}
                   y={origin.y}

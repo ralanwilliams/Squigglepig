@@ -68,16 +68,17 @@ const THEMES: Entry<ThemeReward>[] = [
 ];
 
 // Colors drawn on the canvas's white paper, which is never themed, so each is
-// dark enough to read as a line on white.
+// dark enough to read as a line on white. Picked on the canvas (InkPicker);
+// a drawing names the brush of each stroke (src/lib/drawing.ts `inks`).
 const BRUSHES: Entry<BrushReward>[] = [
-  { id: 'brush.barnRed', label: 'Barn red', tier: 'common', color: '#C62828', soon: true },
-  { id: 'brush.carrot', label: 'Carrot', tier: 'common', color: '#E8650A', soon: true },
-  { id: 'brush.corn', label: 'Corn', tier: 'common', color: '#D9A300', soon: true },
-  { id: 'brush.clover', label: 'Clover', tier: 'common', color: '#2E7D32', soon: true },
-  { id: 'brush.pond', label: 'Pond', tier: 'common', color: '#1E6FD9', soon: true },
-  { id: 'brush.grape', label: 'Grape', tier: 'common', color: '#6A1B9A', soon: true },
-  { id: 'brush.pigPink', label: 'Pig pink', tier: 'common', color: '#E2577F', soon: true },
-  { id: 'brush.mud', label: 'Mud', tier: 'common', color: '#6D4C41', soon: true },
+  { id: 'brush.barnRed', label: 'Barn red', tier: 'common', color: '#C62828' },
+  { id: 'brush.carrot', label: 'Carrot', tier: 'common', color: '#E8650A' },
+  { id: 'brush.corn', label: 'Corn', tier: 'common', color: '#D9A300' },
+  { id: 'brush.clover', label: 'Clover', tier: 'common', color: '#2E7D32' },
+  { id: 'brush.pond', label: 'Pond', tier: 'common', color: '#1E6FD9' },
+  { id: 'brush.grape', label: 'Grape', tier: 'common', color: '#6A1B9A' },
+  { id: 'brush.pigPink', label: 'Pig pink', tier: 'common', color: '#E2577F' },
+  { id: 'brush.mud', label: 'Mud', tier: 'common', color: '#6D4C41' },
 ];
 
 // Packs of pre-drawn pictures a player can stamp onto the canvas in the main
