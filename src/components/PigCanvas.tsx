@@ -1,13 +1,16 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { Animated, LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { G, Path, Rect } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { PigButton } from './PigButton';
 import { WorkStage } from './WorkStage';
-import { Strokes } from './DrawingArt';
+import { Stickers, Strokes } from './DrawingArt';
 import { InkPicker } from './InkPicker';
-import { SPACE, STROKE, inkFor, type Drawing } from '../lib/drawing';
+import { StickerControls, StickerPicker, type StickerAct } from './StickerPicker';
+import { SPACE, STROKE, inkFor, type Drawing, type Sticker } from '../lib/drawing';
 import { rewardsOf } from '../rewards/catalog';
+import { STICKER_ART, stickersIn } from '../stickers/art';
+import { PROPS, type Prop } from '../theme/skins/props';
 import { useInventory } from '../rewards/inventory';
 import { hintLearned, markHintLearned } from '../lib/hints';
 import { FONT_CAP, useUi } from '../theme/responsive';
@@ -43,6 +46,20 @@ const WHEEL_LINE_PX = 16;
 
 type Pt = { x: number; y: number };
 
+// A sticker on this canvas, with a key of its own so the undo history can
+// find it (the key isn't sent).
+type Placed = Sticker & { key: number };
+// The undo history: strokes and stickers in the order they went down.
+type Step = { kind: 'stroke' } | { kind: 'sticker'; key: number };
+
+// A new sticker's width, as a share of the view (so it's the same size on
+// screen at 1× and 2×); the controls grow / shrink it by STICKER_STEP and turn
+// it by STICKER_TURN degrees, within STICKER_SIZES drawing units.
+const STICKER_NEW = 0.25;
+const STICKER_STEP = 1.25;
+const STICKER_TURN = 15;
+const STICKER_SIZES = { min: 20, max: 300 };
+
 // Largest 4:3 rectangle that fits in a box.
 const fitAspect = (box: { w: number; h: number }) => {
   if (!box.w || !box.h) return { w: 0, h: 0 };
@@ -64,7 +81,11 @@ const px = (n: number) => n.toFixed(1);
 // finger always draws; two fingers slide the window; the minimap in the corner
 // shows where the window is and can be tapped or dragged to jump. A player
 // who has won brushes picks the ink in the top-left corner (InkPicker); each
-// drawing starts in black.
+// drawing starts in black. One who has won stickers stamps them from the
+// button under it (StickerPicker): a new sticker lands mid-view, selected,
+// and while it's selected one finger moves it instead of drawing and its
+// controls (StickerControls) resize, turn or remove it until Done. Undo takes
+// back the last stroke or sticker, whichever went down last.
 export function PigCanvas({
   onSubmit,
   timeLimit,
@@ -93,6 +114,20 @@ export function PigCanvas({
   const inkRef = useRef(ink);
   inkRef.current = ink;
   const [picking, setPicking] = useState(false);
+
+  // The stickers this player can use (their packs), the ones on the drawing,
+  // the undo history, the one selected (by key), and whether the tray is open.
+  const available = stickersIn(owned);
+  const placed = useRef<Placed[]>([]);
+  const history = useRef<Step[]>([]);
+  const nextKey = useRef(1);
+  const [selected, setSelected] = useState<number | null>(null);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const [tray, setTray] = useState(false);
+  // A one-finger drag on the selected sticker: where it started, and where
+  // the sticker was then.
+  const moving = useRef<{ from: Pt; x: number; y: number } | null>(null);
 
   // The stroke under the finger. Built as `M p0 Q p0 m1 Q p1 m2 …`: each new
   // point becomes the control of a quadratic that ends at the midpoint between
@@ -217,6 +252,13 @@ export function PigCanvas({
     const d = s.moved ? `${s.d} L ${px(x)} ${px(y)}` : `${s.d} L ${px(x + 0.1)} ${px(y)}`;
     committed.current = [...committed.current, d];
     inks.current = [...inks.current, inkRef.current];
+    history.current = [...history.current, { kind: 'stroke' }];
+    force();
+  };
+
+  // Change the stickers (a new array, so `Stickers` sees it).
+  const restick = (next: Placed[]) => {
+    placed.current = next;
     force();
   };
 
@@ -228,11 +270,27 @@ export function PigCanvas({
     .maxPointers(1)
     .onBegin((e) => {
       const p = toUnits(e.x, e.y);
-      live.current = { d: `M ${px(p.x)} ${px(p.y)}`, last: p, len: 0, moved: false };
       setPicking(false); // drawing shuts the ink picker
+      setTray(false); // and the sticker tray
+      // With a sticker selected, the finger moves it rather than drawing.
+      const sel = placed.current.find((s) => s.key === selectedRef.current);
+      if (sel) {
+        moving.current = { from: p, x: sel.x, y: sel.y };
+        return;
+      }
+      live.current = { d: `M ${px(p.x)} ${px(p.y)}`, last: p, len: 0, moved: false };
       schedule();
     })
     .onUpdate((e) => {
+      const m = moving.current;
+      if (m) {
+        const p = toUnits(e.x, e.y);
+        const x = clamp(m.x + p.x - m.from.x, 0, SPACE.w);
+        const y = clamp(m.y + p.y - m.from.y, 0, SPACE.h);
+        placed.current = placed.current.map((s) => (s.key === selectedRef.current ? { ...s, x, y } : s));
+        schedule();
+        return;
+      }
       const s = live.current;
       if (!s) return;
       // Belt and braces for platforms whose native pan keeps tracking past
@@ -254,7 +312,13 @@ export function PigCanvas({
       schedule();
     })
     // Fires after end AND cancel, so no stroke is ever left dangling.
-    .onFinalize((e) => commit(secondFinger.current || e.numberOfPointers > 1));
+    .onFinalize((e) => {
+      if (moving.current) {
+        moving.current = null;
+        return;
+      }
+      commit(secondFinger.current || e.numberOfPointers > 1);
+    });
 
   // Two fingers slide the window at 2×. Runs alongside `draw`: when the second
   // finger lands, `draw` hits its pointer limit and finalizes, and this starts.
@@ -320,24 +384,75 @@ export function PigCanvas({
   }, []);
 
   // ---- Actions -------------------------------------------------------------
-  // A drawing all in black goes without `inks`, exactly as before brushes.
+  // A drawing all in black without stickers goes without `inks` or
+  // `stickers`, exactly as before either.
   const submit = () => {
     commit(false);
     const data: Drawing = { w: SPACE.w, h: SPACE.h, strokes: committed.current };
     if (inks.current.some((i) => i !== null)) data.inks = inks.current;
+    if (placed.current.length) data.stickers = placed.current.map(({ id, x, y, s, r }) => ({ id, x, y, s, r }));
     onSubmit(JSON.stringify(data));
   };
   const undo = () => {
-    committed.current = committed.current.slice(0, -1);
-    inks.current = inks.current.slice(0, -1);
-    force();
+    const last = history.current[history.current.length - 1];
+    if (!last) return;
+    history.current = history.current.slice(0, -1);
+    if (last.kind === 'stroke') {
+      committed.current = committed.current.slice(0, -1);
+      inks.current = inks.current.slice(0, -1);
+      force();
+    } else {
+      if (selectedRef.current === last.key) setSelected(null);
+      restick(placed.current.filter((s) => s.key !== last.key));
+    }
   };
   const clear = () => {
     committed.current = [];
     inks.current = [];
+    placed.current = [];
+    history.current = [];
     live.current = null;
+    setSelected(null);
     force();
   };
+
+  // A sticker from the tray, in the middle of the view, selected.
+  const stamp = (id: string) => {
+    const key = nextKey.current++;
+    const g = geo.current;
+    const w = SPACE.w / g.zoom;
+    const at = { x: g.origin.x + w / 2, y: g.origin.y + SPACE.h / g.zoom / 2 };
+    placed.current = [...placed.current, { id, ...at, s: Math.round(w * STICKER_NEW), r: 0, key }];
+    history.current = [...history.current, { kind: 'sticker', key }];
+    setTray(false);
+    setSelected(key);
+  };
+  const actOnSticker = (act: StickerAct) => {
+    const key = selectedRef.current;
+    if (act === 'done' || key === null) {
+      setSelected(null);
+      return;
+    }
+    if (act === 'remove') {
+      history.current = history.current.filter((h) => !(h.kind === 'sticker' && h.key === key));
+      setSelected(null);
+      restick(placed.current.filter((s) => s.key !== key));
+      return;
+    }
+    restick(
+      placed.current.map((s) => {
+        if (s.key !== key) return s;
+        if (act === 'smaller' || act === 'bigger') {
+          const size = act === 'bigger' ? s.s * STICKER_STEP : s.s / STICKER_STEP;
+          return { ...s, s: Math.round(clamp(size, STICKER_SIZES.min, STICKER_SIZES.max)) };
+        }
+        return { ...s, r: (s.r + (act === 'right' ? STICKER_TURN : -STICKER_TURN) + 360) % 360 };
+      })
+    );
+  };
+  // The selected sticker's outline: a dashed box round it, turned with it.
+  const sel = placed.current.find((s) => s.key === selected);
+  const selArt: Prop | undefined = sel && STICKER_ART[sel.id] ? PROPS[STICKER_ART[sel.id].prop] : undefined;
 
   const stroke = live.current;
   const viewBox = `${origin.x} ${origin.y} ${view.w} ${view.h}`;
@@ -358,22 +473,60 @@ export function PigCanvas({
                 strokeLinejoin="round"
               />
             ) : null}
+            <Stickers stickers={placed.current} />
+            {sel && selArt ? (
+              <G transform={`translate(${sel.x} ${sel.y}) rotate(${sel.r})`}>
+                <Rect
+                  x={-sel.s / 2 - 4}
+                  y={-(sel.s * selArt.h) / selArt.w / 2 - 4}
+                  width={sel.s + 8}
+                  height={(sel.s * selArt.h) / selArt.w + 8}
+                  rx={6}
+                  fill="none"
+                  stroke="palevioletred"
+                  strokeWidth={2 / zoom}
+                  strokeDasharray={`${6 / zoom} ${4 / zoom}`}
+                />
+              </G>
+            ) : null}
           </Svg>
         </GestureDetector>
 
-        {brushes.length ? (
-          <InkPicker
-            brushes={brushes}
-            ink={ink}
-            open={picking}
-            onOpen={() => setPicking(true)}
-            onPick={(id) => {
-              setInk(id);
-              setPicking(false);
-            }}
-            ui={ui}
-          />
+        {/* Top-left: the ink, then the stickers (only what's been won). */}
+        {brushes.length || available.length ? (
+          <View pointerEvents="box-none" style={[styles.corner, { top: ui.sp(8), left: ui.sp(8), gap: ui.sp(6) }]}>
+            {brushes.length ? (
+              <InkPicker
+                brushes={brushes}
+                ink={ink}
+                open={picking}
+                onOpen={() => {
+                  setTray(false);
+                  setPicking(true);
+                }}
+                onPick={(id) => {
+                  setInk(id);
+                  setPicking(false);
+                }}
+                ui={ui}
+              />
+            ) : null}
+            {available.length ? (
+              <StickerPicker
+                stickers={available}
+                open={tray}
+                onOpen={() => {
+                  setPicking(false);
+                  setTray(true);
+                }}
+                onPick={stamp}
+                ui={ui}
+              />
+            ) : null}
+          </View>
         ) : null}
+
+        {sel ? <StickerControls onAct={actOnSticker} ui={ui} /> : null}
 
         {/* 1× / 2× switch. Both positions always visible; the lit one is current. */}
         <View
@@ -403,13 +556,15 @@ export function PigCanvas({
           ))}
         </View>
 
-        {zoom === 2 ? (
+        {/* While a sticker is selected its controls have the canvas's foot. */}
+        {zoom === 2 && !sel ? (
           <GestureDetector gesture={minimapGesture}>
             <View
               style={[styles.minimap, { width: mm.w, height: mm.h, right: ui.sp(8), bottom: ui.sp(8), borderRadius: ui.sp(4) }]}
             >
               <Svg width={mm.w} height={mm.h} viewBox={`0 0 ${SPACE.w} ${SPACE.h}`}>
                 <Strokes strokes={committed.current} inks={inks.current} width={4} />
+                <Stickers stickers={placed.current} />
                 <Rect
                   x={origin.x}
                   y={origin.y}
@@ -425,7 +580,7 @@ export function PigCanvas({
           </GestureDetector>
         ) : null}
 
-        {hint ? (
+        {hint && !sel ? (
           <Animated.View
             pointerEvents="none"
             style={[
@@ -484,6 +639,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     backgroundColor: paper.fill,
   },
   seg: { position: 'absolute', flexDirection: 'row', backgroundColor: 'rgba(0, 0, 0, 0.55)' },
+  corner: { position: 'absolute', alignItems: 'flex-start', maxWidth: '70%' },
   segItem: { alignItems: 'center', justifyContent: 'center' },
   segOn: { backgroundColor: '#ffffff' },
   segText: { color: '#ffffff', fontFamily: font.bold, letterSpacing: 0.3 },

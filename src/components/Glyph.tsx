@@ -65,6 +65,13 @@ const GLYPHS = {
   sticker: <Path d="M5 4h14v9l-7 7H5zM19 13h-5.5a1.5 1.5 0 0 0-1.5 1.5V20M9 9.5v.01M14 9.5v.01" />, // a sticker peeling at one corner
   hat: <Path d="M8 4.5h8V16H8zM4 16h16M8 12.5h8" />, // a top hat
   bubble: <Path d="M4 5h16v11H10.5L6 20v-4H4z" />, // the pig's speech bubble
+  // A sticker's controls on the canvas (StickerPicker.tsx), drawn in white.
+  minus: <Path d="M5 12h14" />,
+  plus: <Path d="M5 12h14M12 5v14" />,
+  turnLeft: <Path d="M9 4L5 8l4 4M5 8h8a6 6 0 0 1 0 12H9" />,
+  turnRight: <Path d="M15 4l4 4-4 4M19 8h-8a6 6 0 0 0 0 12h4" />,
+  trash: <Path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6" />,
+  check: <Path d="M5 12l5 5 9-10" />,
   chevron: <Path d="M9 6l6 6-6 6" />, // opens a screen in the app
   external: <Path d="M14 4h6v6M20 4l-8.5 8.5M18 14v6H4V6h6" />, // leaves the app
 };

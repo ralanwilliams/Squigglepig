@@ -3,7 +3,7 @@ import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 import { font } from '../theme/tokens';
 import { useReducedMotion, useSkin, useTheme } from '../theme/theme';
-import { PROPS, type Prop } from '../theme/skins/props';
+import { PROPS, type Prop, type TextSlot } from '../theme/skins/props';
 import type { ArtName, Placement } from '../theme/skins';
 
 // The season's props on one piece of pig artwork: Logo and WorkStage lay this
@@ -26,6 +26,8 @@ const TWINKLE_MS = 450;
 const CHAR_W = 0.7; // Roboto Bold's average letter width plus the piping, in ems (for fitting a name)
 const PIPE_STROKE = 0.11; // piped letters' stroke, in ems
 const PIPE_DROP = 0.07; // how far the icing's shade sits below it, in ems
+const LINE_GAP = 1.15; // a two-line slot's line spacing, in ems
+const CAP_MID = 0.35; // from a line's middle down to its baseline, in ems
 const NATIVE = Platform.OS !== 'web';
 
 type Window = { x: number; y: number; w: number; h: number };
@@ -37,16 +39,25 @@ export function SkinDecor({
   height,
   window = FULL,
   layer = 'front',
+  omit,
+  extra,
 }: {
   art: ArtName;
   width: number;
   height: number;
   window?: Window;
   layer?: 'front' | 'behind';
+  // Leave out some of the season's props (a winner's own hat replaces the
+  // season's; their speech bubble clears the sky it covers), and add props of
+  // the caller's own (that hat, that bubble), drawn after the season's.
+  omit?: (p: Placement) => boolean;
+  extra?: Placement[];
 }) {
   const skin = useSkin();
-  const placements = skin?.decor[art]?.filter((p) => !!(PROPS[p.prop] as Prop).behind === (layer === 'behind'));
-  if (!placements?.length || !width || !height) return null;
+  const placements = [...(skin?.decor[art] ?? []).filter((p) => !omit?.(p)), ...(extra ?? [])].filter(
+    (p) => !!(PROPS[p.prop] as Prop).behind === (layer === 'behind')
+  );
+  if (!placements.length || !width || !height) return null;
   // The whole image's size on screen.
   const iw = width / window.w;
   const ih = height / window.h;
@@ -122,15 +133,31 @@ function Piece({ p, i, left, top, imageW }: { p: Placement; i: number; left: num
   );
 }
 
+// The words in a text slot: one line, or for a two-line slot (a speech
+// bubble's) long enough to need it, two, broken at the space nearest the
+// middle. A long word with no space stays whole, and shrinks instead.
+function textLines(text: string, slot: TextSlot): string[] {
+  if (slot.lines !== 2 || text.length <= 12) return [text];
+  const mid = text.length / 2;
+  let at = -1;
+  for (let i = 0; i < text.length; i++) if (text[i] === ' ' && (at < 0 || Math.abs(i - mid) < Math.abs(at - mid))) at = i;
+  return at < 0 ? [text] : [text.slice(0, at), text.slice(at + 1)];
+}
+
 // One prop's drawing, on its own grid, for any <Svg> to place: the dark-mode
 // rim under it when `rim` is given (its width beyond the outline, in grid
 // units), the shapes with a `line`-wide outline, and `text` in its text slot.
 // SkinDecor draws the props round the pig with it; the trough fills with it.
 export function PropArt({ prop, line, rim, text }: { prop: Prop; line: number; rim?: number; text?: string }) {
-  // Words in the prop's text slot (a name on a cake), shrunk to fit its width.
+  // Words in the prop's text slot (a name on a cake, what a pig says), shrunk
+  // to fit its width. A one-line slot's y is the baseline; a two-line slot's
+  // is the middle of the block.
   const slot = prop.text;
-  const words = slot && text ? text : null;
-  const size = slot && words ? Math.min(slot.size, slot.maxW / (CHAR_W * words.length)) : 0;
+  const lines = slot && text ? textLines(text, slot) : [];
+  const words = lines.length ? text : null;
+  const size = slot && words ? Math.min(slot.size, slot.maxW / (CHAR_W * Math.max(...lines.map((l) => l.length)))) : 0;
+  const baseline = (j: number) =>
+    !slot ? 0 : slot.lines ? slot.y + (j - (lines.length - 1) / 2) * size * LINE_GAP + size * CAP_MID : slot.y;
   return (
     <>
       {rim !== undefined ? (
@@ -160,22 +187,24 @@ export function PropArt({ prop, line, rim, text }: { prop: Prop; line: number; r
             slot.shine ? { fill: slot.shine, dy: -PIPE_DROP * 0.6 } : null,
             { fill: slot.fill, dy: 0 },
           ].map((layer, k) =>
-            layer ? (
-              <SvgText
-                key={k}
-                x={slot.x}
-                y={slot.y + layer.dy * size}
-                fontSize={size}
-                fontFamily={font.bold}
-                fill={layer.fill}
-                stroke={slot.shade ? layer.fill : undefined}
-                strokeWidth={slot.shade ? size * (k === 2 ? PIPE_STROKE * 0.75 : PIPE_STROKE) : undefined}
-                strokeLinejoin="round"
-                textAnchor="middle"
-              >
-                {words}
-              </SvgText>
-            ) : null
+            layer
+              ? lines.map((l, j) => (
+                  <SvgText
+                    key={`${k}.${j}`}
+                    x={slot.x}
+                    y={baseline(j) + layer.dy * size}
+                    fontSize={size}
+                    fontFamily={font.bold}
+                    fill={layer.fill}
+                    stroke={slot.shade ? layer.fill : undefined}
+                    strokeWidth={slot.shade ? size * (k === 2 ? PIPE_STROKE * 0.75 : PIPE_STROKE) : undefined}
+                    strokeLinejoin="round"
+                    textAnchor="middle"
+                  >
+                    {l}
+                  </SvgText>
+                ))
+              : null
           )
         : null}
     </>

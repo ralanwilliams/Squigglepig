@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '../lib/supabase';
 import { TIMERS, HOST_GRACE } from '../lib/timers';
 import { saveSession, clearSession } from '../lib/session';
 import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
+import { cleanAvatar, useMyAvatar, type Avatar } from '../avatar/avatar';
 
 // ---- Game model: the "telephone" chain (a Telestrations booklet) ----
 //
@@ -52,6 +53,10 @@ type Game = {
   room: string;
   isHost: boolean;
   players: string[];
+  // Each player's pig as they've dressed it (src/avatar), from their presence.
+  // Kept for players who have since left, so a winner who drops out before
+  // the scoreboard still shows dressed.
+  avatars: Record<string, Avatar>;
   status: ConnStatus;
   statusDetail: string;
   // Round state
@@ -115,6 +120,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [room, setRoom] = useState('');
   const [isHost, setIsHost] = useState(false);
   const [players, setPlayers] = useState<string[]>([]);
+  const [avatars, setAvatars] = useState<Record<string, Avatar>>({});
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [statusDetail, setStatusDetail] = useState('');
 
@@ -135,6 +141,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const isHostRef = useRef(false);
   const hostRef = useRef(''); // current host's name (for detecting handover)
   const joinedAtRef = useRef(0);
+  // This player's own avatar, sent in their presence (and sent again if it
+  // changes while they're in a room).
+  const myAvatar = useMyAvatar();
+  const myAvatarRef = useRef(myAvatar);
+  myAvatarRef.current = myAvatar;
 
   const phaseRef = useRef<Phase>('lobby');
   const stageRef = useRef(0);
@@ -677,6 +688,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           .map((m) => ({ username: m.username, joinedAt: m.joinedAt }));
         playersRef.current = list;
         setPlayers([...list].sort((a, b) => a.joinedAt - b.joinedAt).map((p) => p.username));
+        const seen: Record<string, Avatar> = {};
+        for (const entries of Object.values(state)) {
+          const m = entries[0];
+          if (m?.username) seen[m.username] = cleanAvatar(m.avatar);
+        }
+        setAvatars((was) => ({ ...was, ...seen }));
 
         const hostName = orderedNames()[0] ?? '';
         const iAmHostNow = hostName === usernameRef.current && hostName !== '';
@@ -700,7 +717,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (s === 'SUBSCRIBED') {
         setStatus('connected');
         setStatusDetail('');
-        channel.track({ username: user, joinedAt: joinedAtRef.current });
+        channel.track({ username: user, joinedAt: joinedAtRef.current, avatar: myAvatarRef.current });
         channel.send({ type: 'broadcast', event: 'request-state', payload: { username: user } });
       } else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') {
         setStatus('error');
@@ -731,12 +748,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     poolRef.current = [];
     setPhase('lobby');
     setPlayers([]);
+    setAvatars({});
     setIsHost(false);
     setRoom('');
     setChains([]);
     setScores({});
     setPrev(null);
   };
+
+  // A new outfit or bubble while in a room goes out at once.
+  useEffect(() => {
+    if (status !== 'connected' || !channelRef.current) return;
+    channelRef.current.track({ username: usernameRef.current, joinedAt: joinedAtRef.current, avatar: myAvatar });
+  }, [myAvatar]);
 
   const startGame = (t: number) => {
     if (playersRef.current.length < MIN_PLAYERS) return;
@@ -813,6 +837,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         room,
         isHost,
         players,
+        avatars,
         status,
         statusDetail,
         phase,
