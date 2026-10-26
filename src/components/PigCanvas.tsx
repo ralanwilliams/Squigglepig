@@ -1,22 +1,21 @@
-import React, { memo, useEffect, useReducer, useRef, useState } from 'react';
+import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { Animated, LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { PigButton } from './PigButton';
 import { WorkStage } from './WorkStage';
+import { Strokes } from './DrawingArt';
+import { SPACE, STROKE, type Drawing } from '../lib/drawing';
 import { hintLearned, markHintLearned } from '../lib/hints';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { useThemedStyles } from '../theme/theme';
 import { canvas as paper, font, layout, type Theme } from '../theme/tokens';
 
-// Pen width, in drawing units.
-export const STROKE = 3;
-
-// The drawing space. Every drawing is 400 × 300 units whatever the device,
-// orientation or zoom; the canvas on screen is a window onto it. Strokes are
-// stored in these units, so a line drawn zoomed in, zoomed out, in portrait or
-// in landscape lands in the same place and replays identically everywhere.
-export const SPACE = { w: 400, h: 300 };
+// The drawing space (SPACE, src/lib/drawing.ts) is 400 × 300 units whatever
+// the device, orientation or zoom; the canvas on screen is a window onto it.
+// Strokes are stored in these units, so a line drawn zoomed in, zoomed out, in
+// portrait or in landscape lands in the same place and replays identically
+// everywhere. What's sent when it's done is the format in that file.
 const ASPECT = SPACE.w / SPACE.h;
 
 type Zoom = 1 | 2;
@@ -39,9 +38,6 @@ const SCROLLS = Platform.OS === 'web' && window.matchMedia('(pointer: fine)').ma
 // Wheel deltas in lines (Firefox with a mouse) are converted at this many px.
 const WHEEL_LINE_PX = 16;
 
-// Serialized drawing format sent over the wire (vector, tiny, Expo Go friendly).
-export type Drawing = { w: number; h: number; strokes: string[] };
-
 type Pt = { x: number; y: number };
 
 // Largest 4:3 rectangle that fits in a box.
@@ -58,27 +54,6 @@ const fitAspect = (box: { w: number; h: number }) => {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const px = (n: number) => n.toFixed(1);
-
-// The strokes already laid down. Memoized so that the live stroke, which
-// re-renders on every frame while the finger moves, doesn't drag every earlier
-// path through React with it — that lag was the wobble in long drawings.
-const Committed = memo(function Committed({ strokes, width }: { strokes: string[]; width: number }) {
-  return (
-    <>
-      {strokes.map((d, i) => (
-        <Path
-          key={i}
-          d={d}
-          stroke={paper.ink}
-          strokeWidth={width}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ))}
-    </>
-  );
-});
 
 // The drawing surface, laid out by WorkStage (the same frame the guessing
 // screen uses). The canvas is the largest 4:3 that fits the focus pane and
@@ -99,8 +74,8 @@ export function PigCanvas({
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
 
-  // Replaced (never mutated) on each commit, so `Committed` sees a new identity
-  // exactly when there is something new to draw.
+  // Replaced (never mutated) on each commit, so `Strokes` (memoized) sees a new
+  // identity exactly when there is something new to draw.
   const committed = useRef<string[]>([]);
   // The stroke under the finger. Built as `M p0 Q p0 m1 Q p1 m2 …`: each new
   // point becomes the control of a quadratic that ends at the midpoint between
@@ -349,7 +324,7 @@ export function PigCanvas({
       <View ref={frameRef} style={[styles.frame, { width: size.w, height: size.h, borderRadius: ui.sp(layout.imageRadius) }]}>
         <GestureDetector gesture={canvasGesture}>
           <Svg width={size.w} height={size.h} viewBox={viewBox}>
-            <Committed strokes={committed.current} width={STROKE} />
+            <Strokes strokes={committed.current} width={STROKE} />
             {stroke ? (
               <Path
                 d={stroke.d}
@@ -397,7 +372,7 @@ export function PigCanvas({
               style={[styles.minimap, { width: mm.w, height: mm.h, right: ui.sp(8), bottom: ui.sp(8), borderRadius: ui.sp(4) }]}
             >
               <Svg width={mm.w} height={mm.h} viewBox={`0 0 ${SPACE.w} ${SPACE.h}`}>
-                <Committed strokes={committed.current} width={4} />
+                <Strokes strokes={committed.current} width={4} />
                 <Rect
                   x={origin.x}
                   y={origin.y}

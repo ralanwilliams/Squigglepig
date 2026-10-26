@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg from 'react-native-svg';
 import { canvas, layout } from '../theme/tokens';
-import { STROKE, type Drawing } from './PigCanvas';
+import { STROKE, parseDrawing } from '../lib/drawing';
+import { Stickers, Strokes } from './DrawingArt';
 
-// Renders a submitted drawing (serialized vector strokes) in the original
+// Renders a submitted drawing (src/lib/drawing.ts: vector strokes, each in
+// its brush's ink, and any stickers on top) in the original
 // `.image-class` frame: white, rounded, black border. It takes the pane it is
 // given and draws the largest frame of the drawing's own aspect ratio that fits,
 // so a drawing looks the same on every device and orientation regardless of
@@ -12,14 +14,10 @@ import { STROKE, type Drawing } from './PigCanvas';
 // the reveal screen uses it for the ✓/✗ ruling border.
 export function DrawingImage({ data, frameStyle }: { data: string; frameStyle?: StyleProp<ViewStyle> }) {
   const [host, setHost] = useState({ w: 0, h: 0 });
-  if (!data) return null;
-  let drawing: Drawing;
-  try {
-    drawing = JSON.parse(data);
-  } catch {
-    return null;
-  }
-  const { w, h, strokes } = drawing;
+  // Read once per drawing, not on every render (the frame re-lays out).
+  const drawing = useMemo(() => (data ? parseDrawing(data) : null), [data]);
+  if (!drawing) return null;
+  const { w, h, strokes, inks, stickers } = drawing;
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -38,17 +36,8 @@ export function DrawingImage({ data, frameStyle }: { data: string; frameStyle?: 
       {host.w > 0 && host.h > 0 ? (
         <View style={[styles.frame, { width: Math.round(fw), height: Math.round(fh) }, frameStyle]}>
           <Svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet">
-            {strokes.map((d, i) => (
-              <Path
-                key={i}
-                d={d}
-                stroke={canvas.ink}
-                strokeWidth={STROKE}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            ))}
+            <Strokes strokes={strokes} inks={inks} width={STROKE} />
+            <Stickers stickers={stickers} />
           </Svg>
         </View>
       ) : null}
