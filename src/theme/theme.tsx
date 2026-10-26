@@ -61,6 +61,7 @@ type ThemeCtx = {
   seasonal: boolean;
   setSeasonal: (on: boolean) => void;
   skin: Skin | null; // the skin showing (seasonal or chosen), if any
+  season: Skin | null; // the birthday or holiday in season today, showing or not
 };
 
 // The photo of the old screen, which way it is swept away, and the change it
@@ -277,11 +278,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       seasonal,
       setSeasonal,
       skin,
+      season,
     }),
     [
       theme, mode, pending, name, setMode, toggle, sweep,
       contrast, highContrast, setContrast, motion, reducedMotion, setMotion,
-      seasonal, setSeasonal, skin,
+      seasonal, setSeasonal, skin, season,
     ]
   );
   const wipeValue = useMemo(() => ({ shotRef, size, setSize, wipe, onReady, onDone }), [size, wipe, onReady, onDone]);

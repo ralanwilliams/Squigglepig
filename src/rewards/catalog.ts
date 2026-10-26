@@ -39,6 +39,16 @@ export const KINDS = {
 
 export type Kind = keyof typeof KINDS;
 
+// The menu's Rewards rows that open a Rewards screen, each with just these
+// kinds' tabs (app/rewards.tsx ?group=), named in the menu by the label.
+// Outfits and speech bubbles are the menu's third row, Your pig (app/pig.tsx).
+export const GROUPS = {
+  art: { label: 'Art supplies', kinds: ['brush', 'sticker'] },
+  theme: { label: 'Themes', kinds: ['theme'] },
+} as const satisfies Record<string, { label: string; kinds: readonly Kind[] }>;
+
+export type Group = keyof typeof GROUPS;
+
 // `soon` lists a reward before the feature that uses it is built: the Rewards
 // screen shows it as coming soon, and nothing can award it yet. Remove the
 // flag in the change that makes the reward work.
@@ -47,7 +57,12 @@ type Base = { id: string; label: string; tier: Tier; soon?: true };
 export type ThemeReward = Base & { kind: 'theme' };
 export type BrushReward = Base & { kind: 'brush'; color: string }; // ink on the white paper
 export type StickerReward = Base & { kind: 'sticker' };
-export type OutfitReward = Base & { kind: 'outfit' };
+// Where an outfit goes on the pig. It wears one in each slot at once (a hat,
+// sunglasses and a bow tie), not two hats (inventory.tsx wear).
+export const OUTFIT_SLOTS = ['head', 'eyes', 'neck'] as const;
+export type OutfitSlot = (typeof OUTFIT_SLOTS)[number];
+
+export type OutfitReward = Base & { kind: 'outfit'; slot: OutfitSlot };
 export type BubbleReward = Base & { kind: 'bubble' };
 export type Reward = ThemeReward | BrushReward | StickerReward | OutfitReward | BubbleReward;
 
@@ -62,6 +77,8 @@ type Entry<R extends Reward> = Omit<R, 'kind'>;
 // Each one's art is a skin in src/theme/skins (index.ts UNLOCKABLE).
 const THEMES: Entry<ThemeReward>[] = [
   { id: 'theme.railroad', label: 'Railroad', tier: 'rare' }, // src/theme/skins/railroad.ts
+  { id: 'theme.paul', label: 'Paul', tier: 'rare' }, // src/theme/skins/paul.ts
+  { id: 'theme.bobby', label: 'Bobby', tier: 'rare' }, // src/theme/skins/bobby.ts
 ];
 
 // Colors drawn on the canvas's white paper, which is never themed, so each is
@@ -91,12 +108,12 @@ const STICKERS: Entry<StickerReward>[] = [
 // Worn by the pig on the scoreboard when this player wins. The art is in
 // src/theme/skins/props.ts, placed by src/avatar/outfits.ts.
 const OUTFITS: Entry<OutfitReward>[] = [
-  { id: 'outfit.crown', label: 'Crown', tier: 'rare' },
-  { id: 'outfit.topHat', label: 'Top hat', tier: 'rare' },
-  { id: 'outfit.cowboyHat', label: 'Cowboy hat', tier: 'common' },
-  { id: 'outfit.chefHat', label: "Chef's hat", tier: 'common' },
-  { id: 'outfit.shades', label: 'Sunglasses', tier: 'common' },
-  { id: 'outfit.bowTie', label: 'Bow tie', tier: 'common' },
+  { id: 'outfit.crown', label: 'Crown', tier: 'rare', slot: 'head' },
+  { id: 'outfit.topHat', label: 'Top hat', tier: 'rare', slot: 'head' },
+  { id: 'outfit.cowboyHat', label: 'Cowboy hat', tier: 'common', slot: 'head' },
+  { id: 'outfit.chefHat', label: "Chef's hat", tier: 'common', slot: 'head' },
+  { id: 'outfit.shades', label: 'Sunglasses', tier: 'common', slot: 'eyes' },
+  { id: 'outfit.bowTie', label: 'Bow tie', tier: 'common', slot: 'neck' },
 ];
 
 // The shape of the pig's speech bubble; the words in it are the player's own.
@@ -123,6 +140,23 @@ export const REWARDS: Reward[] = [
 const BY_ID = new Map(REWARDS.map((r) => [r.id, r]));
 
 export const rewardById = (id: string): Reward | undefined => BY_ID.get(id);
+
+// An outfit's slot, or undefined for an id that isn't an outfit.
+export const slotOf = (id: string): OutfitSlot | undefined => {
+  const r = rewardById(id);
+  return r?.kind === 'outfit' ? r.slot : undefined;
+};
+
+// Outfit ids as the pig wears them: known outfits only, one per slot (the
+// first given wins), in slot order (head first).
+export function oneEach(ids: readonly string[]): string[] {
+  const bySlot = new Map<OutfitSlot, string>();
+  for (const id of ids) {
+    const slot = slotOf(id);
+    if (slot && !bySlot.has(slot)) bySlot.set(slot, id);
+  }
+  return OUTFIT_SLOTS.flatMap((s) => (bySlot.has(s) ? [bySlot.get(s)!] : []));
+}
 
 // A card standing for a pick-one kind's default (KINDS `none`): what shows
 // with nothing chosen. Not a real reward: every player has it, and choosing

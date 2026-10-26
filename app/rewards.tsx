@@ -1,37 +1,36 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Stage } from '../src/components/Stage';
-import { Heading } from '../src/components/Heading';
 import { Glyph } from '../src/components/Glyph';
-import { BackButton } from '../src/components/BackButton';
-import { TextLink } from '../src/components/TextLink';
 import { Switch } from '../src/components/Switch';
 import { RewardTile } from '../src/rewards/RewardTile';
 import { KindTabs } from '../src/rewards/KindTabs';
-import { KINDS, REWARDS, isNone, noneOf, rewardsOf, type Kind } from '../src/rewards/catalog';
+import { GROUPS, KINDS, REWARDS, isNone, noneOf, rewardsOf, type Group, type Kind } from '../src/rewards/catalog';
 import { useInventory } from '../src/rewards/inventory';
 import { useChoose } from '../src/rewards/useChoose';
 import { font, type Theme } from '../src/theme/tokens';
 import { useTheme, useThemeMode, useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi, type Ui } from '../src/theme/responsive';
 
-// Rewards, from the menu drawer (src/components/MenuDrawer.tsx): everything
-// there is to win (src/rewards/catalog.ts) and which of it this player owns
-// (src/rewards/inventory.tsx). One tab per kind of reward in the rail, that
-// kind's rewards as a grid of cards in the art pane. A kind with nothing in it
-// yet gets no tab. Nothing scrolls: a kind with more cards than fit is scaled
-// down to fit (Stage's fitFocus).
+// Rewards, from the menu drawer (src/components/MenuDrawer.tsx): what there
+// is to win (src/rewards/catalog.ts) and which of it this player owns
+// (src/rewards/inventory.tsx), one group of kinds at a time (catalog GROUPS:
+// Art supplies, Themes; ?group= from the menu row), untitled: the menu row
+// says which. One tab per kind of reward in the rail, that kind's rewards as
+// a grid of cards in the art pane. A kind with nothing in it yet gets no tab.
+// Nothing scrolls: a kind with more cards than fit is scaled down to fit
+// (Stage's fitFocus).
 //
-// Of a kind the player picks one of (a theme, an outfit), tapping an owned
-// card puts it to use; the kind's default (Classic, No outfit) leads the grid
-// once there's anything to choose instead of it. Birthdays and holidays show
+// Of a kind the player picks one of (a theme), tapping an owned card puts it
+// to use; the kind's default (Classic) leads the grid once there's anything
+// to choose instead of it. Birthdays and holidays show
 // over a chosen theme while Seasonal themes is on: the Themes tab has its
 // switch under the tabs, the same setting as the menu's (src/theme/theme.tsx).
 //
 // Development builds add Unlock all / Reset under the tabs, to see every card
 // both ways.
-const KIND_LIST = (Object.keys(KINDS) as Kind[]).filter((k) => rewardsOf(k).length > 0);
+const kindsOf = (group: Group) => (GROUPS[group].kinds as readonly Kind[]).filter((k) => rewardsOf(k).length > 0);
 
 export default function Rewards() {
   const ui = useUi();
@@ -39,9 +38,10 @@ export default function Rewards() {
   const styles = useThemedStyles(makeStyles);
   const { owns, grant, reset, chosen } = useInventory();
   const putToUse = useChoose();
-  // ?kind= opens on that tab (Your pig's Outfits / Speech bubbles buttons).
-  const asked = useLocalSearchParams<{ kind?: string }>().kind as Kind | undefined;
-  const [kind, setKind] = useState<Kind>(asked && KIND_LIST.includes(asked) ? asked : KIND_LIST[0]);
+  const asked = useLocalSearchParams<{ group?: string }>().group;
+  const group: Group = asked && asked in GROUPS ? (asked as Group) : 'art';
+  const kinds = kindsOf(group);
+  const [kind, setKind] = useState<Kind>(kinds[0]);
   const list = rewardsOf(kind);
   const none = noneOf(kind);
   const inUse = chosen(kind);
@@ -95,7 +95,7 @@ export default function Rewards() {
 
   const tabs = (
     <KindTabs
-      kinds={KIND_LIST}
+      kinds={kinds}
       selected={kind}
       onSelect={setKind}
       count={(k) => {
@@ -106,9 +106,6 @@ export default function Rewards() {
     />
   );
 
-  // An outfit or a bubble is for the pig everyone sees when you win.
-  const yourPig = kind === 'outfit' || kind === 'bubble' ? <TextLink label="See your pig" onPress={() => router.push('/pig')} /> : null;
-
   const dev = __DEV__ ? (
     <View style={[styles.devRow, { gap: ui.sp(24) }]}>
       <DevLink label="Unlock all" onPress={() => REWARDS.forEach((r) => grant(r.id))} ui={ui} styles={styles} />
@@ -117,22 +114,17 @@ export default function Rewards() {
   ) : null;
 
   return (
-    <View style={styles.fill}>
-      <Stage
-        header={<Heading size="h3" lines={1}>Rewards</Heading>}
-        focus={grid}
-        fitFocus
-        actions={
-          <>
-            {tabs}
-            {seasonalRow}
-            {yourPig}
-            {dev}
-          </>
-        }
-      />
-      <BackButton />
-    </View>
+    <Stage
+      focus={grid}
+      fitFocus
+      actions={
+        <>
+          {tabs}
+          {seasonalRow}
+          {dev}
+        </>
+      }
+    />
   );
 }
 
@@ -147,7 +139,6 @@ function DevLink({ label, onPress, ui, styles }: { label: string; onPress: () =>
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  fill: { flex: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   setting: { flexDirection: 'row', alignItems: 'center' },
   settingLabel: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },

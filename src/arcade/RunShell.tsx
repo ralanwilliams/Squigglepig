@@ -1,27 +1,30 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { router } from 'expo-router';
 import { Stage } from '../components/Stage';
 import { Logo } from '../components/Logo';
 import { Heading } from '../components/Heading';
 import { PigButton } from '../components/PigButton';
-import { BackButton } from '../components/BackButton';
 import { TextLink } from '../components/TextLink';
 import { Countdown, deadlineIn } from '../components/Countdown';
 import { showToast } from '../components/Toast';
 import { IMAGES } from '../assets/assets';
+import { useUi } from '../theme/responsive';
 import { LADDER, ROUNDS, START, nextStep, prizeFor, roundSeconds, runReducer } from './engine';
 import { PotLadder } from './PotLadder';
 import { PayoutScreen } from './PayoutScreen';
 import type { Game } from './games';
 
-// One solo run of a game, start to finish (the rules are engine.ts):
+// One solo run of a game, start to finish (the rules are engine.ts). No
+// screen of it has a title; the pot ladder says where the run is.
 //
-//   ready   — the game's name and what to do, the pot ladder, Start
-//   round   — the game's own round, inside RoundFrame: the round count up
-//             top, the timer, the game's controls and the ladder in the rail
-//   between — round won: bank the pot, or keep going (Bank only once there's
-//             a prize in it)
+//   ready   — what to do, the pot ladder, Start
+//   round   — the game's own round, inside RoundFrame: the timer, the game's
+//             controls and the ladder in the rail
+//   between — round won: the round's screen stays up showing how it went
+//             (the answer marked right, the drawing scored), its clock
+//             stopped, and under the game's controls the choice: keep going,
+//             or bank the pot (Bank only once there's a prize in it)
 //   lost    — wrong, or out of time: the pot is gone; play again
 //   payout  — choose the prize (PayoutScreen.tsx)
 //
@@ -67,8 +70,6 @@ export function RunShell({ game }: { game: Game<any> }) {
   if (run.phase === 'ready') {
     return (
       <Plain
-        title={game.label}
-        back
         actions={
           <>
             <Heading>{game.blurb}</Heading>
@@ -80,25 +81,20 @@ export function RunShell({ game }: { game: Game<any> }) {
     );
   }
 
-  if (run.phase === 'round' && specs) {
+  // A round, and once it's won the same round left up (same key, so the
+  // game keeps its state: what was picked, the score) with the choice added.
+  if ((run.phase === 'round' || run.phase === 'between') && specs) {
     const Round = game.Round;
-    const finish = (won: boolean, detail?: string) => dispatch({ type: 'result', won, detail });
-    return (
-      <RoundCtx.Provider value={{ round: run.round, seconds: seconds(run.round), until: run.until, expire: () => dispatch({ type: 'result', won: false, timeout: true }), leave: done }}>
-        <Round key={run.round} spec={specs[run.round - 1]} round={run.round} onResult={finish} Frame={RoundFrame} />
-      </RoundCtx.Provider>
-    );
-  }
-
-  if (run.phase === 'between') {
-    const prize = LADDER.find((s) => s.prize === prizeFor(run.won));
-    const next = nextStep(run.won);
-    return (
-      <Plain
-        title={`Round ${run.won} won!`}
-        actions={
+    const round = run.phase === 'round' ? run.round : run.won;
+    const finish = (won: boolean, detail?: string) => dispatch({ type: 'result', won, detail, at: Date.now() });
+    let settled: RoundCtxValue['settled'];
+    if (run.phase === 'between') {
+      const prize = LADDER.find((s) => s.prize === prizeFor(run.won));
+      const next = nextStep(run.won);
+      settled = {
+        at: run.at,
+        choice: (
           <>
-            <PotLadder won={run.won} />
             <Heading>
               {prize
                 ? `Bank the ${prize.label.toLowerCase()} prize, or risk it on round ${run.won + 1}.`
@@ -107,8 +103,22 @@ export function RunShell({ game }: { game: Game<any> }) {
             <PigButton name="Keep going" onPress={() => dispatch({ type: 'next', until: deadlineIn(seconds(run.won + 1)) })} />
             {prize ? <PigButton name="Bank it" onPress={() => dispatch({ type: 'bank' })} /> : null}
           </>
-        }
-      />
+        ),
+      };
+    }
+    return (
+      <RoundCtx.Provider
+        value={{
+          round,
+          seconds: seconds(round),
+          until: run.until,
+          expire: () => dispatch({ type: 'result', won: false, timeout: true, at: Date.now() }),
+          leave: done,
+          settled,
+        }}
+      >
+        <Round key={round} spec={specs[round - 1]} round={round} onResult={finish} Frame={RoundFrame} />
+      </RoundCtx.Provider>
     );
   }
 
@@ -116,10 +126,9 @@ export function RunShell({ game }: { game: Game<any> }) {
     const lostPrize = LADDER.find((s) => s.prize === prizeFor(run.won));
     return (
       <Plain
-        title={run.timeout ? 'Out of time!' : 'Not quite!'}
-        back
         actions={
           <>
+            <Heading size="h3">{run.timeout ? 'Out of time!' : 'Not quite!'}</Heading>
             {run.detail ? <Heading>{run.detail}</Heading> : null}
             <Heading>
               {lostPrize ? `The ${lostPrize.label.toLowerCase()} prize in the pot is gone.` : `You won ${run.won} of ${ROUNDS}.`}
@@ -136,53 +145,63 @@ export function RunShell({ game }: { game: Game<any> }) {
   return null;
 }
 
-// A screen between rounds: the title, the pig, and the rail. `back` adds the
-// corner ‹ (only where leaving loses nothing).
-function Plain({ title, actions, back }: { title: string; actions: React.ReactNode; back?: boolean }) {
-  return (
-    <View style={styles.fill}>
-      <Stage header={<Heading size="h3" lines={1}>{title}</Heading>} focus={<Logo source={IMAGES.home} />} actions={actions} />
-      {back ? <BackButton /> : null}
-    </View>
-  );
+// A screen between rounds: the pig, and the rail. No back arrow on any
+// screen: Done and Leave are the way out, or the system back.
+function Plain({ actions }: { actions: React.ReactNode }) {
+  return <Stage focus={<Logo source={IMAGES.home} />} actions={actions} />;
 }
 
 // What a game's round is drawn into (games/index.ts Frame). A component of
 // its own rather than one made inside RunShell, so it keeps its identity from
 // render to render and the round's content isn't remounted; the run reaches
-// it through RoundCtx.
-const RoundCtx = createContext<{ round: number; seconds: number; until: number; expire: () => void; leave: () => void } | null>(null);
+// it through RoundCtx. `settled` is set once the round is won: when, and
+// the choice that goes under the game's controls.
+type RoundCtxValue = {
+  round: number;
+  seconds: number;
+  until: number;
+  expire: () => void;
+  leave: () => void;
+  settled?: { at: number; choice: React.ReactNode };
+};
+const RoundCtx = createContext<RoundCtxValue | null>(null);
 
 function RoundFrame({
   focus,
   controls,
   fitFocus,
   onExpire,
+  stoppedAt,
 }: {
   focus: React.ReactNode;
   controls?: React.ReactNode;
   fitFocus?: boolean;
   onExpire?: () => void;
+  stoppedAt?: number;
 }) {
+  const ui = useUi();
   const ctx = useContext(RoundCtx);
   if (!ctx) throw new Error('RoundFrame is drawn by RunShell');
+  const { settled } = ctx;
   return (
     <Stage
-      header={<Heading size="h3" lines={1}>Round {ctx.round} of {ROUNDS}</Heading>}
       focus={focus}
       fitFocus={fitFocus}
       actions={
         <>
-          <Countdown seconds={ctx.seconds} until={ctx.until} onExpire={onExpire ?? ctx.expire} size={32} />
+          <Countdown
+            seconds={ctx.seconds}
+            until={ctx.until}
+            onExpire={onExpire ?? ctx.expire}
+            size={32}
+            stoppedAt={stoppedAt ?? settled?.at}
+          />
           {controls}
-          <PotLadder won={ctx.round - 1} />
+          {settled ? <View style={{ gap: ui.gap }}>{settled.choice}</View> : null}
+          <PotLadder won={settled ? ctx.round : ctx.round - 1} />
           <TextLink label="Leave" onPress={ctx.leave} />
         </>
       }
     />
   );
 }
-
-const styles = StyleSheet.create({
-  fill: { flex: 1 },
-});

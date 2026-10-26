@@ -8,6 +8,7 @@ import { Glyph, type GlyphName } from './Glyph';
 import { Switch } from './Switch';
 import { showToast } from './Toast';
 import { IMAGES } from '../assets/assets';
+import { GROUPS, type Group } from '../rewards/catalog';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
@@ -31,17 +32,18 @@ const NATIVE = Platform.OS !== 'web';
 // mirroring the dark-mode toggle in the top-right (Stage already keeps both
 // corners clear, so nothing moves to make room). It slides a drawer in from
 // the left holding the About information: the app icon, name and version,
-// then the Support / Accessibility / Rewards / Legal / Developer groups and
-// the copyright line. The drawer is painted with the screen's own palette
-// (background, text, link), so it follows light / dark mode like everything
-// else. Nothing scrolls: in two-pane layouts the groups sit in two columns,
-// and the body is a FitBox.
+// then the Support / Accessibility / Rewards / Legal groups and the
+// copyright line, which links to the developer's site. The drawer is painted
+// with the screen's own palette (background, text, link), so it follows
+// light / dark mode like everything else. Nothing scrolls: in two-pane
+// layouts the groups sit in two columns, and the body is a FitBox.
 // `onHowToPlay` replays the first-run walkthrough (Home owns it). The
 // Accessibility group holds the switches (High contrast, Reduce motion,
 // Seasonal themes); the first two show what is in effect — the phone's setting
 // until it is flipped here — and Seasonal themes is on until turned off (the
 // Rewards screen's Themes tab has the same switch, beside the theme cards).
-// Rewards opens what the player has won (app/rewards.tsx).
+// Rewards opens what the player has won, a group at a time (app/rewards.tsx:
+// Art supplies, Themes), and Your pig (app/pig.tsx), its outfits and bubbles.
 // With reduced motion the drawer appears and goes without sliding.
 export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
   const ui = useUi();
@@ -123,7 +125,7 @@ function MenuDrawer({
       onClose();
       showToast(`No email app found. Write to ${CONTACT_EMAIL}`, 4000);
     });
-  const go = (path: '/licenses' | '/rewards') => () => {
+  const go = (path: '/licenses' | '/pig' | `/rewards?group=${Group}`) => () => {
     onClose();
     router.push(path);
   };
@@ -149,15 +151,15 @@ function MenuDrawer({
     { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
     { icon: 'season', label: 'Seasonal themes', on: seasonal, onPress: () => setSeasonal(!seasonal) },
   ];
-  const rewards: Row[] = [{ icon: 'gift', label: 'Your rewards', onPress: go('/rewards'), trailing: 'chevron' }];
+  const rewards: Row[] = [
+    { icon: 'hat', label: 'Your pig', onPress: go('/pig'), trailing: 'chevron' },
+    { icon: 'brush', label: GROUPS.art.label, onPress: go('/rewards?group=art'), trailing: 'chevron' },
+    { icon: 'palette', label: GROUPS.theme.label, onPress: go('/rewards?group=theme'), trailing: 'chevron' },
+  ];
   const legal: Row[] = [
     { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },
     { icon: 'doc', label: 'Terms of Service', onPress: () => open(TERMS_URL), trailing: 'external' },
     { icon: 'code', label: 'Open-source licenses', onPress: go('/licenses'), trailing: 'chevron' },
-  ];
-  const developer: Row[] = [
-    { icon: 'person', label: 'Made by R. Alan Williams' },
-    { icon: 'globe', label: 'ralanwilliams.com', onPress: () => open(DEVELOPER_URL), trailing: 'external' },
   ];
 
   const section = (title: string, rows: Row[]) => (
@@ -173,9 +175,15 @@ function MenuDrawer({
     </View>
   );
 
+  // The copyright carries the link to the developer's site: after it on the
+  // one line two panes have room for, on a line of its own under it in one
+  // column (where a single line would wrap mid-sentence).
   const copyright = (
     <Text style={[styles.copyright, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
-      © 2026 R. Alan Williams. All rights reserved.
+      © 2026 R. Alan Williams. All rights reserved.{ui.twoPane ? ' · ' : '\n'}
+      <Text style={styles.site} accessibilityRole="link" onPress={() => open(DEVELOPER_URL)}>
+        ralanwilliams.com
+      </Text>
     </Text>
   );
 
@@ -234,12 +242,11 @@ function MenuDrawer({
 
           <View style={styles.rule} />
 
-          {ui.twoPane ? (
-            // The copyright ends the second column. It used to be pinned to
-            // the drawer's foot, out of the flow, but with Rewards in it that
-            // column is as tall as the first and the line would sit on its
-            // last link.
-            <FitBox style={styles.flex} align="top">
+          {/* The groups, then the copyright on a line of its own across the
+              foot, under a rule, in the flow (so the FitBox makes room for it
+              rather than the groups running into it). */}
+          <FitBox style={styles.flex} align="top">
+            {ui.twoPane ? (
               <View style={[styles.columns, { gap: ui.gap }]}>
                 <View style={[styles.column, { gap: ui.sp(12) }]}>
                   {section('Support', support)}
@@ -248,26 +255,19 @@ function MenuDrawer({
                 <View style={[styles.column, { gap: ui.sp(12) }]}>
                   {section('Rewards', rewards)}
                   {section('Legal', legal)}
-                  {section('Developer', developer)}
-                  {copyright}
                 </View>
               </View>
-            </FitBox>
-          ) : (
-            <>
-              <FitBox style={styles.flex} align="top">
-                <View style={{ gap: ui.sp(12) }}>
-                  {section('Support', support)}
-                  {section('Accessibility', accessibility)}
-                  {section('Rewards', rewards)}
-                  {section('Legal', legal)}
-                  {section('Developer', developer)}
-                </View>
-              </FitBox>
-              <View style={styles.rule} />
-              {copyright}
-            </>
-          )}
+            ) : (
+              <View style={{ gap: ui.sp(12) }}>
+                {section('Support', support)}
+                {section('Accessibility', accessibility)}
+                {section('Rewards', rewards)}
+                {section('Legal', legal)}
+              </View>
+            )}
+          </FitBox>
+          <View style={styles.rule} />
+          {copyright}
         </Animated.View>
       </View>
     </Modal>
@@ -341,4 +341,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   label: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },
   staticLabel: { color: t.textMuted },
   copyright: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
+  site: { color: t.link, textDecorationLine: 'underline' },
 });

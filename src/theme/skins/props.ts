@@ -30,9 +30,21 @@ export type TextSlot = { x: number; y: number; size: number; maxW: number; fill:
 // `rim: false` leaves a prop out of the dark-mode sticker rim: the hooves
 // below are redrawn over things the pig holds, inside its outline, where the
 // art has no rim.
-// `head` marks something worn on the head (a hat, a crown): a player's own
-// hat (src/avatar) replaces the season's on the winner pig.
-export type Prop = { w: number; h: number; anchor?: [number, number]; text?: TextSlot; behind?: true; pile?: number; rim?: false; head?: true; shapes: Shape[] };
+// `head` marks something worn on the head (a hat, a crown) and `eyes` over
+// the eyes (a visor): a player's own hat or sunglasses (src/avatar) replace
+// the theme's on the winner pig.
+export type Prop = {
+  w: number;
+  h: number;
+  anchor?: [number, number];
+  text?: TextSlot;
+  behind?: true;
+  pile?: number;
+  rim?: false;
+  head?: true;
+  eyes?: true;
+  shapes: Shape[];
+};
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -814,6 +826,156 @@ export const PROPS = {
       { d: 'M30 12L44 36L8 40Z', fill: '#40444A' },
       { d: 'M44 36L62 10L90 30Z', fill: '#36393E' },
       { d: 'M56 18L66 16L62 24Z', fill: 'rgba(255,255,255,0.35)' },
+    ],
+  },
+
+  // Paul (an unlockable theme): Sherwood Forest, men in tights.
+  // An archer's cap: green felt, its peak swept back to a point, the brim
+  // turned up, and a long barred pheasant feather tucked in the band.
+  archerCap: {
+    head: true,
+    w: 100,
+    h: 70,
+    anchor: [44, 58],
+    shapes: [
+      { d: 'M10 56C14 30 40 12 70 10C80 10 92 14 98 20C84 24 76 36 74 56Z', fill: '#3F6B2A', line: true }, // crown
+      { d: 'M24 46C30 31 44 21 62 17C48 25 36 35 30 47Z', fill: '#5A8A3C' }, // highlight
+      { d: 'M40 52C22 44 6 26 4 2C16 16 32 34 48 46Z', fill: '#C4692F', line: true }, // feather, tucked in the band
+      { d: 'M30 46L36 40M20 37L27 30M12 26L19 19', fill: 'none', line: true }, // its bars
+      { d: 'M4 54Q40 44 80 52L82 62Q40 55 2 63Z', fill: '#2F5420', line: true }, // brim
+    ],
+  },
+  // An arrow in flight: a wooden shaft, a steel head, and fletching in the
+  // pink of the tights and plain white.
+  arrow: {
+    w: 100,
+    h: 40,
+    shapes: [
+      { d: rect(18, 16, 58, 8), fill: '#C99A5B', line: true }, // shaft
+      { d: 'M72 4L99 20L72 36L79 20Z', fill: '#C9D3DC', line: true }, // head
+      { d: 'M78 12L91 20L81 20Z', fill: '#FFFFFF' },
+      { d: 'M1 2L32 16H17L6 10Z', fill: '#FF4FA0', line: true }, // fletching
+      { d: 'M1 38L32 24H17L6 30Z', fill: '#FFFFFF', line: true },
+    ],
+  },
+  // A longbow, held at its leather-wrapped grip, string drawn straight.
+  longbow: {
+    w: 60,
+    h: 110,
+    anchor: [13, 55],
+    shapes: [
+      { d: 'M41 3L41 107', fill: 'none', line: true }, // string
+      { d: 'M38 2C4 30 4 80 38 108L44 106C14 80 14 30 44 4Z', fill: '#C8A060', line: true }, // stave
+      { d: 'M37 8C18 30 18 80 37 102L39 101C22 80 22 30 39 9Z', fill: '#E2C489' }, // highlight
+      { d: rect(7, 46, 12, 18), fill: '#7A3B1F', line: true }, // grip
+    ],
+  },
+
+  // Bobby (an unlockable theme): a neon city at night, a pig with attitude.
+  // A mohawk: a narrow crest of hot-pink spikes of every height, swept back
+  // to one side, lighter streaks, darker roots.
+  mohawk: {
+    head: true,
+    w: 100,
+    h: 70,
+    anchor: [50, 62],
+    shapes: [
+      { d: 'M30 64L24 42L38 50L34 20L48 42L50 2L60 38L72 8L70 40L92 22L80 52L99 46L74 64Z', fill: '#FF2BD6', line: true },
+      { d: 'M50 2L48 26L54 24Z', fill: '#FF8AEB' }, // streaks
+      { d: 'M72 8L66 30L71 29Z', fill: '#FF8AEB' },
+      { d: 'M92 22L81 39L85 40Z', fill: '#FF8AEB' },
+      { d: 'M32 60Q52 53 74 60L74 64Q52 57 30 64Z', fill: '#A3128A' }, // roots
+    ],
+  },
+  // Shield sunglasses, 90s sport style: one wide mirrored lens going from hot
+  // pink to purple, a black top bar crackled with neon yellow-green, a neon
+  // nose pad, a purple arm.
+  visor: {
+    eyes: true,
+    w: 100,
+    h: 44,
+    anchor: [55, 20], // the middle of the lens
+    shapes: [
+      { d: 'M1 9L12 6L12 14L3 17Z', fill: '#7A2CF0', line: true }, // the near arm
+      { d: 'M12 11Q55 6 98 11L96 28Q94 38 80 40H64Q59 32 55 32Q51 32 46 40H28Q14 38 13 28Z', fill: '#7A2CF0', line: true }, // lens
+      { d: 'M13 12Q55 7 97 12L96 22Q55 17 14 24Z', fill: '#FF2E9A' }, // its mirror, pink fading to purple
+      { d: 'M14 24Q55 17 96 22L95.5 27Q55 23 14.5 29Z', fill: '#C22DD0' },
+      { d: 'M20 14L34 13L22 34L16 33Z', fill: 'rgba(255,255,255,0.25)' }, // shine
+      { d: 'M10 3Q55 -3 100 3L100 11Q55 6 10 11Z', fill: '#141414', line: true }, // top bar
+      { d: 'M15 5l5 1-2 2 5 1-1 1-6-1 2-2-4-1Z', fill: '#C6F31B' }, // crackle
+      { d: 'M30 3l6 2-3 2 6 0 0 1-8 0 3-2-5-2Z', fill: '#C6F31B' },
+      { d: 'M48 2l5 2 3-1 4 3-1 1-4-2-3 1-5-3Z', fill: '#C6F31B' },
+      { d: 'M66 3l7 1-2 2 6 1-1 1-7-1 2-2-6-1Z', fill: '#C6F31B' },
+      { d: 'M84 3l5 2 4-1 3 2-1 1-3-1-4 1-5-3Z', fill: '#C6F31B' },
+      { d: 'M50 33Q55 27 60 33L58 36Q55 33 52 36Z', fill: '#C6F31B', line: true }, // nose pad
+    ],
+  },
+  // A two-handed sci-fi blaster, rifle length and shape: stock, receiver
+  // with a carry handle, magazine, handguard and barrel, neon strips down its
+  // side. Held level by its pistol grip (the anchor), which fits inside the
+  // hoof redrawn over it (layout.ts held), so the hoof wraps it.
+  rifle: {
+    w: 200,
+    h: 60,
+    anchor: [50, 43], // the middle of the grip
+    shapes: [
+      { d: 'M2 14L40 17V36L4 45Z', fill: '#2A2440', line: true }, // stock
+      { d: 'M74 34H90L95 58H80Z', fill: '#1E1A30', line: true }, // magazine
+      { d: 'M58 34Q66 36 66 43H58', fill: 'none', line: true }, // trigger guard
+      { d: 'M46 34H58L55 52H42Z', fill: '#5A5080', line: true }, // grip, lighter than the hoof over it
+      { d: rect(160, 20, 33, 7), fill: '#2A2440', line: true }, // barrel
+      { d: rect(192, 17, 7, 13), fill: '#3A3458', line: true }, // flash hider
+      { d: rect(108, 15, 52, 18), fill: '#3A3458', line: true }, // handguard
+      { d: 'M155 15L158 5H164L163 15Z', fill: '#2A2440', line: true }, // front sight
+      { d: 'M40 15H110V34H40Z', fill: '#2A2440', line: true }, // receiver
+      { d: 'M58 15V5H98V15H92V10H64V15Z', fill: '#3A3458', line: true }, // carry handle
+      { d: rect(44, 21, 62, 4), fill: '#FF2BD6' },
+      { d: rect(62, 28, 40, 2.5), fill: '#2EF2E6' },
+      { d: rect(113, 21, 42, 3), fill: '#FF2BD6' },
+      { d: rect(113, 27, 42, 2.5), fill: '#2EF2E6' },
+      { d: rect(6, 22, 30, 3), fill: '#2EF2E6' }, // on the stock
+    ],
+  },
+  // A flying car: a low hull, a glass canopy, magenta lights and underglow.
+  hoverCar: {
+    w: 100,
+    h: 46,
+    shapes: [
+      { d: 'M16 34H84L74 44H26Z', fill: 'rgba(255,43,214,0.45)' }, // underglow
+      { d: 'M4 26Q10 12 34 10H66Q90 12 97 24Q90 34 50 34Q10 34 4 26Z', fill: '#2A2250', line: true }, // hull
+      { d: 'M30 12Q40 1 60 3Q71 5 73 12Z', fill: 'rgba(46,242,230,0.55)', line: true }, // canopy
+      { d: rect(12, 21, 48, 3.5), fill: '#FF2BD6' },
+      { d: circle(84, 22, 3.5), fill: '#FF2BD6' }, // lights
+      { d: circle(74, 23, 3), fill: '#FF2BD6' },
+    ],
+  },
+  // A neon sign: a dark panel framed in pink, a pig's face in cyan tubing.
+  neonSign: {
+    w: 80,
+    h: 100,
+    shapes: [
+      { d: rect(4, 4, 72, 92), fill: '#140C2E', line: true },
+      { d: rect(11, 11, 58, 4) + rect(11, 85, 58, 4), fill: '#FF2BD6' }, // frame
+      { d: 'M22 40L26 24L34 34Z', fill: '#2EF2E6' }, // ears
+      { d: 'M58 40L54 24L46 34Z', fill: '#2EF2E6' },
+      { d: circle(40, 50, 19), fill: '#2EF2E6' }, // face
+      { d: circle(40, 50, 15), fill: '#140C2E' },
+      { d: circle(33, 45, 2.5) + circle(47, 45, 2.5), fill: '#2EF2E6' }, // eyes
+      { d: ellipse(40, 56, 8, 5.5), fill: '#2EF2E6' }, // snout
+      { d: circle(37, 56, 1.8) + circle(43, 56, 1.8), fill: '#140C2E' },
+    ],
+  },
+  // A microchip for the trough: a dark body, gold pins, a glowing dot.
+  chip: {
+    w: 100,
+    h: 72,
+    shapes: [
+      { d: rect(24, 2, 6, 10) + rect(37, 2, 6, 10) + rect(50, 2, 6, 10) + rect(63, 2, 6, 10), fill: '#E3B23C', line: true }, // pins
+      { d: rect(24, 60, 6, 10) + rect(37, 60, 6, 10) + rect(50, 60, 6, 10) + rect(63, 60, 6, 10), fill: '#E3B23C', line: true },
+      { d: rect(16, 12, 64, 48), fill: '#1E1A30', line: true }, // body
+      { d: rect(34, 24, 28, 24), fill: '#33285A' }, // die
+      { d: rect(38, 34, 20, 3), fill: '#FF2BD6' },
+      { d: circle(25, 20, 3.5), fill: '#2EF2E6' },
     ],
   },
 

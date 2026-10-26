@@ -1,7 +1,6 @@
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Heading } from '../src/components/Heading';
-import { BackButton } from '../src/components/BackButton';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
@@ -38,7 +37,6 @@ export default function Licenses() {
       <View style={{ minHeight: ui.headerBand, paddingTop: ui.sp(10), paddingHorizontal: ui.pad + ui.sp(36), justifyContent: 'center' }}>
         <Heading size="h3" lines={1}>Open-source licenses</Heading>
       </View>
-      <BackButton />
 
       <FlatList
         data={LICENSES as Pkg[]}
