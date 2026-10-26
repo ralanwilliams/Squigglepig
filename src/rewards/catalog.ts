@@ -62,9 +62,6 @@ type Entry<R extends Reward> = Omit<R, 'kind'>;
 // Each one's art is a skin in src/theme/skins (index.ts UNLOCKABLE).
 const THEMES: Entry<ThemeReward>[] = [
   { id: 'theme.railroad', label: 'Railroad', tier: 'rare' }, // src/theme/skins/railroad.ts
-  { id: 'theme.accountant', label: 'Accountant', tier: 'rare', soon: true },
-  { id: 'theme.wasteManagement', label: 'Waste Management', tier: 'rare', soon: true },
-  { id: 'theme.developer', label: 'Developer', tier: 'rare', soon: true },
 ];
 
 // Colors drawn on the canvas's white paper, which is never themed, so each is
@@ -83,31 +80,33 @@ const BRUSHES: Entry<BrushReward>[] = [
 
 // Packs of pre-drawn pictures a player can stamp onto the canvas in the main
 // game, beside what they draw by hand. Owning a pack unlocks every sticker
-// in it.
+// in it. The stickers in each are listed in src/stickers/art.ts.
 const STICKERS: Entry<StickerReward>[] = [
-  { id: 'sticker.eyes', label: 'Eyes', tier: 'common', soon: true },
-  { id: 'sticker.mouths', label: 'Mouths', tier: 'common', soon: true },
-  { id: 'sticker.hats', label: 'Hats', tier: 'common', soon: true },
-  { id: 'sticker.characters', label: 'Characters', tier: 'rare', soon: true },
+  { id: 'sticker.eyes', label: 'Eyes', tier: 'common' },
+  { id: 'sticker.mouths', label: 'Mouths', tier: 'common' },
+  { id: 'sticker.hats', label: 'Hats', tier: 'common' },
+  { id: 'sticker.characters', label: 'Characters', tier: 'rare' },
 ];
 
-// Worn by the pig on the scoreboard when this player wins.
+// Worn by the pig on the scoreboard when this player wins. The art is in
+// src/theme/skins/props.ts, placed by src/avatar/outfits.ts.
 const OUTFITS: Entry<OutfitReward>[] = [
-  { id: 'outfit.crown', label: 'Crown', tier: 'rare', soon: true },
-  { id: 'outfit.topHat', label: 'Top hat', tier: 'rare', soon: true },
-  { id: 'outfit.cowboyHat', label: 'Cowboy hat', tier: 'common', soon: true },
-  { id: 'outfit.chefHat', label: "Chef's hat", tier: 'common', soon: true },
-  { id: 'outfit.shades', label: 'Sunglasses', tier: 'common', soon: true },
-  { id: 'outfit.bowTie', label: 'Bow tie', tier: 'common', soon: true },
+  { id: 'outfit.crown', label: 'Crown', tier: 'rare' },
+  { id: 'outfit.topHat', label: 'Top hat', tier: 'rare' },
+  { id: 'outfit.cowboyHat', label: 'Cowboy hat', tier: 'common' },
+  { id: 'outfit.chefHat', label: "Chef's hat", tier: 'common' },
+  { id: 'outfit.shades', label: 'Sunglasses', tier: 'common' },
+  { id: 'outfit.bowTie', label: 'Bow tie', tier: 'common' },
 ];
 
 // The shape of the pig's speech bubble; the words in it are the player's own.
+// The art is in src/theme/skins/props.ts (src/avatar/bubbles.ts).
 const BUBBLES: Entry<BubbleReward>[] = [
-  { id: 'bubble.speech', label: 'Speech', tier: 'common', soon: true },
-  { id: 'bubble.thought', label: 'Thought cloud', tier: 'common', soon: true },
-  { id: 'bubble.shout', label: 'Shout', tier: 'common', soon: true },
-  { id: 'bubble.heart', label: 'Heart', tier: 'rare', soon: true },
-  { id: 'bubble.scroll', label: 'Royal scroll', tier: 'rare', soon: true },
+  { id: 'bubble.speech', label: 'Speech', tier: 'common' },
+  { id: 'bubble.thought', label: 'Thought cloud', tier: 'common' },
+  { id: 'bubble.shout', label: 'Shout', tier: 'common' },
+  { id: 'bubble.heart', label: 'Heart', tier: 'rare' },
+  { id: 'bubble.scroll', label: 'Royal scroll', tier: 'rare' },
 ];
 
 const tag = <R extends Reward>(kind: R['kind'], list: Entry<R>[]): R[] => list.map((r) => ({ ...r, kind }) as R);

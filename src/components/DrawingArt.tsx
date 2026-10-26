@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { G, Path } from 'react-native-svg';
 import { PropArt } from './SkinDecor';
 import { STICKER_ART } from '../stickers/art';
+import { PROPS, type Prop } from '../theme/skins/props';
 import { inkColor, type Sticker } from '../lib/drawing';
 
 // A drawing's parts (src/lib/drawing.ts), for any <Svg> whose viewBox is in
@@ -34,8 +35,9 @@ export function Stickers({ stickers }: { stickers?: Sticker[] }) {
   return (
     <>
       {stickers.map((s, i) => {
-        const art = STICKER_ART[s.id]?.art;
-        if (!art) return null;
+        const name = STICKER_ART[s.id]?.prop;
+        if (!name) return null;
+        const art: Prop = PROPS[name];
         const k = s.s / art.w; // drawing units per grid unit
         return (
           <G key={i} transform={`translate(${s.x} ${s.y}) rotate(${s.r}) scale(${k}) translate(${-art.w / 2} ${-art.h / 2})`}>

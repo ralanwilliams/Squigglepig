@@ -5,13 +5,33 @@ import { Glyph } from '../components/Glyph';
 import { canvas } from '../theme/tokens';
 import { useTheme } from '../theme/theme';
 import { UNLOCKABLE, paletteFor } from '../theme/skins';
+import { PROPS, type Prop, type PropName } from '../theme/skins/props';
+import { PropArt } from '../components/SkinDecor';
+import { OUTFITS } from '../avatar/outfits';
+import { BUBBLES } from '../avatar/bubbles';
+import { STICKER_ART } from '../stickers/art';
 import { KINDS, isNone, type Kind, type Reward } from './catalog';
 
 // A small picture of a reward, `size` dp square. A kind without a drawing of
-// its own here, or a reward its drawing can't show yet (a theme still coming
-// soon has no skin), shows the kind's glyph (catalog.ts KINDS); give a kind a
-// picture by adding it to THUMBS.
+// its own here, or a reward with no art (a default card, No outfit), shows
+// the kind's glyph (catalog.ts KINDS); give a kind a picture by adding it to
+// THUMBS.
 type Thumb<K extends Kind> = (reward: Extract<Reward, { kind: K }>, size: number, edge: string) => React.ReactNode | null;
+
+// A prop's own drawing (props.ts), fitted to the square with room for its
+// outline: an outfit, a speech bubble, a sticker.
+function propThumb(name: PropName, size: number) {
+  const prop: Prop = PROPS[name];
+  const side = Math.max(prop.w, prop.h);
+  const line = side / 24;
+  const pad = line;
+  const box = side + 2 * pad;
+  return (
+    <Svg width={size} height={size} viewBox={`${(prop.w - side) / 2 - pad} ${(prop.h - side) / 2 - pad} ${box} ${box}`}>
+      <PropArt prop={prop} line={line} text={prop.text ? '…' : undefined} />
+    </Svg>
+  );
+}
 
 const THUMBS: { [K in Kind]?: Thumb<K> } = {
   // The theme's two backgrounds, day on the left and night on the right, with
@@ -29,6 +49,13 @@ const THUMBS: { [K in Kind]?: Thumb<K> } = {
         <Circle cx="20" cy="20" r="18" fill="none" stroke={edge} strokeWidth={1.5} />
       </Svg>
     );
+  },
+  outfit: (r, size) => (OUTFITS[r.id] ? propThumb(OUTFITS[r.id].prop, size) : null),
+  bubble: (r, size) => (BUBBLES[r.id] ? propThumb(BUBBLES[r.id], size) : null),
+  // A sticker pack shows its first sticker.
+  sticker: (r, size) => {
+    const first = Object.values(STICKER_ART).find((s) => s.pack === r.id);
+    return first ? propThumb(first.prop, size) : null;
   },
   // A squiggle of the color on a disc of the drawing paper, which is white on
   // every palette, so the swatch looks as it will on the canvas.

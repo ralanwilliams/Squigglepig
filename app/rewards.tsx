@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Stage } from '../src/components/Stage';
 import { Heading } from '../src/components/Heading';
 import { Glyph } from '../src/components/Glyph';
 import { BackButton } from '../src/components/BackButton';
+import { TextLink } from '../src/components/TextLink';
 import { Switch } from '../src/components/Switch';
 import { RewardTile } from '../src/rewards/RewardTile';
 import { KindTabs } from '../src/rewards/KindTabs';
@@ -37,7 +39,9 @@ export default function Rewards() {
   const styles = useThemedStyles(makeStyles);
   const { owns, grant, reset, chosen } = useInventory();
   const putToUse = useChoose();
-  const [kind, setKind] = useState<Kind>(KIND_LIST[0]);
+  // ?kind= opens on that tab (Your pig's Outfits / Speech bubbles buttons).
+  const asked = useLocalSearchParams<{ kind?: string }>().kind as Kind | undefined;
+  const [kind, setKind] = useState<Kind>(asked && KIND_LIST.includes(asked) ? asked : KIND_LIST[0]);
   const list = rewardsOf(kind);
   const none = noneOf(kind);
   const inUse = chosen(kind);
@@ -102,6 +106,9 @@ export default function Rewards() {
     />
   );
 
+  // An outfit or a bubble is for the pig everyone sees when you win.
+  const yourPig = kind === 'outfit' || kind === 'bubble' ? <TextLink label="See your pig" onPress={() => router.push('/pig')} /> : null;
+
   const dev = __DEV__ ? (
     <View style={[styles.devRow, { gap: ui.sp(24) }]}>
       <DevLink label="Unlock all" onPress={() => REWARDS.forEach((r) => grant(r.id))} ui={ui} styles={styles} />
@@ -119,6 +126,7 @@ export default function Rewards() {
           <>
             {tabs}
             {seasonalRow}
+            {yourPig}
             {dev}
           </>
         }

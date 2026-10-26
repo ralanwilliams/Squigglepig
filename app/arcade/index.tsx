@@ -27,6 +27,7 @@ export default function Arcade() {
               <PigButton key={g.id} name={g.label} onPress={() => router.push(`/arcade/${g.id}`)} />
             ))}
             <TextLink label="Your rewards" onPress={() => router.push('/rewards')} />
+            <TextLink label="Your pig" onPress={() => router.push('/pig')} />
           </>
         }
       />

@@ -5,6 +5,7 @@ import { assetSize } from '../lib/assetSize';
 import { artFor, artName, darkInset } from '../assets/assets';
 import { useTheme } from '../theme/theme';
 import { SkinDecor } from './SkinDecor';
+import type { Placement } from '../theme/skins';
 
 // A window into the source image, as fractions of its width/height. Used for
 // assets whose pig doesn't fill the frame (the waiting GIF has a wide teal
@@ -33,15 +34,21 @@ const FULL: ImageWindow = { x: 0, y: 0, w: 1, h: 1 };
 //
 // In season, the skin's props are drawn over the frame (SkinDecor), under
 // `children` so hotspots like the snout stay on top; any meant to peek out
-// from behind the pig are drawn under the image.
+// from behind the pig are drawn under the image. `omit` and `extra` pass to
+// SkinDecor: the winner pig drops some of the season's props for the
+// player's own outfit and speech bubble (src/avatar).
 export function Logo({
   source,
   window = FULL,
   children,
+  omit,
+  extra,
 }: {
   source: number;
   window?: ImageWindow;
   children?: React.ReactNode;
+  omit?: (p: Placement) => boolean;
+  extra?: Placement[];
 }) {
   const [box, setBox] = useState({ w: 0, h: 0 });
   const art = artFor(source, useTheme().name === 'dark');
@@ -78,7 +85,7 @@ export function Logo({
     <View style={styles.host} onLayout={onLayout}>
       {box.w > 0 && box.h > 0 ? (
         <View style={[styles.frame, { width: Math.round(fw), height: Math.round(fh) }]}>
-          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} layer="behind" /> : null}
+          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} layer="behind" omit={omit} extra={extra} /> : null}
           <Image
             source={art}
             style={{
@@ -90,7 +97,7 @@ export function Logo({
             }}
             contentFit="fill"
           />
-          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} /> : null}
+          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} omit={omit} extra={extra} /> : null}
           {children}
         </View>
       ) : null}

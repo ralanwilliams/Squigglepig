@@ -2,10 +2,11 @@ import React, { useEffect } from 'react';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
-import { Logo } from '../src/components/Logo';
+import { WinnerPig } from '../src/avatar/WinnerPig';
+import { NO_AVATAR } from '../src/avatar/avatar';
 import { Heading } from '../src/components/Heading';
 import { PigButton } from '../src/components/PigButton';
-import { IMAGES, SOUNDS } from '../src/assets/assets';
+import { SOUNDS } from '../src/assets/assets';
 import { playSound } from '../src/lib/sound';
 import { useGame, MIN_PLAYERS } from '../src/state/GameContext';
 import { font, type Theme } from '../src/theme/tokens';
@@ -16,10 +17,16 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 // can launch a fresh game (reusing the same points-to-win) — it drops every
 // player straight into a new prompts round and clears all history — or drop back
 // to the lobby.
+//
+// The winner's pig is dressed as they dressed it (src/avatar): their outfit,
+// and their speech bubble saying what they wrote, for everyone in the room to
+// see. A tie lines up every winner's pig, each named underneath (up to
+// LINEUP of them).
+const LINEUP = 4;
 export default function Scoreboard() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { players, scores, startGame, target } = useGame();
+  const { players, scores, startGame, target, avatars } = useGame();
 
   useEffect(() => {
     playSound(SOUNDS.winner);
@@ -54,7 +61,21 @@ export default function Scoreboard() {
     </Heading>
   );
 
-  const focus = <Logo source={IMAGES.winner} />;
+  const focus =
+    winners.length > 1 ? (
+      <View style={[styles.lineup, { gap: ui.sp(8) }]}>
+        {winners.slice(0, LINEUP).map((name) => (
+          <View key={name} style={[styles.lineupPig, { gap: ui.sp(4) }]}>
+            <WinnerPig avatar={avatars[name] ?? NO_AVATAR} />
+            <Text style={[styles.lineupName, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
+              {name}
+            </Text>
+          </View>
+        ))}
+      </View>
+    ) : (
+      <WinnerPig avatar={(winners[0] && avatars[winners[0]]) || NO_AVATAR} />
+    );
 
   const row = {
     borderRadius: ui.sp(8),
@@ -117,4 +138,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   score: { color: t.surfaceText, fontFamily: font.bold },
   winnerText: { color: t.buttonText },
   more: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
+  lineup: { flex: 1, minHeight: 0, flexDirection: 'row' },
+  lineupPig: { flex: 1, minWidth: 0, minHeight: 0 },
+  lineupName: { color: t.text, fontFamily: font.medium, textAlign: 'center' },
 });

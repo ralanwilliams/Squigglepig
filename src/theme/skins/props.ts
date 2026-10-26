@@ -20,7 +20,9 @@
 // a glossy one above.
 
 export type Shape = { d: string; fill: string; line?: boolean };
-export type TextSlot = { x: number; y: number; size: number; maxW: number; fill: string; shade?: string; shine?: string };
+// `lines: 2` lets the words wrap onto a second line (a speech bubble's), and
+// then `y` is the middle of the block rather than a baseline.
+export type TextSlot = { x: number; y: number; size: number; maxW: number; fill: string; shade?: string; shine?: string; lines?: 2 };
 // `behind` draws a prop under the artwork instead of over it, so the pig hides
 // part of it (something peeking out from behind the pig).
 // `pile` scales a prop in the trough (trough.ts troughScale): the daisies,
@@ -28,7 +30,9 @@ export type TextSlot = { x: number; y: number; size: number; maxW: number; fill:
 // `rim: false` leaves a prop out of the dark-mode sticker rim: the hooves
 // below are redrawn over things the pig holds, inside its outline, where the
 // art has no rim.
-export type Prop = { w: number; h: number; anchor?: [number, number]; text?: TextSlot; behind?: true; pile?: number; rim?: false; shapes: Shape[] };
+// `head` marks something worn on the head (a hat, a crown): a player's own
+// hat (src/avatar) replaces the season's on the winner pig.
+export type Prop = { w: number; h: number; anchor?: [number, number]; text?: TextSlot; behind?: true; pile?: number; rim?: false; head?: true; shapes: Shape[] };
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -45,6 +49,18 @@ function star(cx: number, cy: number, R: number, r: number, n = 5) {
     const a = -Math.PI / 2 + (i * Math.PI) / n;
     const rad = i % 2 ? r : R;
     d += `${i ? 'L' : 'M'}${r1(cx + rad * Math.cos(a))} ${r1(cy + rad * Math.sin(a))}`;
+  }
+  return d + 'Z';
+}
+
+// A jagged burst round an ellipse: n spikes out to rx / ry, the notches
+// between them pulled in to `inset` of that (a shout).
+function burst(cx: number, cy: number, rx: number, ry: number, n: number, inset: number) {
+  let d = '';
+  for (let i = 0; i < 2 * n; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / n;
+    const k = i % 2 ? inset : 1;
+    d += `${i ? 'L' : 'M'}${r1(cx + rx * k * Math.cos(a))} ${r1(cy + ry * k * Math.sin(a))}`;
   }
   return d + 'Z';
 }
@@ -133,6 +149,7 @@ function leaf(color: string, vein: string): Prop {
 
 function popHat(cone: string, stripe: string, pom: string): Prop {
   return {
+    head: true,
     w: 100,
     h: 100,
     anchor: [50, 92],
@@ -238,6 +255,7 @@ function daisy(petals: string): Prop {
 export const PROPS = {
   // Halloween
   witchHat: {
+    head: true,
     w: 100,
     h: 96,
     shapes: [
@@ -282,6 +300,7 @@ export const PROPS = {
 
   // Thanksgiving
   pilgrimHat: {
+    head: true,
     w: 100,
     h: 82,
     anchor: [50, 72],
@@ -318,6 +337,7 @@ export const PROPS = {
 
   // Christmas
   santaHat: {
+    head: true,
     w: 100,
     h: 92,
     anchor: [50, 80],
@@ -364,6 +384,7 @@ export const PROPS = {
 
   // Groundhog Day
   beanie: {
+    head: true,
     w: 100,
     h: 84,
     anchor: [56, 70], // right of and above the cuff's middle, so it sits down and to the left on the head
@@ -456,6 +477,7 @@ export const PROPS = {
 
   // Spring
   flowerCrown: {
+    head: true,
     w: 100,
     h: 44,
     // The crown wraps the head, its ends curving down: anchored right of
@@ -517,6 +539,7 @@ export const PROPS = {
 
   // St. Patrick's Day
   leprechaunHat: {
+    head: true,
     w: 100,
     h: 90,
     anchor: [50, 78],
@@ -643,6 +666,7 @@ export const PROPS = {
 
   // 4th of July
   unclesamHat: {
+    head: true,
     w: 100,
     h: 98,
     anchor: [50, 88],
@@ -728,6 +752,7 @@ export const PROPS = {
   // A conductor's cap: a navy crown flaring to its top, a gold-piped band, a
   // badge, and a shiny black visor.
   conductorCap: {
+    head: true,
     w: 100,
     h: 74,
     anchor: [50, 60],
@@ -791,6 +816,223 @@ export const PROPS = {
       { d: 'M56 18L66 16L62 24Z', fill: 'rgba(255,255,255,0.35)' },
     ],
   },
+
+  // ---- Outfits (src/avatar/outfits.ts): worn by a player's own pig when
+  // they win, placed on the winner art there.
+  crown: {
+    head: true,
+    w: 100,
+    h: 70,
+    anchor: [50, 62],
+    shapes: [
+      { d: 'M8 64L4 18L28 40L50 8L72 40L96 18L92 64Z', fill: '#F2C230', line: true },
+      { d: 'M16 46L14 26L21 32Z', fill: 'rgba(255,255,255,0.45)' }, // shine
+      { d: rect(8, 50, 84, 14), fill: '#E0A800', line: true }, // band
+      { d: circle(4, 18, 4.5) + circle(96, 18, 4.5), fill: '#F7D35A', line: true },
+      { d: circle(50, 8, 5), fill: '#F7D35A', line: true },
+      { d: circle(50, 57, 4.5), fill: '#D62828', line: true }, // jewels
+      { d: circle(28, 57, 3.5), fill: '#1E6FD9', line: true },
+      { d: circle(72, 57, 3.5), fill: '#2E7D32', line: true },
+    ],
+  },
+  topHat: {
+    head: true,
+    w: 100,
+    h: 88,
+    anchor: [50, 80],
+    shapes: [
+      { d: ellipse(50, 80, 48, 8), fill: '#1F1F1F', line: true }, // brim
+      { d: 'M24 79L22 10Q50 4 78 10L76 79Q50 84 24 79Z', fill: '#1F1F1F', line: true },
+      { d: 'M30 70L29 16L34 15L35 70Z', fill: '#3A3A3A' }, // highlight
+      { d: 'M23.4 62Q50 67 76.6 62L76.2 72Q50 77 23.8 72Z', fill: '#B0123F', line: true }, // band
+      { d: ellipse(50, 9.5, 28, 5), fill: '#2B2B2B', line: true }, // top
+    ],
+  },
+  cowboyHat: {
+    head: true,
+    w: 100,
+    h: 66,
+    anchor: [50, 56],
+    shapes: [
+      { d: 'M2 48Q8 64 50 62Q92 64 98 48Q88 56 50 56Q12 56 2 48Z', fill: '#8B5A2B', line: true }, // brim
+      { d: 'M22 54Q18 20 32 10Q42 18 50 10Q58 18 68 10Q82 20 78 54Q50 60 22 54Z', fill: '#A0692F', line: true },
+      { d: 'M30 46Q28 26 36 18L39 20Q33 28 35 46Z', fill: '#BD8448' }, // highlight
+      { d: 'M21.6 44Q50 50 78.4 44L78 54Q50 60 22 54Z', fill: '#4A2E16', line: true }, // band
+    ],
+  },
+  chefHat: {
+    head: true,
+    w: 100,
+    h: 100,
+    anchor: [50, 92],
+    shapes: [
+      { d: 'M26 70Q8 64 12 44Q14 28 30 30Q32 12 50 12Q68 12 70 30Q86 28 88 44Q92 64 74 70Z', fill: '#FAFAFA', line: true },
+      { d: rect(26, 68, 48, 24), fill: '#F0F0F0', line: true }, // band
+      { d: 'M38 72V90M50 72V90M62 72V90', fill: 'none', line: true }, // pleats
+    ],
+  },
+  shades: {
+    w: 100,
+    h: 40,
+    shapes: [
+      { d: 'M44 13Q50 8 56 13', fill: 'none', line: true }, // bridge
+      { d: 'M4 8H44V20C44 30 36 34 24 34C12 34 4 30 4 20Z', fill: '#1A1A1A', line: true },
+      { d: 'M56 8H96V20C96 30 88 34 76 34C64 34 56 30 56 20Z', fill: '#1A1A1A', line: true },
+      { d: 'M10 12h8l-6 10h-4Z', fill: 'rgba(255,255,255,0.35)' }, // glints
+      { d: 'M62 12h8l-6 10h-4Z', fill: 'rgba(255,255,255,0.35)' },
+    ],
+  },
+  bowTie: {
+    w: 100,
+    h: 50,
+    shapes: [
+      { d: 'M50 25L8 6Q2 25 8 44Z', fill: '#D62828', line: true },
+      { d: 'M50 25L92 6Q98 25 92 44Z', fill: '#D62828', line: true },
+      { d: circle(22, 18, 3) + circle(20, 33, 3) + circle(78, 18, 3) + circle(80, 33, 3), fill: '#FFFFFF' }, // spots
+      { d: 'M42 16Q50 13 58 16V34Q50 37 42 34Z', fill: '#B71C1C', line: true }, // knot
+    ],
+  },
+
+  // ---- Speech bubbles (src/avatar/bubbles.ts): what a player's own pig
+  // says when they win. The words go in the text slot, wrapping onto two
+  // lines; a bubble with a tail points it down and left, at the pig.
+  bubbleSpeech: {
+    w: 200,
+    h: 110,
+    text: { x: 104, y: 47, size: 26, maxW: 160, fill: '#1A1A1A', lines: 2 },
+    shapes: [{ d: 'M30 8H174Q194 8 194 30V64Q194 86 172 86H64L18 106L40 86H30Q8 86 8 64V30Q8 8 30 8Z', fill: '#FFFFFF', line: true }],
+  },
+  bubbleThought: {
+    w: 200,
+    h: 110,
+    text: { x: 104, y: 48, size: 24, maxW: 132, fill: '#1A1A1A', lines: 2 },
+    shapes: [
+      { d: circle(16, 103, 5), fill: '#FFFFFF', line: true },
+      { d: circle(32, 92, 8), fill: '#FFFFFF', line: true },
+      { d: 'M48 84C24 88 14 66 26 54C12 40 26 16 48 24C54 8 80 4 94 16C106 4 136 6 144 20C160 8 188 14 190 34C200 44 198 66 180 72C180 88 154 94 140 84C128 96 100 96 90 86C76 96 56 94 48 84Z', fill: '#FFFFFF', line: true },
+    ],
+  },
+  bubbleShout: {
+    w: 200,
+    h: 110,
+    text: { x: 100, y: 55, size: 24, maxW: 124, fill: '#1A1A1A', lines: 2 },
+    shapes: [{ d: burst(100, 55, 96, 52, 14, 0.8), fill: '#FFF176', line: true }],
+  },
+  bubbleHeart: {
+    w: 200,
+    h: 110,
+    text: { x: 100, y: 52, size: 22, maxW: 104, fill: '#8E1047', lines: 2 },
+    shapes: [{ d: heart(100, 60, 48), fill: '#FFD1DE', line: true }],
+  },
+  bubbleScroll: {
+    w: 200,
+    h: 110,
+    text: { x: 100, y: 55, size: 24, maxW: 128, fill: '#4A2E16', lines: 2 },
+    shapes: [
+      { d: rect(26, 22, 148, 66), fill: '#F5E6C4', line: true },
+      { d: ellipse(26, 55, 12, 38), fill: '#E8D3A6', line: true }, // rolled ends
+      { d: ellipse(174, 55, 12, 38), fill: '#E8D3A6', line: true },
+      { d: ellipse(26, 55, 4, 22), fill: '#C9AE78' },
+      { d: ellipse(174, 55, 4, 22), fill: '#C9AE78' },
+    ],
+  },
+
+  // ---- Stickers (src/stickers/art.ts): stamped on drawings. The Hats and
+  // Characters packs also use props from above (a party hat, a bat…).
+  eyesGoogly: {
+    w: 100,
+    h: 50,
+    shapes: [
+      { d: circle(26, 25, 22) + circle(74, 25, 22), fill: '#FFFFFF', line: true },
+      { d: circle(18, 32, 9) + circle(80, 16, 9), fill: '#1A1A1A' }, // pupils, rolling
+      { d: circle(15, 29, 2.5) + circle(77, 13, 2.5), fill: '#FFFFFF' },
+    ],
+  },
+  eyesAngry: {
+    w: 100,
+    h: 56,
+    shapes: [
+      { d: 'M4 8L44 22L42 30L2 16Z', fill: '#1A1A1A', line: true }, // brows
+      { d: 'M96 8L56 22L58 30L98 16Z', fill: '#1A1A1A', line: true },
+      { d: ellipse(26, 42, 14, 11) + ellipse(74, 42, 14, 11), fill: '#FFFFFF', line: true },
+      { d: circle(29, 44, 6) + circle(71, 44, 6), fill: '#1A1A1A' },
+    ],
+  },
+  eyesSleepy: {
+    w: 100,
+    h: 40,
+    shapes: [
+      { d: 'M6 12Q26 30 46 12M54 12Q74 30 94 12', fill: 'none', line: true }, // shut lids
+      { d: 'M14 22L10 30M26 25V34M38 22L42 30M62 22L58 30M74 25V34M86 22L90 30', fill: 'none', line: true }, // lashes
+    ],
+  },
+  eyesHearts: {
+    w: 100,
+    h: 50,
+    shapes: [
+      { d: heart(26, 26, 17) + heart(74, 26, 17), fill: '#E53950', line: true },
+      { d: ellipse(17, 18, 3, 5) + ellipse(65, 18, 3, 5), fill: '#FF9EAE' },
+    ],
+  },
+  mouthSmile: {
+    w: 100,
+    h: 50,
+    shapes: [
+      { d: 'M6 10Q50 40 94 10Q90 46 50 46Q10 46 6 10Z', fill: '#5A1A1A', line: true },
+      { d: 'M16 17Q50 32 84 17L82 24Q50 36 18 24Z', fill: '#FFFFFF' }, // teeth
+    ],
+  },
+  mouthLaugh: {
+    w: 100,
+    h: 64,
+    shapes: [
+      { d: 'M6 8H94Q94 60 50 60Q6 60 6 8Z', fill: '#5A1A1A', line: true },
+      { d: 'M28 46Q50 32 72 46Q66 58 50 58Q34 58 28 46Z', fill: '#E57373' }, // tongue
+      { d: rect(14, 8, 72, 10), fill: '#FFFFFF', line: true }, // teeth
+    ],
+  },
+  mouthTongue: {
+    w: 100,
+    h: 70,
+    shapes: [
+      { d: 'M34 24Q34 66 50 66Q66 66 66 24Z', fill: '#F48FB1', line: true }, // tongue
+      { d: 'M50 32V52', fill: 'none', line: true },
+      { d: 'M6 12Q50 46 94 12', fill: 'none', line: true }, // the grin over it
+    ],
+  },
+  mouthFrown: {
+    w: 100,
+    h: 40,
+    shapes: [{ d: 'M6 34Q50 -2 94 34L88 38Q50 8 12 38Z', fill: '#5A1A1A', line: true }],
+  },
+  ghost: {
+    w: 100,
+    h: 110,
+    shapes: [
+      { d: 'M10 104V46Q10 6 50 6Q90 6 90 46V104L76 92L63 104L50 92L37 104L24 92Z', fill: '#FAFAFA', line: true },
+      { d: ellipse(36, 44, 6, 9) + ellipse(64, 44, 6, 9), fill: '#1A1A1A' }, // eyes
+      { d: ellipse(50, 68, 8, 10), fill: '#1A1A1A' }, // "oooh"
+      { d: 'M22 40Q24 22 38 16L40 20Q28 26 27 41Z', fill: '#E3E3E3' }, // shade
+    ],
+  },
+  cat: {
+    w: 100,
+    h: 96,
+    shapes: [
+      { d: 'M14 42L18 4L46 24Z', fill: '#F2994A', line: true }, // ears
+      { d: 'M86 42L82 4L54 24Z', fill: '#F2994A', line: true },
+      { d: 'M21 30L23 14L35 24Z', fill: '#F8BBD0' },
+      { d: 'M79 30L77 14L65 24Z', fill: '#F8BBD0' },
+      { d: ellipse(50, 56, 42, 38), fill: '#F2994A', line: true }, // head
+      { d: 'M42 22Q50 30 58 22M38 30Q50 38 62 30', fill: 'none', line: true }, // stripes
+      { d: ellipse(34, 50, 7, 9) + ellipse(66, 50, 7, 9), fill: '#9CCC65', line: true }, // eyes
+      { d: ellipse(34, 50, 2, 7) + ellipse(66, 50, 2, 7), fill: '#1A1A1A' },
+      { d: 'M45 62H55L50 68Z', fill: '#F48FB1', line: true }, // nose
+      { d: 'M50 68Q45 75 39 71M50 68Q55 75 61 71', fill: 'none', line: true }, // mouth
+      { d: 'M28 64H6M28 69L8 76M72 64H94M72 69L92 76', fill: 'none', line: true }, // whiskers
+    ],
+  },
+
   // The pig's own left hoof on each piece of art, traced from it (layout.ts
   // HOOVES puts each back exactly where it was): redrawn over a held prop's
   // handle so the hoof wraps round it. Solid black like the art's, no rim.
