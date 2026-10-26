@@ -89,9 +89,12 @@ export function parseDrawing(data: string): Drawing | null {
   };
 }
 
-// The color stroke `i` is drawn in: its brush's, or black ink.
-export function inkColor(inks: (string | null)[] | undefined, i: number): string {
-  const id = inks?.[i];
+// The color a brush draws in, by its id; null (or an id that isn't a brush
+// this app knows) is black ink.
+export function inkFor(id: string | null | undefined): string {
   const brush = id ? rewardById(id) : undefined;
   return brush?.kind === 'brush' ? brush.color : canvas.ink;
 }
+
+// The color stroke `i` is drawn in: its brush's, or black ink.
+export const inkColor = (inks: (string | null)[] | undefined, i: number): string => inkFor(inks?.[i]);
