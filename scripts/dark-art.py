@@ -2,8 +2,9 @@
 
 The art is black line work drawn for the teal background. On the dark palette
 the outline (and the thin hand-written "squigglepig" wordmark and tail) sinks
-into the background, so each image gets a "sticker" border: the artwork's
-silhouette, grown by RADIUS px and filled with OUTLINE, laid underneath it.
+into the background, so each image gets a light "sticker" border: the
+artwork's silhouette, grown by RADIUS px and filled with OUTLINE, laid
+underneath it.
 The art runs right to the edges of most images, so each dark version gets a
 transparent margin of PAD px on every side for the border to grow into; Logo
 and WorkStage work the margin out from the two sizes and line the original
@@ -24,9 +25,9 @@ from PIL import Image, ImageSequence
 DIR = Path(__file__).resolve().parent.parent / 'src' / 'assets' / 'images'
 PNGS = ['squigglepig_clear', 'squigglepig_join_game_clear', 'squigglepig_lobby_clear', 'squigglepig_cell', 'canvas_pig']
 GIFS = ['squigglepig_winner', 'squigglepig']
-RADIUS = 8  # px at the source resolution (thick)
+RADIUS = 5  # px at the source resolution (medium)
 PAD = 12  # transparent margin on every side (PNGs; the half-size GIFs get half), enough for RADIUS up to 10
-OUTLINE = '#4ECDC4'  # the brand teal: in dark mode the art keeps a rim of the light-mode background
+OUTLINE = '#E6EDEE'  # a soft off-white: reads against every dark background, seasonal ones included
 
 
 def disk_dilate(alpha, r):

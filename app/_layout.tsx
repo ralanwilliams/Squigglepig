@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -27,6 +27,14 @@ import { useAppFrame } from '../src/theme/responsive';
 // scoreboard, and through a solo run (/arcade/<game>); if a new game drops
 // everyone back into /prompts or /lobby it starts again from the top.
 const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/rewards', '/pig', '/arcade', '/join', '/create', '/lobby', '/prompts', '/waiting']);
+
+// Installed as a PWA (Add to Home Screen; on an iPhone, navigator.standalone):
+// the system bars are always black, whatever the palette (Shell).
+const STANDALONE =
+  Platform.OS === 'web' &&
+  typeof window !== 'undefined' &&
+  (window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as { standalone?: boolean }).standalone === true);
+const BAR = '#000000';
 
 export default function RootLayout() {
   // Load Roboto (Bootswatch Materia's font). Render regardless so the UI is
@@ -77,6 +85,7 @@ export default function RootLayout() {
 function Shell() {
   const theme = useTheme();
   const frame = useAppFrame();
+  const insets = useSafeAreaInsets();
 
   // On the web (a tab, or installed as a PWA) the browser's own bars and the
   // page behind the app follow the palette too — dark mode, a holiday, a won
@@ -84,11 +93,14 @@ function Shell() {
   // background, which shows in the strips round the app (an iPhone's status
   // bar and home indicator) and when the page bounces. public/index.html
   // starts them right for the OS's light or dark mode, before this runs.
+  // Installed as a PWA they're black instead, and so are the strips at the
+  // top and bottom insets, where the app runs under the system bars.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', theme.background));
-    document.documentElement.style.backgroundColor = theme.background;
-    document.body.style.backgroundColor = theme.background;
+    const page = STANDALONE ? BAR : theme.background;
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', page));
+    document.documentElement.style.backgroundColor = page;
+    document.body.style.backgroundColor = page;
   }, [theme.background]);
 
   return (
@@ -109,6 +121,12 @@ function Shell() {
         <ThemeToggleOverlay />
         <ToastOverlay />
       </View>
+      {STANDALONE ? (
+        <>
+          <View pointerEvents="none" style={[styles.bar, { top: 0, height: insets.top }]} />
+          <View pointerEvents="none" style={[styles.bar, { bottom: 0, height: insets.bottom }]} />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -116,4 +134,5 @@ function Shell() {
 const styles = StyleSheet.create({
   window: { flex: 1, alignItems: 'center' },
   frame: { flex: 1, width: '100%' },
+  bar: { position: 'absolute', left: 0, right: 0, backgroundColor: BAR },
 });

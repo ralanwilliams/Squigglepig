@@ -5,6 +5,7 @@ import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { LADDER, ROUNDS, prizeFor } from './engine';
+import { useFieldColors } from './fieldColors';
 
 // The pot ladder (engine.ts LADDER) as a slider: a track of ROUNDS rounds,
 // filled in the button color as far as the rounds won, with the app's pig
@@ -13,15 +14,20 @@ import { LADDER, ROUNDS, prizeFor } from './engine';
 // it's told apart by the mark, not by color alone. All the colors are the
 // theme's.
 //
+// The `field` look is for a full-screen game (FieldFrame.tsx): thinner and
+// smaller, in the field's cream and amber, and under the track only the tier
+// the pot is at ("Reward Tier: Common"), since the slider shows the rest.
+//
 // Where the pig was last shown, so it slides on from there to the new count
 // (when a round is won it moves up one); a new run puts it back at the start.
 let lastWon = 0;
 
 const SLIDE_MS = 700;
 
-export function PotLadder({ won }: { won: number }) {
+export function PotLadder({ won, look }: { won: number; look?: 'field' }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const fc = useFieldColors();
   const reduced = useReducedMotion();
   const prize = LADDER.find((s) => s.prize === prizeFor(won));
   const from = !reduced && won > lastWon ? lastWon : won;
@@ -37,65 +43,91 @@ export function PotLadder({ won }: { won: number }) {
     }).start();
   }, [at, won, reduced]);
 
-  const pig = ui.sp(39);
-  const track = ui.sp(10);
-  const tick = ui.sp(12);
+  const field = look === 'field';
+  const pig = ui.sp(field ? 28 : 39);
+  const track = ui.sp(field ? 5 : 10);
+  const tick = ui.sp(field ? 8 : 12);
   const pct = at.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   return (
     <View
       accessible
       accessibilityLabel={`${won} of ${ROUNDS} rounds won. ${prize ? `In the pot: ${prize.label.toLowerCase()} prize.` : 'Nothing in the pot yet.'}`}
-      style={{ gap: ui.sp(4) }}
+      style={{ gap: ui.sp(field ? 2 : 4) }}
     >
-      <Text style={[styles.count, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
+      <Text style={[styles.count, { fontSize: ui.f(field ? 11 : 13) }, field && { color: fc.muted }]} maxFontSizeMultiplier={FONT_CAP}>
         {won} of {ROUNDS} won
       </Text>
       {/* Inset by half the pig, so at 0 and at ROUNDS it stays inside the rail. */}
       <View style={{ marginHorizontal: pig / 2 }}>
         <View style={[styles.slot, { height: pig }]}>
-          <View style={[styles.track, { height: track, borderRadius: track / 2 }]}>
-            <Animated.View style={[styles.fill, { width: pct }]} />
+          <View
+            style={[
+              styles.track,
+              { height: track, borderRadius: track / 2 },
+              field && { backgroundColor: fc.track, borderWidth: 0 },
+            ]}
+          >
+            <Animated.View style={[styles.fill, { width: pct }, field && { backgroundColor: fc.amber }]} />
           </View>
-          {LADDER.map((step) => (
-            <View
-              key={step.prize}
-              style={[
-                styles.tick,
-                won >= step.won && styles.tickOn,
-                { left: `${(100 * step.won) / ROUNDS}%`, width: tick, height: tick, borderRadius: tick / 2, marginLeft: -tick / 2 },
-              ]}
-            />
-          ))}
-          <Animated.View style={[styles.pig, { left: pct, width: pig, height: pig, borderRadius: pig / 2, marginLeft: -pig / 2 }]}>
-            <Image source={IMAGES.icon} style={{ width: '100%', height: '100%' }} />
-          </Animated.View>
-        </View>
-        <View style={{ height: ui.f(13) * 1.25 + ui.f(11) * 1.25 }}>
           {LADDER.map((step) => {
-            const reached = won >= step.won;
-            const last = step.won === ROUNDS;
-            const w = ui.sp(80);
+            const on = won >= step.won;
             return (
               <View
                 key={step.prize}
                 style={[
-                  styles.label,
-                  // The last step is flush with the end of the track; the rest centre on their tick.
-                  last ? { right: -pig / 2, alignItems: 'flex-end' } : { left: `${(100 * step.won) / ROUNDS}%`, marginLeft: -w / 2 },
-                  { width: w },
+                  styles.tick,
+                  on && styles.tickOn,
+                  field && { backgroundColor: on ? fc.amber : fc.tick, borderColor: on ? fc.amber : fc.muted, borderWidth: 1.5 },
+                  { left: `${(100 * step.won) / ROUNDS}%`, width: tick, height: tick, borderRadius: tick / 2, marginLeft: -tick / 2 },
                 ]}
-              >
-                <Text style={[styles.name, reached && styles.nameOn, { fontSize: ui.f(13) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
-                  {reached ? '✓ ' : ''}
-                  {step.label}
-                </Text>
-                <Text style={[styles.need, { fontSize: ui.f(11) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
-                  {last ? `All ${ROUNDS}` : `${step.won} wins`}
-                </Text>
-              </View>
+              />
             );
           })}
+          <Animated.View
+            style={[
+              styles.pig,
+              { left: pct, width: pig, height: pig, borderRadius: pig / 2, marginLeft: -pig / 2 },
+              field && { borderWidth: 1.5, borderColor: fc.amber },
+            ]}
+          >
+            <Image source={IMAGES.icon} style={{ width: '100%', height: '100%' }} />
+          </Animated.View>
         </View>
+        {field ? (
+          <Text style={[styles.tier, { fontSize: ui.f(12), color: fc.muted }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
+            Reward Tier:{' '}
+            <Text style={prize ? [styles.tierOn, { color: fc.amber }] : [styles.tierNone, { color: fc.text }]}>
+              {prize ? prize.label : 'None yet'}
+            </Text>
+          </Text>
+        ) : (
+          <View style={{ height: ui.f(13) * 1.25 + ui.f(11) * 1.25 }}>
+            {LADDER.map((step) => {
+              const reached = won >= step.won;
+              const last = step.won === ROUNDS;
+              const w = ui.sp(80);
+              return (
+                <View
+                  key={step.prize}
+                  style={[
+                    styles.label,
+                    // The last step is flush with the end of the track; the rest centre on their tick.
+                    last ? { right: -pig / 2, alignItems: 'flex-end' } : { left: `${(100 * step.won) / ROUNDS}%`, marginLeft: -w / 2 },
+                    { width: w },
+                  ]}
+                >
+                  <Text style={[styles.name, reached && styles.nameOn, { fontSize: ui.f(13) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
+                    {reached ? '✓ ' : ''}
+                    {step.label}
+                  </Text>
+                  <Text style={[styles.need, { fontSize: ui.f(11) }]} numberOfLines={1} maxFontSizeMultiplier={FONT_CAP}>
+                    {last ? `All ${ROUNDS}` : `${step.won} wins`}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -113,4 +145,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   name: { color: t.text, fontFamily: font.medium },
   nameOn: { fontFamily: font.bold },
   need: { color: t.textMuted, fontFamily: font.regular },
+  tier: { fontFamily: font.regular, textAlign: 'center' },
+  tierOn: { fontFamily: font.bold },
+  tierNone: { fontFamily: font.medium },
 });

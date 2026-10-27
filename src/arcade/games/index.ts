@@ -3,6 +3,7 @@ import type { GlyphName } from '../../components/Glyph';
 import { bigger } from './bigger';
 import { memory } from './memory';
 import { trivia } from './trivia';
+import { truffles } from './truffles';
 
 // Every solo mini-game. A game supplies only what's its own: its rounds. The
 // run around them (the timer, the round count, the pot, banking, the payout)
@@ -20,21 +21,29 @@ import { trivia } from './trivia';
 // itself (calls onResult), as a drawing is scored on what's there.
 // `stoppedAt` (epoch ms) stops the clock there, for a round that's been
 // answered but is still showing how it went before it calls onResult.
+// `headline` heads the card a full-screen game's won round shows ("Found
+// them all!"); without it the card says which round was won.
 export type Frame = (props: {
   focus: React.ReactNode;
   controls?: React.ReactNode;
   fitFocus?: boolean;
   onExpire?: () => void;
   stoppedAt?: number;
+  headline?: string;
 }) => React.ReactElement;
 
 export type RoundProps<S> = {
   spec: S; // this round's puzzle, from makeRun
   round: number; // 1-based
   // The round is over: right or wrong. `detail` is shown when it was wrong
-  // ("The answer was Paris"). Only the first call counts.
-  onResult: (won: boolean, detail?: string) => void;
+  // ("The answer was Paris"); `timedOut` when it was lost on time, for a game
+  // that settles its own clock (Frame onExpire). Only the first call counts.
+  onResult: (won: boolean, detail?: string, timedOut?: boolean) => void;
   Frame: Frame;
+  // Set once the round is over and its screen is staying up: won, under the
+  // choice to keep going or bank it, or for a full-screen game lost, under
+  // the news. `at` is when (epoch ms). A round stops taking input then.
+  ended?: { won: boolean; at: number };
 };
 
 export type Game<S = unknown> = {
@@ -49,10 +58,15 @@ export type Game<S = unknown> = {
   // Seconds for round n (1-based), for a game whose rounds need longer than
   // the engine's roundSeconds.
   seconds?: (round: number) => number;
+  // The round fills the screen (FieldFrame.tsx) instead of Stage's two panes:
+  // `focus` is drawn edge to edge, the run's clock, pot and Leave float over
+  // it with the game's `controls`, and the end of the round, won or lost,
+  // comes up on it rather than on a screen of its own.
+  fullScreen?: true;
   dev?: true; // a test game, for development builds only
 };
 
-export const GAMES: Game<any>[] = [trivia, memory, bigger];
+export const GAMES: Game<any>[] = [trivia, memory, truffles, bigger];
 
 // The games this build offers.
 export const PLAYABLE = GAMES.filter((g) => __DEV__ || !g.dev);

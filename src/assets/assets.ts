@@ -15,7 +15,7 @@ export const IMAGES = {
   icon: require('./images/logo-192X192.png'), // the app icon, for the menu drawer
 };
 
-// Dark-mode versions: the same art with a teal "sticker" border, so the black
+// Dark-mode versions: the same art with a light "sticker" border, so the black
 // outline and the thin "squigglepig" wordmark don't sink into the dark
 // background. Each has a transparent margin around the original for the
 // border to grow into (the art touches the edges of most images); darkInset()

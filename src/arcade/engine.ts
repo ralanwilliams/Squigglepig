@@ -42,7 +42,10 @@ export type Run =
   // set to `until`: bank, or keep going. The round's screen stays up, its
   // clock stopped where it was answered.
   | { phase: 'between'; won: number; until: number; at: number }
-  | { phase: 'lost'; won: number; timeout: boolean; detail?: string } // the pot is gone
+  // The pot is gone, at `at` (epoch ms). A full-screen game's round stays up
+  // under the news, its clock (set to `until`) stopped there
+  // (games/index.ts Game.fullScreen).
+  | { phase: 'lost'; won: number; timeout: boolean; detail?: string; until: number; at: number }
   | { phase: 'payout'; won: number; prize: Prize }; // banked: choose the prize
 
 export type RunAction =
@@ -62,7 +65,7 @@ export function runReducer(run: Run, action: RunAction): Run {
       // Only the round in play can end, once (a late timeout after an answer is ignored).
       if (run.phase !== 'round') return run;
       const won = run.round - 1;
-      if (!action.won) return { phase: 'lost', won, timeout: !!action.timeout, detail: action.detail };
+      if (!action.won) return { phase: 'lost', won, timeout: !!action.timeout, detail: action.detail, until: run.until, at: action.at };
       if (run.round === ROUNDS) return { phase: 'payout', won: ROUNDS, prize: 'any' };
       return { phase: 'between', won: run.round, until: run.until, at: action.at };
     }
