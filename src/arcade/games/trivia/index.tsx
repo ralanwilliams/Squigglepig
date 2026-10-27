@@ -16,8 +16,9 @@ import { questionsForRun } from './store';
 //
 // Once an answer is picked the answers lock and say how it went: the right
 // one green with a ✓, a wrong pick red with a ✗ (the verdict colors, told
-// apart by the mark), the rest faded. A right answer leaves the question up
-// with the run's choice under it (keep going, or bank it: RunShell.tsx).
+// apart by the mark), the rest faded. A right answer leaves the question up,
+// with the run's choice under it at a new tier (keep going, or bank it:
+// RunShell.tsx), else for a moment before the next round.
 
 type Spec = { text: string; category: string; answers: string[]; correct: number };
 

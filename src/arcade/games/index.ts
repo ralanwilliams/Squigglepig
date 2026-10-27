@@ -21,15 +21,12 @@ import { truffles } from './truffles';
 // itself (calls onResult), as a drawing is scored on what's there.
 // `stoppedAt` (epoch ms) stops the clock there, for a round that's been
 // answered but is still showing how it went before it calls onResult.
-// `headline` heads the card a full-screen game's won round shows ("Found
-// them all!"); without it the card says which round was won.
 export type Frame = (props: {
   focus: React.ReactNode;
   controls?: React.ReactNode;
   fitFocus?: boolean;
   onExpire?: () => void;
   stoppedAt?: number;
-  headline?: string;
 }) => React.ReactElement;
 
 export type RoundProps<S> = {

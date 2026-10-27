@@ -20,10 +20,12 @@ import type { Frame } from './games';
 // bottom left and Leave bottom right. There's no title; the slider says
 // where the run is, as on every arcade screen.
 //
-// When the round ends its screen stays up and the news comes up on it as a
-// card between the chips: won, the choice to keep going or bank it (headed
-// by the game's `headline`); lost, what happened and Play again / Done, a
-// beat later so the game can show what was missed first.
+// When the round ends its screen stays up. Won, the game shows it on the
+// field itself; at a new tier the choice to keep going or bank it then comes
+// up as a card between the chips, a beat later so the game's celebration
+// plays first (any other win has nothing to show here: RunShell moves on by
+// itself). Lost, a card says what happened, with Play again / Done, a beat
+// later so the game can show what was missed first.
 //
 // The game learns where it may put things through useFieldArea(): the whole
 // field's size, and the box between the chips at the top and the bottom.
@@ -44,9 +46,10 @@ export const useFieldArea = () => useContext(AreaCtx);
 
 const CARD_IN_MS = 380;
 const LOST_CARD_DELAY_MS = 1400; // the game rings what was missed first
+const WON_CARD_DELAY_MS = 1300; // the game celebrates first
 const NATIVE = Platform.OS !== 'web';
 
-export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt, headline }) => {
+export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
   const ui = useUi();
   const fc = useFieldColors();
   const ctx = useContext(RoundCtx);
@@ -160,14 +163,14 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt, headli
           )}
         </View>
         <View pointerEvents="box-none" style={styles.middle}>
-          {settled ? (
+          {settled && (settled.lost || settled.actions.length) ? (
             <FitBox style={styles.fill}>
               <View style={styles.center}>
                 <Card
                   key={settled.lost ? 'lost' : 'won'}
                   colors={fc}
-                  delay={settled.lost ? LOST_CARD_DELAY_MS : 0}
-                  title={settled.lost ? settled.title ?? '' : headline ?? `Round ${ctx.round} won!`}
+                  delay={settled.lost ? LOST_CARD_DELAY_MS : WON_CARD_DELAY_MS}
+                  title={settled.title}
                   lines={settled.lines}
                   actions={settled.actions}
                 />
@@ -198,7 +201,7 @@ function Card({
 }: {
   colors: FieldColors;
   delay: number;
-  title: string;
+  title?: string;
   lines: string[];
   actions: { name: string; onPress: () => void }[];
 }) {
@@ -227,19 +230,23 @@ function Card({
         },
       ]}
     >
-      <Text style={[styles.title, { color: fc.text, fontSize: ui.f(21) }]} maxFontSizeMultiplier={FONT_CAP}>
-        {title}
-      </Text>
+      {title ? (
+        <Text style={[styles.title, { color: fc.text, fontSize: ui.f(21) }]} maxFontSizeMultiplier={FONT_CAP}>
+          {title}
+        </Text>
+      ) : null}
       {lines.map((line) => (
         <Text key={line} style={[styles.line, { color: fc.muted, fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
           {line}
         </Text>
       ))}
-      <View style={[styles.row, { gap: ui.sp(8), marginTop: ui.sp(6) }]}>
-        {actions.map((a, i) => (
-          <FieldButton key={a.name} name={a.name} onPress={a.onPress} main={i === 0} colors={fc} />
-        ))}
-      </View>
+      {actions.length ? (
+        <View style={[styles.row, { gap: ui.sp(8), marginTop: ui.sp(6) }]}>
+          {actions.map((a, i) => (
+            <FieldButton key={a.name} name={a.name} onPress={a.onPress} main={i === 0} colors={fc} />
+          ))}
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
