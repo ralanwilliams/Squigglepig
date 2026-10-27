@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Easing, GestureResponderEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 import { font } from '../../../theme/tokens';
-import { useReducedMotion } from '../../../theme/theme';
+import { useFadesWithTheme, useReducedMotion } from '../../../theme/theme';
 import { FONT_CAP, useUi } from '../../../theme/responsive';
 import { ROUNDS } from '../../engine';
 import { useFieldArea } from '../../FieldFrame';
@@ -10,6 +10,8 @@ import { useFieldColors } from '../../fieldColors';
 import type { Game, RoundProps } from '../index';
 import { PIP, Truffle, makeField, type Look, type TruffleArt } from './art';
 import { PigSprite, usePigWalk } from './Pig';
+import { FieldLight } from '../../FieldLight';
+import { Cheer, Hop } from '../../Cheer';
 
 // Truffle Hunter: each round scatters truffles over a forest floor that
 // fills the screen (art.tsx), and the player taps them all before the clock
@@ -25,6 +27,9 @@ import { PigSprite, usePigWalk } from './Pig';
 // with more clutter, leaves over their edges, and look-alike stones. The
 // round fills the screen (Game.fullScreen): the run's clock, pot and Leave
 // float over the field (FieldFrame.tsx), with the count here bottom left.
+// In dark mode it's night in the woods, and switching fades the light
+// (FieldLight.tsx) rather than sweeping the screen. A win is cheered on the
+// field (Cheer.tsx).
 
 type Spec = Look;
 
@@ -57,9 +62,6 @@ const CREAM = '#F4EAD9';
 const AMBER = '#E2B06A';
 const AMBER_TEXT = '#2A1A0E';
 const MISSED = '#FF8FB3';
-const CELEBRATE_MS = 1500; // the win's cheer, start to finish (RunShell moves on at 1.8 s)
-const SPARKS = 14;
-const SPARK_COLORS = [AMBER, CREAM, '#F6A0B5'];
 
 const uneaten = (n: number) => `${n} ${n === 1 ? 'truffle was' : 'truffles were'} still on the ground.`;
 
@@ -142,6 +144,7 @@ function Hunt({
   const ui = useUi();
   const reduced = useReducedMotion();
   const area = useFieldArea();
+  useFadesWithTheme();
   // Drawn once per field size: a new one only when the phone turns.
   const box = area && `${Math.round(area.w)},${Math.round(area.h)},${Math.round(area.x0)},${Math.round(area.y0)},${Math.round(area.x1)},${Math.round(area.y1)}`;
   const field = useMemo(() => (area ? makeField(area.w, area.h, area, spec, ui.s) : null), [box, spec, ui.s]);
@@ -195,6 +198,7 @@ function Hunt({
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {field.over}
       </View>
+      <FieldLight w={area.w} h={area.h} seed={spec.seed} />
       {spots.map((t, i) =>
         eaten.includes(i) ? (
           <Dug key={i} t={t} />
@@ -212,7 +216,7 @@ function Hunt({
       {taps.map((t) => (
         <TapRing key={t.id} x={t.x} y={t.y} hit={t.hit} />
       ))}
-      {ended?.won ? <Celebrate x={(area.x0 + area.x1) / 2} y={area.y0 + (area.y1 - area.y0) * 0.38} /> : null}
+      {ended?.won ? <Cheer x={(area.x0 + area.x1) / 2} y={area.y0 + (area.y1 - area.y0) * 0.38} text="Found them all!" /> : null}
       {/* The taps, as soon as a finger lands. A responder rather than a
           Pressable: its grant comes while the touch is being handled, so
           locationX is there on the web too (a press arrives a moment later,
@@ -336,102 +340,6 @@ function Missed({ t }: { t: TruffleArt }) {
   );
 }
 
-// Won: the pig hops for joy where it stands, three times, each lower.
-function Hop({ on, children }: { on: boolean; children: React.ReactNode }) {
-  const ui = useUi();
-  const reduced = useReducedMotion();
-  const y = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!on || reduced) return;
-    const hop = (h: number) =>
-      Animated.sequence([
-        Animated.timing(y, { toValue: -ui.sp(h), duration: 170, easing: Easing.out(Easing.quad), useNativeDriver: NATIVE }),
-        Animated.timing(y, { toValue: 0, duration: 170, easing: Easing.in(Easing.quad), useNativeDriver: NATIVE }),
-      ]);
-    Animated.sequence([hop(14), hop(9), hop(5)]).start();
-  }, [on, reduced]);
-  return <Animated.View style={{ transform: [{ translateY: y }] }}>{children}</Animated.View>;
-}
-
-// Won: "Found them all!" stamps down over the field, centred at x, y, in a
-// burst of sparks in the field's amber and cream and the pig's pink, then
-// rises away. With reduced motion it simply shows.
-function Celebrate({ x, y }: { x: number; y: number }) {
-  const ui = useUi();
-  const reduced = useReducedMotion();
-  const p = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!reduced) Animated.timing(p, { toValue: 1, duration: CELEBRATE_MS, easing: Easing.linear, useNativeDriver: NATIVE }).start();
-  }, [p, reduced]);
-  const w = ui.sp(320);
-  const h = ui.sp(48);
-  const cheer = (
-    <Text
-      style={[styles.cheer, { fontSize: ui.f(34), textShadowRadius: ui.sp(6) }]}
-      maxFontSizeMultiplier={FONT_CAP}
-      numberOfLines={1}
-      adjustsFontSizeToFit
-      accessibilityLiveRegion="polite"
-    >
-      Found them all!
-    </Text>
-  );
-  const box = { left: x - w / 2, top: y - h / 2, width: w, height: h };
-  if (reduced) {
-    return (
-      <View pointerEvents="none" style={[styles.abs, styles.cheerBox, box]}>
-        {cheer}
-      </View>
-    );
-  }
-  return (
-    <>
-      {Array.from({ length: SPARKS }, (_, i) => {
-        const a = (i / SPARKS) * 2 * Math.PI + (i % 2) * 0.2;
-        const d = ui.sp(i % 2 ? 95 : 135);
-        const size = ui.sp(i % 3 === 0 ? 10 : 7);
-        const out = (to: number) => p.interpolate({ inputRange: [0, 0.5], outputRange: [0, to], extrapolate: 'clamp', easing: Easing.out(Easing.cubic) });
-        return (
-          <Animated.View
-            key={i}
-            pointerEvents="none"
-            style={[
-              styles.abs,
-              {
-                left: x - size / 2,
-                top: y - size / 2,
-                width: size,
-                height: size,
-                borderRadius: i % 3 === 0 ? ui.sp(2) : size / 2,
-                backgroundColor: SPARK_COLORS[i % SPARK_COLORS.length],
-                opacity: p.interpolate({ inputRange: [0, 0.05, 0.45, 0.65], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' }),
-                transform: [{ translateX: out(Math.cos(a) * d) }, { translateY: out(Math.sin(a) * d) }, { rotate: '45deg' }],
-              },
-            ]}
-          />
-        );
-      })}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.abs,
-          styles.cheerBox,
-          box,
-          {
-            opacity: p.interpolate({ inputRange: [0, 0.08, 0.8, 1], outputRange: [0, 1, 1, 0] }),
-            transform: [
-              { translateY: p.interpolate({ inputRange: [0.8, 1], outputRange: [0, -ui.sp(24)], extrapolate: 'clamp' }) },
-              { scale: p.interpolate({ inputRange: [0, 0.12, 0.2], outputRange: [1.8, 0.92, 1], extrapolate: 'clamp' }) },
-            ],
-          },
-        ]}
-      >
-        {cheer}
-      </Animated.View>
-    </>
-  );
-}
-
 // Where a tap landed: a ring, and on bare ground a little dust.
 function TapRing({ x, y, hit }: { x: number; y: number; hit: boolean }) {
   const ui = useUi();
@@ -501,14 +409,6 @@ const styles = StyleSheet.create({
   countNum: { fontFamily: font.bold },
   ring: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(244, 234, 217, 0.12)' },
   tick: { position: 'absolute', alignItems: 'center', justifyContent: 'center', backgroundColor: AMBER, borderWidth: 1, borderColor: AMBER_TEXT },
-  cheerBox: { alignItems: 'center', justifyContent: 'center' },
-  cheer: {
-    color: CREAM,
-    fontFamily: font.bold,
-    textAlign: 'center',
-    textShadowColor: 'rgba(42, 26, 14, 0.9)',
-    textShadowOffset: { width: 0, height: 2 },
-  },
 });
 
 export const truffles: Game<Spec> = {

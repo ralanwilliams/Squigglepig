@@ -1,5 +1,6 @@
 import React from 'react';
 import Svg, { Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { rng } from '../../rng';
 
 // The forest floor, made up fresh for each round from its seed: soil, leaf
 // litter, twigs, pebbles and moss, the truffles, and from round 5 smooth dark
@@ -36,15 +37,6 @@ export type Field = {
 
 // ---- Helpers -----------------------------------------------------------------
 
-export function rng(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 type Rand = () => number;
 
 const f1 = (v: number) => v.toFixed(1);

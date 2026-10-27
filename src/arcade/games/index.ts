@@ -2,6 +2,7 @@ import type React from 'react';
 import type { GlyphName } from '../../components/Glyph';
 import { bigger } from './bigger';
 import { memory } from './memory';
+import { pigpen } from './pigpen';
 import { trivia } from './trivia';
 import { truffles } from './truffles';
 
@@ -63,7 +64,7 @@ export type Game<S = unknown> = {
   dev?: true; // a test game, for development builds only
 };
 
-export const GAMES: Game<any>[] = [trivia, memory, truffles, bigger];
+export const GAMES: Game<any>[] = [trivia, memory, truffles, pigpen, bigger];
 
 // The games this build offers.
 export const PLAYABLE = GAMES.filter((g) => __DEV__ || !g.dev);
