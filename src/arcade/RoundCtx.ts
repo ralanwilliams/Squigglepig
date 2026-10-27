@@ -10,7 +10,7 @@ import { createContext } from 'react';
 export type Settled = {
   at: number; // when the round ended (epoch ms): the clock stops there
   lost: boolean;
-  title?: string; // heads the full-screen card ("Out of time!"); a won round's comes from the game
+  title?: string; // heads a lost round's full-screen card ("Out of time!")
   lines: string[];
   actions: { name: string; onPress: () => void }[];
 };

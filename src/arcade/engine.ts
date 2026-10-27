@@ -1,11 +1,15 @@
 // The rules of a solo run, shared by every mini-game (src/arcade/games):
 // up to ROUNDS rounds, each with less time than the last. Every round won
-// climbs the pot ladder; between rounds the player banks what's in the pot or
-// risks it on the next round. A wrong answer, or running out of time, loses
-// the pot. Winning the last round banks it automatically.
+// climbs the pot ladder. A win that reaches a new step of it (newTier) lets
+// the player bank the pot or risk it on the next round; any other win goes
+// on to the next round by itself, since there's nothing new to bank. A wrong
+// answer, or running out of time, loses the pot. Winning the last round
+// banks it automatically.
 //
 // Plain data and a reducer, no React: RunShell (RunShell.tsx) holds the state
 // and draws each phase.
+
+import type { Tier } from '../rewards/catalog';
 
 export const ROUNDS = 10;
 
@@ -13,16 +17,16 @@ export const ROUNDS = 10;
 // under 6. A game can set its own (games/index.ts Game.seconds).
 export const roundSeconds = (n: number) => Math.max(6, 25 - 2 * n);
 
-// What a banked pot pays: a common reward, a rare one, or the pick of every
-// reward the player doesn't own yet (payout.ts).
-export type Prize = 'common' | 'rare' | 'any';
+// What a banked pot pays: a reward of that tier (catalog.ts Tier; payout.ts).
+// Premium, the top, is for winning every round.
+export type Prize = Tier;
 
 // The pot ladder: rounds won to reach each prize. Nothing can be banked below
 // the first step.
 export const LADDER: { won: number; prize: Prize; label: string }[] = [
   { won: 3, prize: 'common', label: 'Common' },
   { won: 6, prize: 'rare', label: 'Rare' },
-  { won: ROUNDS, prize: 'any', label: 'Pick any' },
+  { won: ROUNDS, prize: 'premium', label: 'Premium' },
 ];
 
 // The prize in the pot after `won` rounds won, if any.
@@ -32,15 +36,17 @@ export function prizeFor(won: number): Prize | null {
   return prize;
 }
 
-// The next step up the ladder from `won`, if there is one.
-export const nextStep = (won: number) => LADDER.find((s) => s.won > won) ?? null;
+// Whether winning the `won`th round reached a new step: the only time the
+// pot can be banked.
+export const newTier = (won: number) => LADDER.some((s) => s.won === won);
 
 export type Run =
   | { phase: 'ready' } // the game's intro, before round 1
   | { phase: 'round'; round: number; until: number } // playing round `round` until `until` (epoch ms)
   // Won `won` rounds so far, the last one at `at` (epoch ms) with its clock
-  // set to `until`: bank, or keep going. The round's screen stays up, its
-  // clock stopped where it was answered.
+  // set to `until`. The round's screen stays up, its clock stopped where it
+  // was answered: at a new tier until the player banks or keeps going, else
+  // for a moment before the next round (RunShell.tsx).
   | { phase: 'between'; won: number; until: number; at: number }
   // The pot is gone, at `at` (epoch ms). A full-screen game's round stays up
   // under the news, its clock (set to `until`) stopped there
@@ -66,7 +72,7 @@ export function runReducer(run: Run, action: RunAction): Run {
       if (run.phase !== 'round') return run;
       const won = run.round - 1;
       if (!action.won) return { phase: 'lost', won, timeout: !!action.timeout, detail: action.detail, until: run.until, at: action.at };
-      if (run.round === ROUNDS) return { phase: 'payout', won: ROUNDS, prize: 'any' };
+      if (run.round === ROUNDS) return { phase: 'payout', won: ROUNDS, prize: 'premium' };
       return { phase: 'between', won: run.round, until: run.until, at: action.at };
     }
     case 'next':
@@ -74,7 +80,7 @@ export function runReducer(run: Run, action: RunAction): Run {
     case 'bank': {
       if (run.phase !== 'between') return run;
       const prize = prizeFor(run.won);
-      return prize ? { phase: 'payout', won: run.won, prize } : run;
+      return prize && newTier(run.won) ? { phase: 'payout', won: run.won, prize } : run;
     }
     case 'restart':
       return START;

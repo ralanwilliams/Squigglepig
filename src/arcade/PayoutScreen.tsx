@@ -4,20 +4,17 @@ import { Stage } from '../components/Stage';
 import { Heading } from '../components/Heading';
 import { PigButton } from '../components/PigButton';
 import { RewardTile } from '../rewards/RewardTile';
-import { KindTabs } from '../rewards/KindTabs';
-import { KINDS, type Kind, type Reward } from '../rewards/catalog';
+import { KINDS, type Reward } from '../rewards/catalog';
 import { useInventory } from '../rewards/inventory';
 import { useChoose } from '../rewards/useChoose';
 import { useUi } from '../theme/responsive';
 import { playSound } from '../lib/sound';
 import { SOUNDS } from '../assets/assets';
-import { LADDER, type Prize } from './engine';
+import { LADDER, ROUNDS, type Prize } from './engine';
 import { offers } from './payout';
 
 // The end of a banked run: choose a prize (payout.ts offers), then it's
-// yours. A common or rare pot offers three to choose from; the top one, every
-// reward not yet won, a tab per kind in the rail like the Rewards screen. A
-// won reward of a kind worn one at a time (a theme) can be put to use there
+// yours. Every pot offers three of its tier to choose from. A won reward of a kind worn one at a time (a theme) can be put to use there
 // and then. With nothing left to give, it says so.
 export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain: () => void; onDone: () => void }) {
   const ui = useUi();
@@ -26,8 +23,6 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
   // Drawn once: the offer doesn't reshuffle as the screen re-renders.
   const [list] = useState(() => offers(prize, owned));
   const [taken, setTaken] = useState<Reward | null>(null);
-  const kinds = (Object.keys(KINDS) as Kind[]).filter((k) => list.some((r) => r.kind === k));
-  const [kind, setKind] = useState<Kind | undefined>(kinds[0]);
   const label = LADDER.find((s) => s.prize === prize)?.label.toLowerCase();
 
   useEffect(() => {
@@ -75,27 +70,17 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
     );
   }
 
-  const shown = prize === 'any' ? list.filter((r) => r.kind === kind) : list;
   return (
     <Screen fitFocus>
       <View style={[styles.grid, { gap: ui.sp(10) }]}>
-        {shown.map((r) => (
+        {list.map((r) => (
           <RewardTile key={r.id} reward={r} owned status="Tap to take" onPress={() => take(r)} />
         ))}
       </View>
       <>
-        <Heading>{prize === 'any' ? 'You won every round! Take any one.' : `You banked a ${label} prize. Choose one.`}</Heading>
-        {prize === 'any' && kind ? (
-          <KindTabs
-            kinds={kinds}
-            selected={kind}
-            onSelect={setKind}
-            count={(k) => {
-              const n = list.filter((r) => r.kind === k).length;
-              return { text: String(n), spoken: `${n} to choose from` };
-            }}
-          />
-        ) : null}
+        <Heading>
+          {prize === 'premium' ? `You won all ${ROUNDS} rounds! Choose a premium prize.` : `You banked a ${label} prize. Choose one.`}
+        </Heading>
       </>
     </Screen>
   );

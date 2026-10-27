@@ -26,8 +26,8 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const big = Math.max(spec.left, spec.right);
-  // Once picked the buttons stop answering: a won round stays up under the
-  // run's choice (RunShell.tsx).
+  // Once picked the buttons stop answering: a won round stays up, under the
+  // run's choice at a new tier (RunShell.tsx).
   const [picked, setPicked] = useState(false);
   const pick = (n: number) => {
     if (picked) return;

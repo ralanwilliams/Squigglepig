@@ -15,8 +15,9 @@ import type { GlyphName } from '../components/Glyph';
 // the previews build from it too (previews/_build-rewards.mjs).
 
 // How hard a reward is to win. A solo run that banks more rounds draws from a
-// higher tier.
-export type Tier = 'common' | 'rare';
+// higher tier: common at 3 wins, rare at 6, premium (unique prizes) for
+// winning all 10 (src/arcade/engine.ts LADDER).
+export type Tier = 'common' | 'rare' | 'premium';
 
 // The kinds, in the order the Rewards screen lists them. `pick` is how an
 // owned reward is used:

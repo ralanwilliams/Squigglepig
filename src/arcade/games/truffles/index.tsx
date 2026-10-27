@@ -14,9 +14,12 @@ import { PigSprite, usePigWalk } from './Pig';
 // Truffle Hunter: each round scatters truffles over a forest floor that
 // fills the screen (art.tsx), and the player taps them all before the clock
 // runs out. A tap on bare ground does nothing. A tap marks its truffle at
-// once, and a little pig (Pig.tsx) trots over and snuffles it up. Once the
-// last is found the clock stops, and when the pig has eaten it the round is
-// won. Running out of time loses it, and the ones missed are ringed.
+// once, and a little pig (Pig.tsx) trots over and snuffles it up, in the
+// order they were tapped. The clock runs until the pig has eaten the last
+// one, so the tapping order is the pig's route: in the last rounds a
+// wasteful one runs out of time. Then the round is won: the pig hops for joy
+// and "Found them all!" stamps down over the field in a burst of sparks.
+// Running out of time loses it, and the ones not found are ringed.
 //
 // Later rounds bring more truffles, smaller, closer to the soil's color,
 // with more clutter, leaves over their edges, and look-alike stones. The
@@ -26,9 +29,12 @@ import { PigSprite, usePigWalk } from './Pig';
 type Spec = Look;
 
 const ease = (round: number) => (round - 1) / (ROUNDS - 1); // 0 on round 1, 1 on the last
-// The round's own clock: 21 s for round 1, down to 12 (the engine's 23 down
-// to 6 is too short to find nine).
-const seconds = (round: number) => Math.max(12, 22 - round);
+// The round's own clock: 25 s for round 1, down to 16 on the last (the
+// engine's 23 down to 6 is too short to find nine and walk the pig to them).
+// Measured on random fields (Pig.tsx SPEED): on the last rounds a route that
+// goes to the nearest truffle next fits with time to spot them, and one that
+// zigzags and doubles back runs out.
+const seconds = (round: number) => Math.max(16, 26 - round);
 
 function makeRun(): Spec[] {
   return Array.from({ length: ROUNDS }, (_, i) => {
@@ -51,17 +57,21 @@ const CREAM = '#F4EAD9';
 const AMBER = '#E2B06A';
 const AMBER_TEXT = '#2A1A0E';
 const MISSED = '#FF8FB3';
+const CELEBRATE_MS = 1500; // the win's cheer, start to finish (RunShell moves on at 1.8 s)
+const SPARKS = 14;
+const SPARK_COLORS = [AMBER, CREAM, '#F6A0B5'];
 
-const hidden = (n: number) => `${n} ${n === 1 ? 'truffle was' : 'truffles were'} still hidden.`;
+const uneaten = (n: number) => `${n} ${n === 1 ? 'truffle was' : 'truffles were'} still on the ground.`;
 
 function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
   const ui = useUi();
   const fc = useFieldColors();
   const [found, setFound] = useState<number[]>([]); // truffles, in the order found
+  const [eaten, setEaten] = useState<number[]>([]); // the ones the pig has snuffled up
   const [total, setTotal] = useState(spec.count); // as placed (a cramped field may fit fewer)
   const [stoppedAt, setStoppedAt] = useState<number>();
   const left = useRef(spec.count);
-  left.current = total - found.length;
+  left.current = total - eaten.length;
   const reported = useRef(false);
   const report = (won: boolean, detail?: string, timedOut?: boolean) => {
     if (reported.current) return;
@@ -70,27 +80,22 @@ function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
   };
 
   const find = (i: number) => setFound((f) => (f.includes(i) ? f : [...f, i]));
-  // The last one found: the clock stops there while the pig finishes.
-  const all = total > 0 && found.length >= total;
+  const eat = useCallback((i: number) => setEaten((e) => (e.includes(i) ? e : [...e, i])), []);
+  // The last one eaten: the clock stops there, and a moment later the round
+  // is won (unless the clock ran out first).
+  const all = total > 0 && eaten.length >= total;
   useEffect(() => {
-    if (all) setStoppedAt((at) => at ?? Date.now());
+    if (!all || reported.current) return;
+    setStoppedAt(Date.now());
+    const timer = setTimeout(() => report(true), WON_AFTER_MS);
+    return () => clearTimeout(timer);
   }, [all]);
 
   return (
     <Frame
-      headline="Found them all!"
       stoppedAt={stoppedAt}
-      onExpire={() => report(false, hidden(left.current), true)}
-      focus={
-        <Hunt
-          spec={spec}
-          found={found}
-          ended={ended}
-          onPlaced={setTotal}
-          onFind={find}
-          onAllEaten={() => setTimeout(() => report(true), WON_AFTER_MS)}
-        />
-      }
+      onExpire={() => report(false, uneaten(left.current), true)}
+      focus={<Hunt spec={spec} found={found} eaten={eaten} ended={ended} onPlaced={setTotal} onFind={find} onEat={eat} />}
       controls={
         <View style={[styles.row, { gap: ui.sp(7) }]} accessible accessibilityLabel={`${found.length} of ${total} truffles found`}>
           <Text style={[styles.count, { color: fc.muted, fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
@@ -120,17 +125,19 @@ function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
 function Hunt({
   spec,
   found,
+  eaten,
   ended,
   onPlaced,
   onFind,
-  onAllEaten,
+  onEat,
 }: {
   spec: Spec;
   found: number[];
+  eaten: number[];
   ended?: { won: boolean; at: number };
   onPlaced: (n: number) => void;
   onFind: (i: number) => void;
-  onAllEaten: () => void;
+  onEat: (i: number) => void;
 }) {
   const ui = useUi();
   const reduced = useReducedMotion();
@@ -143,15 +150,8 @@ function Hunt({
     if (field) onPlaced(field.truffles.length);
   }, [field]);
 
-  const [eaten, setEaten] = useState<number[]>([]);
-  const allEaten = spots.length > 0 && eaten.length === spots.length;
-  useEffect(() => {
-    if (allEaten) onAllEaten();
-  }, [allEaten]);
-
   const start = area ? { x: (area.x0 + area.x1) / 2, y: (area.y0 + area.y1) / 2 + ui.sp(30) } : { x: 0, y: 0 };
-  const eat = useCallback((i: number) => setEaten((e) => (e.includes(i) ? e : [...e, i])), []);
-  const pig = usePigWalk(spots, start, ui.s, reduced, eat);
+  const pig = usePigWalk(spots, start, ui.s, reduced, onEat);
 
   // Taps: the nearest truffle not yet found within reach, else nothing.
   // `claimed` holds the finds at once, so two taps before the next render
@@ -205,11 +205,14 @@ function Hunt({
         ) : null
       )}
       <Animated.View pointerEvents="none" style={[styles.pig, { transform: pig.pos.getTranslateTransform() }]}>
-        <PigSprite walking={pig.walking} facing={pig.facing} head={pig.head} scale={pig.scale} />
+        <Hop on={!!ended?.won}>
+          <PigSprite walking={pig.walking} facing={pig.facing} head={pig.head} scale={pig.scale} />
+        </Hop>
       </Animated.View>
       {taps.map((t) => (
         <TapRing key={t.id} x={t.x} y={t.y} hit={t.hit} />
       ))}
+      {ended?.won ? <Celebrate x={(area.x0 + area.x1) / 2} y={area.y0 + (area.y1 - area.y0) * 0.38} /> : null}
       {/* The taps, as soon as a finger lands. A responder rather than a
           Pressable: its grant comes while the touch is being handled, so
           locationX is there on the web too (a press arrives a moment later,
@@ -333,6 +336,102 @@ function Missed({ t }: { t: TruffleArt }) {
   );
 }
 
+// Won: the pig hops for joy where it stands, three times, each lower.
+function Hop({ on, children }: { on: boolean; children: React.ReactNode }) {
+  const ui = useUi();
+  const reduced = useReducedMotion();
+  const y = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!on || reduced) return;
+    const hop = (h: number) =>
+      Animated.sequence([
+        Animated.timing(y, { toValue: -ui.sp(h), duration: 170, easing: Easing.out(Easing.quad), useNativeDriver: NATIVE }),
+        Animated.timing(y, { toValue: 0, duration: 170, easing: Easing.in(Easing.quad), useNativeDriver: NATIVE }),
+      ]);
+    Animated.sequence([hop(14), hop(9), hop(5)]).start();
+  }, [on, reduced]);
+  return <Animated.View style={{ transform: [{ translateY: y }] }}>{children}</Animated.View>;
+}
+
+// Won: "Found them all!" stamps down over the field, centred at x, y, in a
+// burst of sparks in the field's amber and cream and the pig's pink, then
+// rises away. With reduced motion it simply shows.
+function Celebrate({ x, y }: { x: number; y: number }) {
+  const ui = useUi();
+  const reduced = useReducedMotion();
+  const p = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!reduced) Animated.timing(p, { toValue: 1, duration: CELEBRATE_MS, easing: Easing.linear, useNativeDriver: NATIVE }).start();
+  }, [p, reduced]);
+  const w = ui.sp(320);
+  const h = ui.sp(48);
+  const cheer = (
+    <Text
+      style={[styles.cheer, { fontSize: ui.f(34), textShadowRadius: ui.sp(6) }]}
+      maxFontSizeMultiplier={FONT_CAP}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      accessibilityLiveRegion="polite"
+    >
+      Found them all!
+    </Text>
+  );
+  const box = { left: x - w / 2, top: y - h / 2, width: w, height: h };
+  if (reduced) {
+    return (
+      <View pointerEvents="none" style={[styles.abs, styles.cheerBox, box]}>
+        {cheer}
+      </View>
+    );
+  }
+  return (
+    <>
+      {Array.from({ length: SPARKS }, (_, i) => {
+        const a = (i / SPARKS) * 2 * Math.PI + (i % 2) * 0.2;
+        const d = ui.sp(i % 2 ? 95 : 135);
+        const size = ui.sp(i % 3 === 0 ? 10 : 7);
+        const out = (to: number) => p.interpolate({ inputRange: [0, 0.5], outputRange: [0, to], extrapolate: 'clamp', easing: Easing.out(Easing.cubic) });
+        return (
+          <Animated.View
+            key={i}
+            pointerEvents="none"
+            style={[
+              styles.abs,
+              {
+                left: x - size / 2,
+                top: y - size / 2,
+                width: size,
+                height: size,
+                borderRadius: i % 3 === 0 ? ui.sp(2) : size / 2,
+                backgroundColor: SPARK_COLORS[i % SPARK_COLORS.length],
+                opacity: p.interpolate({ inputRange: [0, 0.05, 0.45, 0.65], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' }),
+                transform: [{ translateX: out(Math.cos(a) * d) }, { translateY: out(Math.sin(a) * d) }, { rotate: '45deg' }],
+              },
+            ]}
+          />
+        );
+      })}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.abs,
+          styles.cheerBox,
+          box,
+          {
+            opacity: p.interpolate({ inputRange: [0, 0.08, 0.8, 1], outputRange: [0, 1, 1, 0] }),
+            transform: [
+              { translateY: p.interpolate({ inputRange: [0.8, 1], outputRange: [0, -ui.sp(24)], extrapolate: 'clamp' }) },
+              { scale: p.interpolate({ inputRange: [0, 0.12, 0.2], outputRange: [1.8, 0.92, 1], extrapolate: 'clamp' }) },
+            ],
+          },
+        ]}
+      >
+        {cheer}
+      </Animated.View>
+    </>
+  );
+}
+
 // Where a tap landed: a ring, and on bare ground a little dust.
 function TapRing({ x, y, hit }: { x: number; y: number; hit: boolean }) {
   const ui = useUi();
@@ -402,6 +501,14 @@ const styles = StyleSheet.create({
   countNum: { fontFamily: font.bold },
   ring: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(244, 234, 217, 0.12)' },
   tick: { position: 'absolute', alignItems: 'center', justifyContent: 'center', backgroundColor: AMBER, borderWidth: 1, borderColor: AMBER_TEXT },
+  cheerBox: { alignItems: 'center', justifyContent: 'center' },
+  cheer: {
+    color: CREAM,
+    fontFamily: font.bold,
+    textAlign: 'center',
+    textShadowColor: 'rgba(42, 26, 14, 0.9)',
+    textShadowOffset: { width: 0, height: 2 },
+  },
 });
 
 export const truffles: Game<Spec> = {

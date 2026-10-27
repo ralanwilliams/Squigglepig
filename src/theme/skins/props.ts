@@ -1055,6 +1055,18 @@ export const PROPS = {
     ],
   },
 
+  // ---- The solo games' reward podium (src/arcade/RewardPodium.tsx): a
+  // blank card over the "Join Game" on the sign the join art's pig holds up,
+  // with the wins a tier takes written on it. No outline or rim: the sign's
+  // own frame is round it.
+  signCard: {
+    w: 100,
+    h: 69,
+    rim: false,
+    text: { x: 50, y: 53, size: 54, maxW: 84, fill: '#1A1A1A' },
+    shapes: [{ d: 'M6 0H94Q100 0 100 6V63Q100 69 94 69H6Q0 69 0 63V6Q0 0 6 0Z', fill: '#EFEFEF' }],
+  },
+
   // ---- Speech bubbles (src/avatar/bubbles.ts): what a player's own pig
   // says when they win. The words go in the text slot, wrapping onto two
   // lines; a bubble with a tail points it down and left, at the pig.

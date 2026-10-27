@@ -12,7 +12,9 @@ import type { Spot } from './art';
 // usePigWalk keeps the queue: a find goes on it at once (the tap has already
 // marked the truffle), and the pig works through them in order, walking over
 // so its snout is at the truffle, snuffling, and only then moving on. With
-// reduced motion it's simply there.
+// reduced motion it doesn't walk or dip its head, but it takes as long: it
+// waits out the walk where it is, then it's there, so the route the taps
+// make costs the same time either way.
 
 const W = 62;
 const H = 44;
@@ -21,7 +23,7 @@ const INK = '#1a1a1a';
 const PINK = '#F6A0B5';
 const PINK_DARK = '#E3879E';
 const STEP_MS = 110; // each swap of the legs while walking
-const SPEED = 300; // dp a second, before the UI scale
+const SPEED = 170; // dp a second, before the UI scale: a trot, so the route the taps make matters (index.tsx seconds)
 const SNUFFLE_MS = 520;
 const EAT_AT = 180; // into the snuffle, the truffle goes
 const REST_MS = 560; // from arriving to setting off for the next
@@ -138,21 +140,30 @@ export function usePigWalk(spots: Spot[], start: { x: number; y: number }, s: nu
     const dir: 1 | -1 = t.x >= at.current.x ? 1 : -1;
     // Stop with the snout (27 grid units ahead of the middle) at the truffle's edge.
     const to = { x: t.x - dir * (t.r * 0.6 + 27 * scale), y: t.y + 7 * scale };
-    const ms = still ? 0 : Math.max(280, Math.min(1100, (Math.hypot(to.x - at.current.x, to.y - at.current.y) / (SPEED * k)) * 1000));
+    const ms = Math.max(280, (Math.hypot(to.x - at.current.x, to.y - at.current.y) / (SPEED * k)) * 1000);
     at.current = to;
     setFacing(dir);
-    setWalking(!still);
-    Animated.timing(pos, { toValue: place(to), duration: ms, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVE }).start(({ finished }) => {
-      if (!finished) return;
+    const arrive = () => {
       setWalking(false);
+      playSound(SOUNDS.grunt, 0.15);
       if (!still) {
-        playSound(SOUNDS.grunt, 0.15);
         Animated.sequence(
           [1, 0.25, 1, 0].map((v) => Animated.timing(head, { toValue: v, duration: SNUFFLE_MS / 4, useNativeDriver: NATIVE }))
         ).start();
       }
-      later(still ? 0 : EAT_AT, () => eat.current(i));
-      later(still ? 0 : REST_MS, next);
+      later(EAT_AT, () => eat.current(i));
+      later(REST_MS, next);
+    };
+    if (still) {
+      later(ms, () => {
+        pos.setValue(place(to));
+        arrive();
+      });
+      return;
+    }
+    setWalking(true);
+    Animated.timing(pos, { toValue: place(to), duration: ms, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVE }).start(({ finished }) => {
+      if (finished) arrive();
     });
   };
 
