@@ -27,7 +27,7 @@ const FULL: ImageWindow = { x: 0, y: 0, w: 1, h: 1 };
 // offsets lands on the same part of the pig at every screen size.
 //
 // On the dark palette it shows the image's dark version (assets.ts artFor),
-// which has a teal border so the line art stands off the background. That
+// which has a light border so the line art stands off the background. That
 // version has a transparent margin for the border; the window is moved into
 // it, so the frame (and anything in `children`) lands exactly where it does
 // in light mode and the border spills just past it.

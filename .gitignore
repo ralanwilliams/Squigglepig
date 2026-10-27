@@ -50,3 +50,6 @@ yarn-error.*
 # local-only: design previews and dev/test tooling (never shipped)
 /previews/
 /src/dev/local/
+
+# local-only: rules for Claude Code in this workspace
+/CLAUDE.md

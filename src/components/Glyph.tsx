@@ -50,6 +50,7 @@ const GLYPHS = {
   brush: <Path d="M19.5 4.5l-7.2 7.2M10.6 10.6l2.8 2.8M10.6 10.6c-2.4-.5-4.6 1.2-4.6 3.9 0 1.5-.9 2.7-2.5 3.4 3.4 1.8 7.9.7 9.2-2.4.5-1.3.4-2.5-.3-3.5" />,
   sticker: <Path d="M5 4h14v9l-7 7H5zM19 13h-5.5a1.5 1.5 0 0 0-1.5 1.5V20M9 9.5v.01M14 9.5v.01" />, // a sticker peeling at one corner
   hat: <Path d="M8 4.5h8V16H8zM4 16h16M8 12.5h8" />, // a top hat
+  truffle: <Path d="M7.5 8.5c.4-2.6 3.3-4.2 5.9-3.4 2.4-.6 4.9 1.2 5 3.7 1.7 1.4 1.8 4.1.2 5.6.2 2.6-2.2 4.6-4.7 4.1-1.8 1.5-4.6 1.3-6-.5-2.5-.2-4-2.9-3-5.2-.9-1.7-.2-3.8 1.6-4.3zM10 11v.01M14 10v.01M12.5 14v.01" />, // Truffle Hunter
   bubble: <Path d="M4 5h16v11H10.5L6 20v-4H4z" />, // the pig's speech bubble
   // A sticker's controls on the canvas (StickerPicker.tsx), drawn in white.
   minus: <Path d="M5 12h14" />,

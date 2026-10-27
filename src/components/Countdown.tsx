@@ -20,6 +20,9 @@ import { URGENT_AT } from '../lib/timers';
 // moment, dimmed, and never expires — a solo round once it's answered (the
 // memory game's once Done is pressed, any game's once won). A time, not a
 // flag, so a remount while stopped shows the same.
+//
+// `colors` replaces the theme's text and urgent colors, for a clock over a
+// game's own art (FieldFrame.tsx).
 const secondsLeft = (deadline: number, now = Date.now()) => Math.max(0, Math.ceil((deadline - now) / 1000));
 
 export function Countdown({
@@ -28,12 +31,14 @@ export function Countdown({
   onExpire,
   size = 20,
   stoppedAt,
+  colors,
 }: {
   seconds: number;
   until?: number;
   onExpire?: () => void;
   size?: number; // base font size, scaled by the UI scale
   stoppedAt?: number;
+  colors?: { text: string; urgent: string };
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -66,10 +71,17 @@ export function Countdown({
   const mm = Math.floor(remaining / 60);
   const ss = remaining % 60;
   const label = mm > 0 ? `${mm}:${ss.toString().padStart(2, '0')}` : `${ss}s`;
+  const urgent = remaining <= URGENT_AT;
 
   return (
     <Text
-      style={[styles.text, { fontSize: ui.f(size) }, remaining <= URGENT_AT && styles.urgent, !!stoppedAt && styles.stopped]}
+      style={[
+        styles.text,
+        { fontSize: ui.f(size) },
+        urgent && styles.urgent,
+        colors && { color: urgent ? colors.urgent : colors.text },
+        !!stoppedAt && styles.stopped,
+      ]}
       maxFontSizeMultiplier={FONT_CAP}
       numberOfLines={1}
     >

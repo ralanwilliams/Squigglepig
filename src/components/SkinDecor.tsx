@@ -15,12 +15,12 @@ import type { ArtName, Placement } from '../theme/skins';
 // second SkinDecor with layer="behind", mounted under the image.
 //
 // Line weights are fractions of the image width, so a prop's outline matches
-// the art's at any size; on the dark palette each prop gets the same teal
+// the art's at any size; on the dark palette each prop gets the same light
 // sticker rim scripts/dark-art.py gives the artwork.
 const LINE = 9 / 954; // the art's black outline
-const RIM = 8 / 954; // dark-art.py's RADIUS on the 954px stills
+const RIM = 5 / 954; // dark-art.py's RADIUS on the 954px stills
 const INK = '#000000';
-const RIM_COLOR = '#4ECDC4';
+const RIM_COLOR = '#E6EDEE'; // dark-art.py's OUTLINE
 const BOB_MS = 1400;
 const TWINKLE_MS = 450;
 const CHAR_W = 0.7; // Roboto Bold's average letter width plus the piping, in ems (for fitting a name)

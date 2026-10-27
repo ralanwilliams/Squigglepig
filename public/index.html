@@ -7,9 +7,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Squigglepig | Draw Squiggles, Get Giggles</title>
     <meta name="description" content="A real-time drawing telephone party game. A prompt becomes a drawing becomes a guess becomes the next drawing, passed around the whole group." />
-    <!-- The browser's toolbar / status bar: classic teal, or the dark palette's
-         background in dark mode, until the app takes over (app/_layout.tsx
-         sets it from the palette showing, theme and all). -->
+    <!-- The browser's toolbar / status bar. Installed (Add to Home Screen) it's
+         always black, whatever the palette. In a tab it's classic teal, or the
+         dark palette's background in dark mode, until the app takes over
+         (app/_layout.tsx sets it from the palette showing, theme and all).
+         The first tag that matches wins, so the installed one goes first. -->
+    <meta name="theme-color" content="#000000" media="(display-mode: standalone)" />
     <meta name="theme-color" content="#4ECDC4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0B1F23" media="(prefers-color-scheme: dark)" />
 
@@ -19,11 +22,9 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Squigglepig" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <!-- Installed on an iPhone, the app runs up under the status bar (its
-         safe-area insets keep the content clear), so the bar shows the app's
-         own background rather than a fixed white one. iOS draws its text
-         white in this mode. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Installed on an iPhone, the status bar is solid black with white
+         text, whatever the palette, and the app starts below it. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="mobile-web-app-capable" content="yes" />
 
     <!-- Link previews (Messages, WhatsApp, Slack, Discord, social sites). -->
@@ -65,6 +66,13 @@
         html,
         body {
           background-color: #0b1f23;
+        }
+      }
+      /* Installed, the strips round the app are black, like the bars. */
+      @media (display-mode: standalone) {
+        html,
+        body {
+          background-color: #000000;
         }
       }
       input,
