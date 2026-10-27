@@ -62,6 +62,9 @@ type ThemeCtx = {
   setSeasonal: (on: boolean) => void;
   skin: Skin | null; // the skin showing (seasonal or chosen), if any
   season: Skin | null; // the birthday or holiday in season today, showing or not
+  // A screen whose art changes with the light itself (useFadesWithTheme)
+  // registers while it's up (+1) and leaves (-1).
+  fadesItself: (delta: number) => void;
 };
 
 // The photo of the old screen, which way it is swept away, and the change it
@@ -218,6 +221,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<ThemeName | null>(null);
   const [wipe, setWipe] = useState<Wipe | null>(null);
   const sweeping = useRef(false); // from the photo being taken until the sweep ends
+  // Screens up now that fade their own art between day and night
+  // (useFadesWithTheme): while there are any, the light / dark switch flips
+  // the palette without the sweep, and they fade.
+  const selfFaders = useRef(0);
+  const fadesItself = useCallback((delta: number) => {
+    selfFaders.current += delta;
+  }, []);
 
   const sweep = useCallback(
     (apply: () => void, up = false) => {
@@ -242,7 +252,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(() => {
     if (pending) return; // one at a time
     const to: ThemeName = name === 'dark' ? 'light' : 'dark';
-    if (reducedMotion) {
+    if (reducedMotion || selfFaders.current > 0) {
       setMode(to);
       return;
     }
@@ -279,11 +289,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setSeasonal,
       skin,
       season,
+      fadesItself,
     }),
     [
       theme, mode, pending, name, setMode, toggle, sweep,
       contrast, highContrast, setContrast, motion, reducedMotion, setMotion,
-      seasonal, setSeasonal, skin, season,
+      seasonal, setSeasonal, skin, season, fadesItself,
     ]
   );
   const wipeValue = useMemo(() => ({ shotRef, size, setSize, wipe, onReady, onDone }), [size, wipe, onReady, onDone]);
@@ -395,6 +406,18 @@ export function useTheme(): Theme {
   const ctx = useContext(Ctx);
   const system = useColorScheme();
   return ctx ? ctx.theme : system === 'dark' ? themes.dark.normal : themes.light.normal;
+}
+
+// For a screen whose art changes with the light itself, like a game's field
+// going from day to night: while it's mounted the light / dark switch skips
+// the sweep (the screen fades instead).
+export function useFadesWithTheme() {
+  const fadesItself = useContext(Ctx)?.fadesItself;
+  useEffect(() => {
+    if (!fadesItself) return;
+    fadesItself(1);
+    return () => fadesItself(-1);
+  }, [fadesItself]);
 }
 
 // Whether to hold still: the menu's Reduce motion setting, else the OS one.
