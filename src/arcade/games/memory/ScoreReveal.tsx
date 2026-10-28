@@ -22,8 +22,8 @@ import { fit, inkLength } from './score';
 // and the bar fills to the score in bursts, each pause longer than the last,
 // the number shaking harder the nearer it gets. Then the ✓ or ✗ lands on the
 // drawing (RuleBadge, as on the reveal screen) and a pass throws confetti. Then a pass goes to the run
-// by itself, which leaves this up, with its choice under it at a new tier
-// (keep going, or bank it: RunShell.tsx), else for a moment before the next
+// by itself, which leaves this up, with its choice over it at a new tier
+// (keep going, or bank it, on a card: RunShell.tsx), else for a moment before the next
 // round; a miss waits for Continue. Tapping the drawing
 // skips to the end; with reduced motion it starts there.
 //

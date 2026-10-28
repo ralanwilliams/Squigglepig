@@ -1,43 +1,50 @@
 import React, { useContext, useEffect, useReducer, useRef, useState } from 'react';
-import { Animated, Platform, View } from 'react-native';
+import { Animated, Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Stage } from '../components/Stage';
+import { FitBox } from '../components/FitBox';
 import { Logo } from '../components/Logo';
 import { Heading } from '../components/Heading';
+import { NoteCard } from '../components/NoteCard';
 import { PigButton } from '../components/PigButton';
 import { TextLink } from '../components/TextLink';
 import { Countdown, deadlineIn } from '../components/Countdown';
 import { showToast } from '../components/Toast';
 import { IMAGES } from '../assets/assets';
 import { useUi } from '../theme/responsive';
-import { useReducedMotion } from '../theme/theme';
+import { useReducedMotion, useTheme } from '../theme/theme';
 import { LADDER, ROUNDS, START, newTier, prizeFor, roundSeconds, runReducer } from './engine';
 import { PotLadder } from './PotLadder';
 import { RewardPodium } from './RewardPodium';
 import { PayoutScreen } from './PayoutScreen';
 import { FieldFrame } from './FieldFrame';
+import { RoundCard, WON_CARD_DELAY_MS, useCardIn, useStageCardLook } from './RoundCard';
+import { COUNT_IN_MS, useStarted } from './RoundCountdown';
 import { RoundCtx, type Settled } from './RoundCtx';
 import type { Game } from './games';
 
 // One solo run of a game, start to finish (the rules are engine.ts). No
 // screen of it has a title; the pot ladder says where the run is.
 //
-//   ready   — what to do, the reward tiers on a podium (RewardPodium.tsx), Start
+//   ready   — how to play, on a note (NoteCard.tsx), the reward tiers on a
+//             podium (RewardPodium.tsx), Start
 //   round   — the game's own round, inside RoundFrame: the timer, the game's
 //             controls and the ladder in the rail
 //   between — round won: the round's screen stays up showing how it went
 //             (the answer marked right, the drawing scored), its clock
-//             stopped. A win that reaches a new tier puts the choice under
-//             the game's controls: keep going, or bank the pot. Any other
-//             win has nothing new to bank: the screen stays up for HOLD_MS
-//             (the slider's pig climbs a step), fades out, and the next
-//             round fades in
+//             stopped. A win that reaches a new tier brings up a card over
+//             it with the choice (RoundCard.tsx): keep going, or bank the
+//             pot. Any other win has nothing new to bank: the screen stays
+//             up for HOLD_MS (the slider's pig climbs a step), fades out,
+//             and the next round fades in
 //   lost    — wrong, or out of time: the pot is gone; play again
 //   payout  — choose the prize (PayoutScreen.tsx)
 //
 // A full-screen game (Game.fullScreen) draws its rounds in FieldFrame
-// instead, and its lost round stays up too, with the news on it, so the
-// player only leaves the field when the run ends.
+// instead. Each of its rounds counts in first (RoundCountdown.tsx: 3, 2, 1,
+// Go!), the field under a curtain and the clock waiting, so the deadline is
+// set that much later. Its lost round stays up too, with the news on it, so
+// the player only leaves the field when the run ends.
 //
 // Nothing about a run is saved: leaving the screen mid-run (Leave, the back
 // button) ends it and loses the pot, and so does the clock running out while
@@ -51,6 +58,11 @@ export function RunShell({ game }: { game: Game<any> }) {
   const reduced = useReducedMotion();
   const fade = useRef(new Animated.Value(1)).current;
   const seconds = game.seconds ?? roundSeconds;
+  // A round's deadline: its seconds from now, after the count in on a full-screen game.
+  const deadline = (round: number) => deadlineIn(seconds(round) + (game.fullScreen ? COUNT_IN_MS / 1000 : 0));
+  // When the round in play starts, on a full-screen game (else it starts at once).
+  const startsAt = run.phase === 'round' && game.fullScreen ? run.until - seconds(run.round) * 1000 : undefined;
+  const started = useStarted(startsAt);
   const [specs, setSpecs] = useState<unknown[] | null>(null);
   const [loading, setLoading] = useState(false);
   const starting = useRef(false); // a ref, not `loading`: two taps in one frame both see the old state
@@ -73,7 +85,7 @@ export function RunShell({ game }: { game: Game<any> }) {
       if (!live.current) return;
       if (made.length < ROUNDS) throw new Error(`${game.id}: ${made.length} of ${ROUNDS} rounds`);
       setSpecs(made);
-      dispatch({ type: 'start', until: deadlineIn(seconds(1)) });
+      dispatch({ type: 'start', until: deadline(1) });
     } catch {
       if (live.current) showToast("Couldn't get the game ready. Try again.", 3000);
     } finally {
@@ -83,7 +95,7 @@ export function RunShell({ game }: { game: Game<any> }) {
   };
   const done = () => (router.canGoBack() ? router.back() : router.replace('/arcade'));
   const again = () => dispatch({ type: 'restart' });
-  const keepGoing = (won: number) => dispatch({ type: 'next', until: deadlineIn(seconds(won + 1)) });
+  const keepGoing = (won: number) => dispatch({ type: 'next', until: deadline(won + 1) });
 
   // A round won short of a new tier: nothing to choose, so after a moment
   // it fades out and the next round fades in.
@@ -106,7 +118,7 @@ export function RunShell({ game }: { game: Game<any> }) {
       <Plain
         actions={
           <>
-            <Heading>{game.blurb}</Heading>
+            <NoteCard label="How to play">{game.blurb}</NoteCard>
             <RewardPodium />
             <PigButton name={loading ? 'Getting ready…' : 'Start'} onPress={start} />
           </>
@@ -148,6 +160,7 @@ export function RunShell({ game }: { game: Game<any> }) {
           round,
           seconds: seconds(round),
           until: run.until,
+          startsAt,
           expire: () => dispatch({ type: 'result', won: false, timeout: true, at: Date.now() }),
           leave: done,
           settled,
@@ -161,6 +174,7 @@ export function RunShell({ game }: { game: Game<any> }) {
             onResult={finish}
             Frame={game.fullScreen ? FieldFrame : RoundFrame}
             ended={settled ? { won: !settled.lost, at: settled.at } : undefined}
+            held={!started}
           />
         </Animated.View>
       </RoundCtx.Provider>
@@ -209,8 +223,10 @@ function Plain({ actions }: { actions: React.ReactNode }) {
 
 // What a game's round is drawn into (games/index.ts Frame), on Stage; the
 // run reaches it through RoundCtx. `settled` is set once the round is won:
-// when, and what goes under the game's controls (the choice, at a new
-// tier; else nothing).
+// when, and at a new tier the choice, which comes up over the round as the
+// same card a full-screen game's field shows (RoundCard.tsx), in the theme's
+// colors on a scrim, a beat later so the win shows first. The rail doesn't
+// change, so nothing in it moves.
 function RoundFrame({
   focus,
   controls,
@@ -224,38 +240,64 @@ function RoundFrame({
   onExpire?: () => void;
   stoppedAt?: number;
 }) {
-  const ui = useUi();
   const ctx = useContext(RoundCtx);
   if (!ctx) throw new Error('RoundFrame is drawn by RunShell');
   const { settled } = ctx;
   return (
-    <Stage
-      focus={focus}
-      fitFocus={fitFocus}
-      actions={
-        <>
-          <Countdown
-            seconds={ctx.seconds}
-            until={ctx.until}
-            onExpire={onExpire ?? ctx.expire}
-            size={32}
-            stoppedAt={stoppedAt ?? settled?.at}
-          />
-          {controls}
-          {settled && (settled.lines.length || settled.actions.length) ? (
-            <View style={{ gap: ui.gap }}>
-              {settled.lines.map((line) => (
-                <Heading key={line}>{line}</Heading>
-              ))}
-              {settled.actions.map((a) => (
-                <PigButton key={a.name} name={a.name} onPress={a.onPress} />
-              ))}
-            </View>
-          ) : null}
-          <PotLadder won={settled ? ctx.round : ctx.round - 1} />
-          <TextLink label="Leave" onPress={ctx.leave} />
-        </>
-      }
-    />
+    <View style={styles.fill}>
+      <Stage
+        focus={focus}
+        fitFocus={fitFocus}
+        actions={
+          <>
+            <Countdown
+              seconds={ctx.seconds}
+              until={ctx.until}
+              onExpire={onExpire ?? ctx.expire}
+              size={32}
+              stoppedAt={stoppedAt ?? settled?.at}
+            />
+            {controls}
+            <PotLadder won={settled ? ctx.round : ctx.round - 1} />
+            <TextLink label="Leave" onPress={ctx.leave} />
+          </>
+        }
+      />
+      {settled && settled.actions.length ? <Choice settled={settled} /> : null}
+    </View>
   );
 }
+
+// The card over a Stage round, on the theme's scrim, which takes the taps
+// under it: the round is over, the card is the way on.
+function Choice({ settled }: { settled: Settled }) {
+  const ui = useUi();
+  const t = useTheme();
+  const look = useStageCardLook();
+  const p = useCardIn(WON_CARD_DELAY_MS);
+  return (
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          paddingTop: ui.insets.top + ui.pad,
+          paddingBottom: ui.insets.bottom + ui.pad,
+          paddingLeft: ui.insets.left + ui.pad,
+          paddingRight: ui.insets.right + ui.pad,
+        },
+      ]}
+    >
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: t.scrim, opacity: p }]} />
+      <FitBox style={styles.fill}>
+        <View style={styles.center}>
+          <RoundCard look={look} delay={WON_CARD_DELAY_MS} title={settled.title} lines={settled.lines} actions={settled.actions} />
+        </View>
+      </FitBox>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  center: { alignItems: 'center' },
+});

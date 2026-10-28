@@ -65,7 +65,7 @@ const MISSED = '#FF8FB3';
 
 const uneaten = (n: number) => `${n} ${n === 1 ? 'truffle was' : 'truffles were'} still on the ground.`;
 
-function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
+function Round({ spec, onResult, Frame, ended, held }: RoundProps<Spec>) {
   const ui = useUi();
   const fc = useFieldColors();
   const [found, setFound] = useState<number[]>([]); // truffles, in the order found
@@ -97,7 +97,7 @@ function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
     <Frame
       stoppedAt={stoppedAt}
       onExpire={() => report(false, uneaten(left.current), true)}
-      focus={<Hunt spec={spec} found={found} eaten={eaten} ended={ended} onPlaced={setTotal} onFind={find} onEat={eat} />}
+      focus={<Hunt spec={spec} found={found} eaten={eaten} ended={ended} held={held} onPlaced={setTotal} onFind={find} onEat={eat} />}
       controls={
         <View style={[styles.row, { gap: ui.sp(7) }]} accessible accessibilityLabel={`${found.length} of ${total} truffles found`}>
           <Text style={[styles.count, { color: fc.muted, fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
@@ -129,6 +129,7 @@ function Hunt({
   found,
   eaten,
   ended,
+  held,
   onPlaced,
   onFind,
   onEat,
@@ -137,6 +138,7 @@ function Hunt({
   found: number[];
   eaten: number[];
   ended?: { won: boolean; at: number };
+  held?: boolean; // counting in: no taps yet
   onPlaced: (n: number) => void;
   onFind: (i: number) => void;
   onEat: (i: number) => void;
@@ -223,7 +225,7 @@ function Hunt({
           when it no longer is). */}
       <View
         style={StyleSheet.absoluteFill}
-        onStartShouldSetResponder={() => !ended}
+        onStartShouldSetResponder={() => !ended && !held}
         onResponderGrant={tap}
         accessible
         accessibilityLabel="The forest floor. Tap each truffle you spot."

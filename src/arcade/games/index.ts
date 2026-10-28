@@ -42,6 +42,9 @@ export type RoundProps<S> = {
   // choice to keep going or bank it, or for a full-screen game lost, under
   // the news. `at` is when (epoch ms). A round stops taking input then.
   ended?: { won: boolean; at: number };
+  // Set while a full-screen game's round counts in (RoundCountdown.tsx): the
+  // field is under a curtain and its clock hasn't started. Take no input.
+  held?: boolean;
 };
 
 export type Game<S = unknown> = {
@@ -58,8 +61,9 @@ export type Game<S = unknown> = {
   seconds?: (round: number) => number;
   // The round fills the screen (FieldFrame.tsx) instead of Stage's two panes:
   // `focus` is drawn edge to edge, the run's clock, pot and Leave float over
-  // it with the game's `controls`, and the end of the round, won or lost,
-  // comes up on it rather than on a screen of its own.
+  // it with the game's `controls`, each round counts in (3, 2, 1, Go!) before
+  // its clock starts, and the end of the round, won or lost, comes up on it
+  // rather than on a screen of its own.
   fullScreen?: true;
   dev?: true; // a test game, for development builds only
 };

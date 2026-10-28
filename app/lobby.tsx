@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { PigButton } from '../src/components/PigButton';
@@ -10,7 +9,7 @@ import { IMAGES } from '../src/assets/assets';
 import { useGame, MIN_PLAYERS } from '../src/state/GameContext';
 import { roomLink } from '../src/lib/links';
 import { font, type Theme } from '../src/theme/tokens';
-import { useTheme, useThemedStyles } from '../src/theme/theme';
+import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
 import { DevPanel } from '../src/dev'; // local-only tooling (src/dev/local is gitignored)
 
@@ -34,34 +33,6 @@ const colorFor = (name: string) => {
   for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % AVATAR_COLORS.length;
   return AVATAR_COLORS[h];
 };
-
-// The connection light beside the banner. Never color alone: connected is a
-// filled dot with a ✓, connecting a hollow ring, and a problem a filled dot
-// with a !. The mark is cut in the screen's background color.
-type Link = 'ok' | 'connecting' | 'problem';
-function StatusDot({ state, size }: { state: Link; size: number }) {
-  const t = useTheme();
-  const fill = state === 'ok' ? t.success : t.accent;
-  return (
-    <Svg width={size} height={size} viewBox="0 0 16 16" accessibilityElementsHidden importantForAccessibility="no">
-      {state === 'connecting' ? (
-        <Circle cx="8" cy="8" r="6" fill="none" stroke={fill} strokeWidth="2.5" />
-      ) : (
-        <>
-          <Circle cx="8" cy="8" r="8" fill={fill} />
-          <Path
-            d={state === 'ok' ? 'M4.6 8.3l2.2 2.2 4.6-4.8' : 'M8 4.2v4.6M8 11.6v.1'}
-            stroke={t.background}
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </>
-      )}
-    </Svg>
-  );
-}
 
 // In a browser on a phone or tablet the share button opens the system share
 // sheet (navigator.share), as in the app. Desktop browsers either have no share
@@ -101,7 +72,6 @@ export default function Lobby() {
 
   const canStart = players.length >= MIN_PLAYERS;
   const connected = status === 'connected';
-  const link: Link = connected ? 'ok' : status === 'connecting' ? 'connecting' : 'problem';
 
   const banner =
     status === 'no-keys'
@@ -118,16 +88,13 @@ export default function Lobby() {
   const hidden = Math.max(0, players.length - visible);
 
   const header = (
-    <View style={[styles.headerRow, { gap: ui.sp(8) }]}>
-      <StatusDot state={link} size={ui.sp(14)} />
-      <Text
-        style={[styles.status, { fontSize: ui.f(13) }, connected ? styles.ok : styles.warn]}
-        maxFontSizeMultiplier={FONT_CAP}
-        numberOfLines={2}
-      >
-        {banner}
-      </Text>
-    </View>
+    <Text
+      style={[styles.status, { fontSize: ui.f(13) }, connected ? styles.ok : styles.warn]}
+      maxFontSizeMultiplier={FONT_CAP}
+      numberOfLines={2}
+    >
+      {banner}
+    </Text>
   );
 
   const focus = <Logo source={IMAGES.lobby} />;
@@ -252,11 +219,9 @@ export default function Lobby() {
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  // Header: a live status dot + the connection banner. The banner is in plain
-  // text colors (the pink is too light for small text on the teal); the dot
-  // and the banner's own ⚠ carry the warning.
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  status: { flex: 1, fontFamily: font.regular },
+  // Header: the connection banner. It's in plain text colors (the pink is too
+  // light for small text on the teal); the banner's own ⚠ carries a warning.
+  status: { fontFamily: font.regular },
   ok: { color: t.link },
   warn: { color: t.text },
 

@@ -17,8 +17,8 @@ import { questionsForRun } from './store';
 // Once an answer is picked the answers lock and say how it went: the right
 // one green with a ✓, a wrong pick red with a ✗ (the verdict colors, told
 // apart by the mark), the rest faded. A right answer leaves the question up,
-// with the run's choice under it at a new tier (keep going, or bank it:
-// RunShell.tsx), else for a moment before the next round.
+// with the run's choice over it at a new tier (keep going, or bank it, on a
+// card: RunShell.tsx), else for a moment before the next round.
 
 type Spec = { text: string; category: string; answers: string[]; correct: number };
 
@@ -130,7 +130,7 @@ export const trivia: Game<Spec> = {
   id: 'trivia',
   label: 'Trivia',
   glyph: 'help',
-  blurb: 'Four answers, one right. Easy questions first, hard ones last.',
+  blurb: 'The further you go, the harder it gets.',
   makeRun,
   Round,
 };

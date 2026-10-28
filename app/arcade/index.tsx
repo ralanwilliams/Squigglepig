@@ -18,7 +18,7 @@ export default function Arcade() {
       focus={<Logo source={IMAGES.home} />}
       actions={
         <>
-          <Heading>Win rounds in a row to fill the pot, then bank it for a reward.</Heading>
+          <Heading>Small games. Big rewards.</Heading>
           {PLAYABLE.map((g) => (
             <PigButton key={g.id} name={g.label} onPress={() => router.push(`/arcade/${g.id}`)} />
           ))}

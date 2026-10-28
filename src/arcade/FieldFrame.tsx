@@ -1,14 +1,13 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { createContext, useContext, useState } from 'react';
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Countdown } from '../components/Countdown';
 import { FitBox } from '../components/FitBox';
-import { SOUNDS } from '../assets/assets';
-import { playSound } from '../lib/sound';
 import { font } from '../theme/tokens';
-import { useReducedMotion } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
-import { useFieldColors, type FieldColors } from './fieldColors';
+import { useFieldColors } from './fieldColors';
 import { PotLadder } from './PotLadder';
+import { RoundCard, WON_CARD_DELAY_MS, useFieldCardLook } from './RoundCard';
+import { RoundCountdown, useStarted } from './RoundCountdown';
 import { RoundCtx } from './RoundCtx';
 import type { Frame } from './games';
 
@@ -20,12 +19,17 @@ import type { Frame } from './games';
 // bottom left and Leave bottom right. There's no title; the slider says
 // where the run is, as on every arcade screen.
 //
+// Each round counts in first (RoundCountdown.tsx): a curtain over the field,
+// under the chips, with 3, 2, 1 and "Go!" on it; the clock shows the
+// round's full time, stopped, until it lifts.
+//
 // When the round ends its screen stays up. Won, the game shows it on the
 // field itself; at a new tier the choice to keep going or bank it then comes
-// up as a card between the chips, a beat later so the game's celebration
-// plays first (any other win has nothing to show here: RunShell moves on by
-// itself). Lost, a card says what happened, with Play again / Done, a beat
-// later so the game can show what was missed first.
+// up as a card between the chips (RoundCard.tsx, in the field's look), a
+// beat later so the game's celebration plays first (any other win has
+// nothing to show here: RunShell moves on by itself). Lost, a card says what
+// happened, with Play again / Done, a beat later so the game can show what
+// was missed first.
 //
 // The game learns where it may put things through useFieldArea(): the whole
 // field's size, and the box between the chips at the top and the bottom.
@@ -44,17 +48,16 @@ const AreaCtx = createContext<FieldArea | null>(null);
 // The field's size and clear box, once the frame has been laid out (null before).
 export const useFieldArea = () => useContext(AreaCtx);
 
-const CARD_IN_MS = 380;
 const LOST_CARD_DELAY_MS = 1400; // the game rings what was missed first
-const WON_CARD_DELAY_MS = 1300; // the game celebrates first
-const NATIVE = Platform.OS !== 'web';
 
 export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
   const ui = useUi();
   const fc = useFieldColors();
+  const look = useFieldCardLook();
   const ctx = useContext(RoundCtx);
   if (!ctx) throw new Error('FieldFrame is drawn by RunShell');
   const { settled } = ctx;
+  const started = useStarted(ctx.startsAt);
 
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [bands, setBands] = useState({ top: 0, bottom: 0 });
@@ -92,7 +95,7 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
         until={ctx.until}
         onExpire={onExpire ?? ctx.expire}
         size={18}
-        stoppedAt={stoppedAt ?? settled?.at}
+        stoppedAt={stoppedAt ?? settled?.at ?? (started ? undefined : ctx.startsAt)}
         colors={{ text: fc.text, urgent: fc.urgent }}
       />
     </View>
@@ -116,6 +119,7 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
       <View style={StyleSheet.absoluteFill}>
         <AreaCtx.Provider value={area}>{focus}</AreaCtx.Provider>
       </View>
+      {ctx.startsAt ? <RoundCountdown startsAt={ctx.startsAt} /> : null}
       {/* Behind the app's dark-mode toggle (ThemeToggleOverlay), a disc like the chips. */}
       <View
         pointerEvents="none"
@@ -166,9 +170,9 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
           {settled && (settled.lost || settled.actions.length) ? (
             <FitBox style={styles.fill}>
               <View style={styles.center}>
-                <Card
+                <RoundCard
                   key={settled.lost ? 'lost' : 'won'}
-                  colors={fc}
+                  look={look}
                   delay={settled.lost ? LOST_CARD_DELAY_MS : WON_CARD_DELAY_MS}
                   title={settled.title}
                   lines={settled.lines}
@@ -191,101 +195,6 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
   );
 };
 
-// The news at the end of the round, popping up between the chips.
-function Card({
-  colors: fc,
-  delay,
-  title,
-  lines,
-  actions,
-}: {
-  colors: FieldColors;
-  delay: number;
-  title?: string;
-  lines: string[];
-  actions: { name: string; onPress: () => void }[];
-}) {
-  const ui = useUi();
-  const reduced = useReducedMotion();
-  const p = useRef(new Animated.Value(reduced ? 1 : 0)).current;
-  useEffect(() => {
-    if (reduced) return;
-    Animated.timing(p, { toValue: 1, duration: CARD_IN_MS, delay, easing: Easing.out(Easing.back(1.4)), useNativeDriver: NATIVE }).start();
-  }, [p, delay, reduced]);
-  return (
-    <Animated.View
-      accessibilityLiveRegion="polite"
-      style={[
-        styles.card,
-        {
-          backgroundColor: fc.card,
-          borderColor: fc.line,
-          width: ui.sp(290),
-          padding: ui.sp(14),
-          paddingHorizontal: ui.sp(16),
-          gap: ui.sp(6),
-          borderRadius: ui.sp(16),
-          opacity: p,
-          transform: [{ scale: p.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
-        },
-      ]}
-    >
-      {title ? (
-        <Text style={[styles.title, { color: fc.text, fontSize: ui.f(21) }]} maxFontSizeMultiplier={FONT_CAP}>
-          {title}
-        </Text>
-      ) : null}
-      {lines.map((line) => (
-        <Text key={line} style={[styles.line, { color: fc.muted, fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
-          {line}
-        </Text>
-      ))}
-      {actions.length ? (
-        <View style={[styles.row, { gap: ui.sp(8), marginTop: ui.sp(6) }]}>
-          {actions.map((a, i) => (
-            <FieldButton key={a.name} name={a.name} onPress={a.onPress} main={i === 0} colors={fc} />
-          ))}
-        </View>
-      ) : null}
-    </Animated.View>
-  );
-}
-
-// The card's buttons: the first filled amber, the rest outlined. Like
-// PigButton they grunt.
-function FieldButton({ name, onPress, main, colors: fc }: { name: string; onPress: () => void; main: boolean; colors: FieldColors }) {
-  const ui = useUi();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => {
-        playSound(SOUNDS.grunt);
-        onPress();
-      }}
-      style={({ pressed }) => [
-        styles.button,
-        {
-          minHeight: ui.sp(44),
-          paddingHorizontal: ui.sp(10),
-          borderRadius: ui.sp(8),
-          backgroundColor: main ? fc.amber : 'transparent',
-          borderColor: main ? fc.amber : fc.line,
-          opacity: pressed ? 0.75 : 1,
-        },
-      ]}
-    >
-      <Text
-        style={[styles.buttonText, { color: main ? fc.amberText : fc.text, fontSize: ui.f(14) }]}
-        maxFontSizeMultiplier={FONT_CAP}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-      >
-        {name}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -298,9 +207,4 @@ const styles = StyleSheet.create({
   ladder: { flexDirection: 'column', alignItems: 'stretch' },
   disc: { position: 'absolute', borderWidth: 1 },
   leave: { fontFamily: font.regular, textDecorationLine: 'underline' },
-  card: { borderWidth: 1 },
-  title: { fontFamily: font.bold, textAlign: 'center' },
-  line: { fontFamily: font.regular, textAlign: 'center' },
-  button: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
-  buttonText: { fontFamily: font.medium, letterSpacing: 0.3 },
 });

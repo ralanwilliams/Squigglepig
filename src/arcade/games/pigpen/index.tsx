@@ -54,7 +54,7 @@ const PIG_W = 62; // the sprite's grid (truffles/Pig.tsx)
 
 const away = (n: number) => `The apples were ${n} ${n === 1 ? 'step' : 'steps'} away.`;
 
-function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
+function Round({ spec, onResult, Frame, ended, held }: RoundProps<Spec>) {
   const ui = useUi();
   const fc = useFieldColors();
   const [stoppedAt, setStoppedAt] = useState<number>();
@@ -75,7 +75,7 @@ function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
     <Frame
       stoppedAt={stoppedAt}
       onExpire={() => report(false, away(left.current), true)}
-      focus={<Pasture spec={spec} ended={ended} onMove={(n) => (left.current = n)} onReach={reach} />}
+      focus={<Pasture spec={spec} ended={ended} held={held} onMove={(n) => (left.current = n)} onReach={reach} />}
       controls={
         <Text style={[styles.hint, { color: fc.muted, fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
           <Text style={[styles.hintKey, { color: fc.text }]}>Swipe</Text> to trot
@@ -89,11 +89,13 @@ function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
 function Pasture({
   spec,
   ended,
+  held,
   onMove,
   onReach,
 }: {
   spec: Spec;
   ended?: { won: boolean; at: number };
+  held?: boolean; // counting in: no moves yet
   onMove: (stepsLeft: number) => void;
   onReach: () => void;
 }) {
@@ -118,7 +120,7 @@ function Pasture({
   };
   const onMoveTouch = (e: GestureResponderEvent) => {
     const t = touch.current;
-    if (!t || t.done || ended) return;
+    if (!t || t.done || ended || held) return;
     const dx = e.nativeEvent.pageX - t.x;
     const dy = e.nativeEvent.pageY - t.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < ui.sp(SWIPE_DP)) return;
@@ -129,7 +131,7 @@ function Pasture({
   // On the web, the arrow keys.
   const go = pig.go;
   useEffect(() => {
-    if (Platform.OS !== 'web' || ended) return;
+    if (Platform.OS !== 'web' || ended || held) return;
     const KEYS: Record<string, Dir> = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
     const onKey = (e: KeyboardEvent) => {
       const d = KEYS[e.key];
@@ -139,7 +141,7 @@ function Pasture({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ended, go]);
+  }, [ended, held, go]);
 
   if (!pen || !area) return <View style={[styles.fill, styles.grass]} />;
   const lost = ended && !ended.won;
@@ -160,8 +162,8 @@ function Pasture({
       {ended?.won ? <Cheer x={(area.x0 + area.x1) / 2} y={Math.min(g.y - pen.cell * 1.4, area.y0 + (area.y1 - area.y0) * 0.38)} text="Made it!" /> : null}
       <View
         style={StyleSheet.absoluteFill}
-        onStartShouldSetResponder={() => !ended}
-        onMoveShouldSetResponder={() => !ended}
+        onStartShouldSetResponder={() => !ended && !held}
+        onMoveShouldSetResponder={() => !ended && !held}
         onResponderGrant={onGrant}
         onResponderMove={onMoveTouch}
         onResponderRelease={() => (touch.current = null)}

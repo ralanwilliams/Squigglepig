@@ -32,7 +32,8 @@ const NATIVE = Platform.OS !== 'web';
 // mirroring the dark-mode toggle in the top-right (Stage already keeps both
 // corners clear, so nothing moves to make room). It slides a drawer in from
 // the left holding the About information: the app icon, name and version,
-// then the Support / Accessibility / Rewards / Legal groups and the
+// then the Support / Accessibility / Rewards groups (Support ends with the
+// Privacy Policy, Terms of Service and open-source licenses) and the
 // copyright line, which links to the developer's site. The drawer is painted
 // with the screen's own palette (background, text, link), so it follows
 // light / dark mode like everything else. Nothing scrolls: in two-pane
@@ -145,6 +146,11 @@ function MenuDrawer({
       ? []
       : [{ icon: 'star', label: 'Rate this app', onPress: rate, trailing: 'external' } as Row]),
     { icon: 'help', label: 'Help & FAQ', onPress: () => open(HELP_URL), trailing: 'external' },
+    // The stores want the privacy policy reachable in the app, and the
+    // bundled packages' licenses (and the Quick, Draw! credit) must ship with it.
+    { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },
+    { icon: 'doc', label: 'Terms of Service', onPress: () => open(TERMS_URL), trailing: 'external' },
+    { icon: 'code', label: 'Open-source licenses', onPress: go('/licenses'), trailing: 'chevron' },
   ];
   const accessibility: Row[] = [
     { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },
@@ -155,11 +161,6 @@ function MenuDrawer({
     { icon: 'hat', label: 'Your pig', onPress: go('/pig'), trailing: 'chevron' },
     { icon: 'brush', label: GROUPS.art.label, onPress: go('/rewards?group=art'), trailing: 'chevron' },
     { icon: 'palette', label: GROUPS.theme.label, onPress: go('/rewards?group=theme'), trailing: 'chevron' },
-  ];
-  const legal: Row[] = [
-    { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },
-    { icon: 'doc', label: 'Terms of Service', onPress: () => open(TERMS_URL), trailing: 'external' },
-    { icon: 'code', label: 'Open-source licenses', onPress: go('/licenses'), trailing: 'chevron' },
   ];
 
   const section = (title: string, rows: Row[]) => (
@@ -250,11 +251,10 @@ function MenuDrawer({
               <View style={[styles.columns, { gap: ui.gap }]}>
                 <View style={[styles.column, { gap: ui.sp(12) }]}>
                   {section('Support', support)}
-                  {section('Accessibility', accessibility)}
                 </View>
                 <View style={[styles.column, { gap: ui.sp(12) }]}>
+                  {section('Accessibility', accessibility)}
                   {section('Rewards', rewards)}
-                  {section('Legal', legal)}
                 </View>
               </View>
             ) : (
@@ -262,7 +262,6 @@ function MenuDrawer({
                 {section('Support', support)}
                 {section('Accessibility', accessibility)}
                 {section('Rewards', rewards)}
-                {section('Legal', legal)}
               </View>
             )}
           </FitBox>
