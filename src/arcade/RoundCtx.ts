@@ -19,6 +19,9 @@ export type RoundCtxValue = {
   round: number;
   seconds: number;
   until: number;
+  // When a full-screen game's round starts (epoch ms), after its count in
+  // (RoundCountdown.tsx); its clock waits until then. Unset on Stage.
+  startsAt?: number;
   expire: () => void;
   leave: () => void;
   settled?: Settled;

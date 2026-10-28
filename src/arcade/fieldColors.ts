@@ -8,6 +8,7 @@ import { useTheme } from '../theme/theme';
 export type FieldColors = {
   panel: string; // a chip's fill
   card: string; // the end-of-round card's fill, a little more solid
+  curtain: string; // over the field while a round counts in (RoundCountdown.tsx): solid, so nothing shows through
   line: string; // their hairline edge
   text: string;
   muted: string;
@@ -21,6 +22,7 @@ export type FieldColors = {
 const NORMAL: FieldColors = {
   panel: 'rgba(30, 20, 12, 0.58)',
   card: 'rgba(30, 20, 12, 0.84)',
+  curtain: '#1E140C',
   line: 'rgba(255, 244, 228, 0.16)',
   text: '#F4EAD9',
   muted: 'rgba(244, 234, 217, 0.7)',
@@ -34,6 +36,7 @@ const NORMAL: FieldColors = {
 const HIGH: FieldColors = {
   panel: '#000000',
   card: '#000000',
+  curtain: '#000000',
   line: '#ffffff',
   text: '#ffffff',
   muted: '#ffffff',
