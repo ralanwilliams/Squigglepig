@@ -1,33 +1,35 @@
-import React, { useContext, useEffect, useReducer, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import React, { useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { Animated, BackHandler, Platform, StyleSheet, View } from 'react-native';
+import { router, useNavigation } from 'expo-router';
 import { Stage } from '../components/Stage';
 import { FitBox } from '../components/FitBox';
-import { Logo } from '../components/Logo';
-import { Heading } from '../components/Heading';
 import { NoteCard } from '../components/NoteCard';
 import { PigButton } from '../components/PigButton';
 import { TextLink } from '../components/TextLink';
 import { Countdown, deadlineIn } from '../components/Countdown';
 import { showToast } from '../components/Toast';
-import { IMAGES } from '../assets/assets';
+import { hideThemeToggle } from '../components/ThemeToggle';
+import { guidedAccessOn, pinScreen, unpinScreen } from '../lib/screenPin';
 import { useUi } from '../theme/responsive';
 import { useReducedMotion, useTheme } from '../theme/theme';
-import { LADDER, ROUNDS, START, newTier, prizeFor, roundSeconds, runReducer } from './engine';
+import { LADDER, ROUNDS, RULES, START, newTier, prizeFor, roundSeconds, runReducer } from './engine';
 import { PotLadder } from './PotLadder';
 import { RewardPodium } from './RewardPodium';
 import { PayoutScreen } from './PayoutScreen';
 import { FieldFrame } from './FieldFrame';
-import { RoundCard, WON_CARD_DELAY_MS, useCardIn, useStageCardLook } from './RoundCard';
+import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, useCardIn, useStageCardLook } from './RoundCard';
 import { COUNT_IN_MS, useStarted } from './RoundCountdown';
-import { RoundCtx, type Settled } from './RoundCtx';
+import { RoundCtx, type Endless, type Settled } from './RoundCtx';
+import { DIFFICULTIES } from './DifficultyMeter';
 import type { Game } from './games';
 
 // One solo run of a game, start to finish (the rules are engine.ts). No
 // screen of it has a title; the pot ladder says where the run is.
 //
-//   ready   — how to play, on a note (NoteCard.tsx), the reward tiers on a
-//             podium (RewardPodium.tsx), Start
+//   ready   — the reward tiers on a podium (RewardPodium.tsx), large, as
+//             the screen's picture; in the rail how to play on a note
+//             (NoteCard.tsx): the game's line, then the run's rules
+//             (engine.ts RULES), numbered; Start
 //   round   — the game's own round, inside RoundFrame: the timer, the game's
 //             controls and the ladder in the rail
 //   between — round won: the round's screen stays up showing how it went
@@ -37,21 +39,47 @@ import type { Game } from './games';
 //             pot. Any other win has nothing new to bank: the screen stays
 //             up for HOLD_MS (the slider's pig climbs a step), fades out,
 //             and the next round fades in
-//   lost    — wrong, or out of time: the pot is gone; play again
+//   lost    — wrong, or out of time: the round's screen stays up the same
+//             way, showing what was missed (the right answer, the drawing
+//             scored), and the news comes up over it on the same card: the
+//             pot is gone; Play again, or Done. So the player only leaves
+//             the round when the run ends
 //   payout  — choose the prize (PayoutScreen.tsx)
 //
 // A full-screen game (Game.fullScreen) draws its rounds in FieldFrame
 // instead. Each of its rounds counts in first (RoundCountdown.tsx: 3, 2, 1,
 // Go!), the field under a curtain and the clock waiting, so the deadline is
-// set that much later. Its lost round stays up too, with the news on it, so
-// the player only leaves the field when the run ends.
+// set that much later. Its cards come up on the field, in its own look.
 //
 // Nothing about a run is saved: leaving the screen mid-run (Leave, the back
 // button) ends it and loses the pot, and so does the clock running out while
 // the app is in the background — the timer goes by the wall clock.
+//
+// A game with an endless hunt of its own (Game.endless: Truffle Hunter) can
+// be switched to it from any round, with Change to Endless Hunt on the pot
+// ladder slider (FieldFrame.tsx). The run just ends, pot and all, and the
+// hunt starts at level 1, at the difficulty nearest the round's. A level has
+// no clock: it's cleared when it's won, cheered, and after HOLD_MS the next
+// fades in, one level up. Changing the difficulty deals the level again at
+// once. Back to <game> starts a run of it from round 1, and Leave leaves.
+// None of the hunt is saved either.
+//
+// Its padlock locks the screen for a child: only the game's field takes a
+// tap. The meter, Leave and the dark-mode toggle go, the back button and the
+// back swipe do nothing, and on Android the app asks to be pinned
+// (src/lib/screenPin.ts: Android asks the person first). An iPhone can't be
+// pinned by an app, so the first lock suggests Guided Access, once a launch,
+// unless it's on. Holding the padlock for 3 s unlocks (Padlock.tsx).
 const HOLD_MS = 1800; // a won round with no choice stays up this long (the slider's pig climbs a step in it)
 const FADE_MS = 300; // then it fades out, and the next round in
 const NATIVE = Platform.OS !== 'web';
+
+// The endless hunt in play: the level, the difficulty, which deal of them
+// this is (a new one each level and each change of difficulty, so the round
+// starts afresh), and once it's won, when.
+type Hunt = { level: number; difficulty: number; deal: number; cleared?: number };
+const GUIDED_ACCESS_TIP = 'To lock the whole phone too, triple-click the side button for Guided Access (Settings › Accessibility).';
+let guidedTipShown = false; // once a launch
 
 export function RunShell({ game }: { game: Game<any> }) {
   const [run, dispatch] = useReducer(runReducer, START);
@@ -74,9 +102,19 @@ export function RunShell({ game }: { game: Game<any> }) {
     []
   );
 
+  // The endless hunt, when it's on (it covers the run, which waits at its intro).
+  const [hunt, setHunt] = useState<Hunt | null>(null);
+  const [locked, setLocked] = useState(false);
+  const navigation = useNavigation();
+  const huntSpec = useMemo(
+    () => (hunt && game.endless ? game.endless(hunt.level, hunt.difficulty) : null),
+    [hunt?.level, hunt?.difficulty, hunt?.deal]
+  );
+
   // Make the run's rounds, then start round 1. A game that can't make all
   // ROUNDS of them (a question list that came back short) doesn't start.
-  const start = async () => {
+  // `then` runs once it has (the hunt's way back gives way to it then).
+  const start = async (then?: () => void) => {
     if (starting.current) return;
     starting.current = true;
     setLoading(true);
@@ -86,6 +124,7 @@ export function RunShell({ game }: { game: Game<any> }) {
       if (made.length < ROUNDS) throw new Error(`${game.id}: ${made.length} of ${ROUNDS} rounds`);
       setSpecs(made);
       dispatch({ type: 'start', until: deadline(1) });
+      then?.();
     } catch {
       if (live.current) showToast("Couldn't get the game ready. Try again.", 3000);
     } finally {
@@ -96,6 +135,56 @@ export function RunShell({ game }: { game: Game<any> }) {
   const done = () => (router.canGoBack() ? router.back() : router.replace('/arcade'));
   const again = () => dispatch({ type: 'restart' });
   const keepGoing = (won: number) => dispatch({ type: 'next', until: deadline(won + 1) });
+
+  // Into the endless hunt from round `round`: the run ends where it is.
+  const toEndless = (round: number) => () => {
+    dispatch({ type: 'restart' });
+    setHunt({ level: 1, difficulty: Math.round(((round - 1) / (ROUNDS - 1)) * (DIFFICULTIES.length - 1)), deal: 1 });
+  };
+  const backToRun = () => {
+    setLocked(false);
+    start(() => setHunt(null));
+  };
+
+  // A level won: after a moment it fades out and the next fades in, one up.
+  const cleared = hunt?.cleared;
+  useEffect(() => {
+    if (!cleared) return;
+    const next = () => setHunt((h) => h && { level: h.level + 1, difficulty: h.difficulty, deal: h.deal + 1 });
+    const timer = setTimeout(() => {
+      if (reduced) return next();
+      Animated.timing(fade, { toValue: 0, duration: FADE_MS, useNativeDriver: NATIVE }).start(({ finished }) => {
+        if (!finished || !live.current) return;
+        next();
+        Animated.timing(fade, { toValue: 1, duration: FADE_MS, useNativeDriver: NATIVE }).start();
+      });
+    }, HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [cleared]);
+
+  // Locked: no dark-mode toggle, no back button or back swipe, and on
+  // Android the app pinned; all of it undone on unlocking or leaving.
+  useEffect(() => {
+    if (!locked) return;
+    hideThemeToggle(true);
+    pinScreen();
+    navigation.setOptions({ gestureEnabled: false });
+    const back = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => {
+      back.remove();
+      navigation.setOptions({ gestureEnabled: true });
+      unpinScreen();
+      hideThemeToggle(false);
+    };
+  }, [locked]);
+  const lock = () => {
+    setLocked(true);
+    if (Platform.OS !== 'ios' || guidedTipShown) return;
+    guidedTipShown = true;
+    guidedAccessOn().then((on) => {
+      if (!on && live.current) showToast(GUIDED_ACCESS_TIP, 6000);
+    });
+  };
 
   // A round won short of a new tier: nothing to choose, so after a moment
   // it fades out and the next round fades in.
@@ -113,25 +202,68 @@ export function RunShell({ game }: { game: Game<any> }) {
     return () => clearTimeout(timer);
   }, [autoNext]);
 
+  if (hunt && huntSpec) {
+    const Round = game.Round;
+    const endless: Endless = {
+      level: hunt.level,
+      difficulty: hunt.difficulty,
+      setDifficulty: (d) => setHunt((h) => h && { level: h.level, difficulty: d, deal: h.deal + 1 }),
+      back: backToRun,
+      game: game.label,
+      locked,
+      lock,
+      unlock: () => setLocked(false),
+    };
+    const won = (ok: boolean) => {
+      if (ok) setHunt((h) => (h && !h.cleared ? { ...h, cleared: Date.now() } : h));
+    };
+    return (
+      <RoundCtx.Provider
+        value={{
+          round: hunt.level,
+          seconds: 0,
+          until: 0,
+          expire: () => {},
+          leave: done,
+          settled: hunt.cleared ? { at: hunt.cleared, lost: false, lines: [], actions: [] } : undefined,
+          endless,
+        }}
+      >
+        <Animated.View style={{ flex: 1, opacity: fade }}>
+          <Round
+            key={`hunt${hunt.deal}`}
+            spec={huntSpec}
+            round={hunt.level}
+            onResult={won}
+            Frame={FieldFrame}
+            ended={hunt.cleared ? { won: true, at: hunt.cleared } : undefined}
+          />
+        </Animated.View>
+      </RoundCtx.Provider>
+    );
+  }
+
   if (run.phase === 'ready') {
     return (
-      <Plain
+      <Stage
+        focus={<RewardPodium scale={1.5} />}
+        fitFocus
         actions={
           <>
-            <NoteCard label="How to play">{game.blurb}</NoteCard>
-            <RewardPodium />
-            <PigButton name={loading ? 'Getting ready…' : 'Start'} onPress={start} />
+            <NoteCard label="How to play" steps={RULES}>
+              {game.blurb}
+            </NoteCard>
+            <PigButton name={loading ? 'Getting ready…' : 'Start'} onPress={() => start()} />
           </>
         }
       />
     );
   }
 
-  // A round, and once it's won the same round left up (same key, so the
-  // game keeps its state: what was picked, the score) with the choice added;
-  // a full-screen game's lost round stays up the same way.
-  const lostOnField = run.phase === 'lost' && !!game.fullScreen;
-  if ((run.phase === 'round' || run.phase === 'between' || lostOnField) && specs) {
+  // A round, and once it's over the same round left up (same key, so the
+  // game keeps its state: what was picked, the score) with the choice or
+  // the news added.
+  if ((run.phase === 'round' || run.phase === 'between' || run.phase === 'lost') && specs) {
     const Round = game.Round;
     const round = run.phase === 'round' ? run.round : run.phase === 'between' ? run.won : run.won + 1;
     const finish = (won: boolean, detail?: string, timedOut?: boolean) =>
@@ -164,6 +296,7 @@ export function RunShell({ game }: { game: Game<any> }) {
           expire: () => dispatch({ type: 'result', won: false, timeout: true, at: Date.now() }),
           leave: done,
           settled,
+          toEndless: game.endless && game.fullScreen ? toEndless(round) : undefined,
         }}
       >
         <Animated.View style={{ flex: 1, opacity: fade }}>
@@ -178,24 +311,6 @@ export function RunShell({ game }: { game: Game<any> }) {
           />
         </Animated.View>
       </RoundCtx.Provider>
-    );
-  }
-
-  if (run.phase === 'lost') {
-    const news = lostNews(run);
-    return (
-      <Plain
-        actions={
-          <>
-            <Heading size="h3">{news.title}</Heading>
-            {news.lines.map((line) => (
-              <Heading key={line}>{line}</Heading>
-            ))}
-            <PigButton name="Play again" onPress={again} />
-            <PigButton name="Done" onPress={done} />
-          </>
-        }
-      />
     );
   }
 
@@ -215,18 +330,14 @@ function lostNews(run: { won: number; timeout: boolean; detail?: string }) {
   };
 }
 
-// A screen between rounds: the pig, and the rail. No back arrow on any
-// screen: Done and Leave are the way out, or the system back.
-function Plain({ actions }: { actions: React.ReactNode }) {
-  return <Stage focus={<Logo source={IMAGES.home} />} actions={actions} />;
-}
-
 // What a game's round is drawn into (games/index.ts Frame), on Stage; the
-// run reaches it through RoundCtx. `settled` is set once the round is won:
-// when, and at a new tier the choice, which comes up over the round as the
-// same card a full-screen game's field shows (RoundCard.tsx), in the theme's
-// colors on a scrim, a beat later so the win shows first. The rail doesn't
-// change, so nothing in it moves.
+// run reaches it through RoundCtx. `settled` is set once the round is over:
+// when, and at a new tier the choice, or for a lost round the news, which
+// comes up over the round as the same card a full-screen game's field shows
+// (RoundCard.tsx), in the theme's colors on a scrim, a beat later so the win
+// or the miss shows first. The rail doesn't change, so nothing in it moves.
+// No back arrow on any screen: Done and Leave are the way out, or the
+// system back.
 function RoundFrame({
   focus,
   controls,
@@ -258,7 +369,7 @@ function RoundFrame({
               stoppedAt={stoppedAt ?? settled?.at}
             />
             {controls}
-            <PotLadder won={settled ? ctx.round : ctx.round - 1} />
+            <PotLadder won={settled && !settled.lost ? ctx.round : ctx.round - 1} />
             <TextLink label="Leave" onPress={ctx.leave} />
           </>
         }
@@ -274,7 +385,8 @@ function Choice({ settled }: { settled: Settled }) {
   const ui = useUi();
   const t = useTheme();
   const look = useStageCardLook();
-  const p = useCardIn(WON_CARD_DELAY_MS);
+  const delay = settled.lost ? LOST_CARD_DELAY_MS : WON_CARD_DELAY_MS;
+  const p = useCardIn(delay);
   return (
     <View
       style={[
@@ -290,7 +402,7 @@ function Choice({ settled }: { settled: Settled }) {
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: t.scrim, opacity: p }]} />
       <FitBox style={styles.fill}>
         <View style={styles.center}>
-          <RoundCard look={look} delay={WON_CARD_DELAY_MS} title={settled.title} lines={settled.lines} actions={settled.actions} />
+          <RoundCard look={look} delay={delay} title={settled.title} lines={settled.lines} actions={settled.actions} />
         </View>
       </FitBox>
     </View>

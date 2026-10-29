@@ -1,19 +1,22 @@
 import { useMemo } from 'react';
-import { UNLOCKABLE, type Placement, type Skin } from '../theme/skins';
+import { UNLOCKABLE, type ArtName, type Placement, type Skin } from '../theme/skins';
 import { cleanBubbleText, useInventory } from '../rewards/inventory';
 import { oneEach, slotOf } from '../rewards/catalog';
 import { useSkin, useThemeMode } from '../theme/theme';
-import { parsePart, partOf, placementsOf } from './themeParts';
-import { OUTFITS } from './outfits';
+import { onHead, parsePart, partOf, placementsOf } from './themeParts';
+import { OUTFITS, outfitOn } from './outfits';
 import { BUBBLES, BUBBLE_AT, DEFAULT_SAY, underBubble } from './bubbles';
 
-// A player's pig as everyone sees it when they win: the outfits it has on
+// A player's pig: the outfits it has on
 // (one per slot: a hat, sunglasses, a bow tie), the speech bubble they chose,
 // what it says (all from what they've won, src/rewards/inventory.tsx), the
 // parts of themes they've put on it, and the parts of the showing theme
 // they've taken off (themeParts.ts). It travels with them into a room, in
 // their presence (src/state/GameContext.tsx, as wireAvatar), and the
-// scoreboard dresses the winner pig with it.
+// scoreboard dresses the winner pig with it. On their own phone every pig is
+// theirs (Logo.tsx, PeekPig.tsx): it wears their avatar everywhere, all of it
+// on a pig with its hooves free, only what's on its head on one holding
+// something or peeking over it, and the bubble only when it wins.
 //
 // Anyone can send anything, so one received from another phone is read
 // through cleanAvatar: an outfit, bubble or theme part this app has no art
@@ -91,28 +94,42 @@ export function useMyAvatar(): Avatar {
   );
 }
 
-// The winner art (Logo's omit / extra) for an avatar: the outfits, the theme
-// parts put on, and the bubble with the words in it. A hat takes the place of
-// the showing theme's hat, and a theme part the place of its same part; the
-// bubble, of anything in its corner of the sky; and the parts the player took
-// off are left off.
-export function avatarDecor(a: Avatar): { extra: Placement[]; omit?: (p: Placement) => boolean } {
-  const outfits = a.outfits.map((id) => OUTFITS[id]).filter(Boolean);
-  const bubble = a.bubble ? BUBBLES[a.bubble] : undefined;
-  const parts = a.theme.map(parsePart).filter((p) => !!p);
+// Whether a pig on `art` wears all of an avatar: Home's and the winner's,
+// standing with their hooves free. The others are holding something (the
+// sign, the phone, the pencil) or peeking over it, so they wear only what's
+// on their head.
+export const wearsAll = (art: ArtName) => art === 'home' || art === 'winner';
+
+// An avatar on a piece of pig art (Logo's omit / extra): the outfits, the
+// theme parts put on, and on the winner art the bubble with the words in it;
+// with `headOnly`, only what's on the pig's head (themeParts.ts onHead). A hat
+// takes the place of the showing theme's hat, and a theme part the place of
+// its same part; the bubble, of anything in its corner of the sky; and the
+// parts the player took off are left off.
+export function avatarDecor(
+  a: Avatar,
+  art: ArtName = 'winner',
+  headOnly = false
+): { extra: Placement[]; omit?: (p: Placement) => boolean } {
+  const wanted = (key: string) => !headOnly || onHead(key);
+  const worn = a.outfits.filter((id) => wanted(slotOf(id) ?? ''));
+  const outfits = worn.map((id) => outfitOn(id, art)).filter((p) => !!p);
+  const bubble = a.bubble && art === 'winner' && !headOnly ? BUBBLES[a.bubble] : undefined;
+  const parts = a.theme.map(parsePart).filter((p) => !!p && wanted(p.key)) as { skin: Skin; key: string }[];
+  const hide = a.hide.filter(wanted);
   // The theme's parts something else stands in for: a theme part put on, or
   // an outfit in that slot (a hat for the theme's hat, sunglasses for its
   // visor).
-  const replaced = new Set<string>([...parts.map((p) => p.key), ...a.outfits.map(slotOf).filter((s) => !!s)]);
+  const replaced = new Set<string>([...parts.map((p) => p.key), ...worn.map(slotOf).filter((s) => !!s)]);
   const extra: Placement[] = [
-    ...parts.flatMap((p) => placementsOf(p.skin, p.key)).filter((p) => !bubble || !underBubble(p)),
+    ...parts.flatMap((p) => placementsOf(p.skin, p.key, art)).filter((p) => !bubble || !underBubble(p)),
     ...outfits,
   ];
   if (bubble) extra.push({ prop: bubble, ...BUBBLE_AT, text: a.say || DEFAULT_SAY });
-  if (!bubble && !a.hide.length && !replaced.size) return { extra };
+  if (!bubble && !hide.length && !replaced.size) return { extra };
   return {
     extra,
-    omit: (p) => (!!bubble && underBubble(p)) || a.hide.includes(partOf(p)) || replaced.has(partOf(p)),
+    omit: (p) => (!!bubble && underBubble(p)) || hide.includes(partOf(p)) || replaced.has(partOf(p)),
   };
 }
 

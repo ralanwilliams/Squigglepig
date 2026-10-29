@@ -8,8 +8,8 @@ import { FONT_CAP, useUi } from '../theme/responsive';
 import { useFieldColors } from './fieldColors';
 
 // The news at the end of a round, popping up as a card: at a new tier the
-// choice to keep going or bank it, and on a full-screen game's field a lost
-// round's news too. Every game draws the same card, in one of two looks: over
+// choice to keep going or bank it, and a lost round's news, with Play again
+// and Done. Every game draws the same card, in one of two looks: over
 // a full-screen game's art, the field's quiet dark panel and amber
 // (fieldColors.ts; FieldFrame.tsx); over a Stage round (RunShell's
 // RoundFrame), the theme's overlay panel and button colors, the app's own
@@ -53,6 +53,7 @@ export function useStageCardLook(): CardLook {
 
 const CARD_IN_MS = 380;
 export const WON_CARD_DELAY_MS = 1300; // the round's win shows first (a cheer, the answer marked right)
+export const LOST_CARD_DELAY_MS = 1400; // the game rings what was missed first (the right answer, the truffles left)
 const NATIVE = Platform.OS !== 'web';
 
 // 0 → 1 over CARD_IN_MS after `delay`, for the card and anything that comes

@@ -18,6 +18,12 @@ import type { ArtName, Placement, Skin } from './types';
 type Slot = { x: number; y: number; w: number; rotate?: number };
 
 const STILL_HEAD: Slot = { x: 0.311, y: 0.12, w: 0.3, rotate: -10 };
+// How far the tallest hat in the head slot reaches above the top of the
+// still art (Home's, the join art), of its height: New Year's and the
+// birthday's party hats, 18.4% with their outline and dark-mode rim. A crop
+// of the art that's to show any hat whole starts this far above it (the
+// reward podium's pigs, PigBoard.tsx).
+export const HAT_ROOM = 0.19;
 const STILL_SKY: Slot[] = [
   { x: 0.8, y: 0.13, w: 0.22 },
   { x: 0.66, y: 0.33, w: 0.14 },
@@ -58,6 +64,23 @@ export const SLOTS: Record<ArtName, { head?: Slot; sky: Slot[]; hold?: Slot }> =
     ],
   },
   icon: { sky: [] }, // the app icon in the menu is never dressed
+};
+
+// Over the pig's eyes on each piece of art: the middle of a pair of glasses
+// on the point midway between them, measured from the art (the stills share
+// one drawing of the pig, the phone art sits a little lower, and the
+// drawing-screen pig's head is tilted). `w` is the width the shield
+// sunglasses are drawn at (props.ts visor); a smaller pair is drawn smaller
+// (src/avatar/outfits.ts).
+const STILL_EYES: Slot = { x: 0.3085, y: 0.1765, w: 0.21 };
+export const EYES: Partial<Record<ArtName, Slot>> = {
+  home: STILL_EYES,
+  join: STILL_EYES,
+  lobby: STILL_EYES,
+  cell: { x: 0.308, y: 0.207, w: 0.19, rotate: -2 },
+  waiting: { x: 0.487, y: 0.369, w: 0.15, rotate: -4 },
+  winner: { x: 0.316, y: 0.18, w: 0.19, rotate: -4 },
+  canvasPig: { x: 0.5035, y: 0.383, w: 0.175, rotate: -10 },
 };
 
 const TILTS = [0, 8, -10];

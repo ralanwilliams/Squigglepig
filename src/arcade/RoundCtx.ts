@@ -10,7 +10,7 @@ import { createContext } from 'react';
 export type Settled = {
   at: number; // when the round ended (epoch ms): the clock stops there
   lost: boolean;
-  title?: string; // heads a lost round's full-screen card ("Out of time!")
+  title?: string; // heads a lost round's card ("Out of time!")
   lines: string[];
   actions: { name: string; onPress: () => void }[];
 };
@@ -25,6 +25,23 @@ export type RoundCtxValue = {
   expire: () => void;
   leave: () => void;
   settled?: Settled;
+  // A game with an endless hunt of its own (Game.endless): in a run, the way
+  // into it, on the pot ladder slider; in it, the hunt.
+  toEndless?: () => void;
+  endless?: Endless;
+};
+
+// The endless hunt (RunShell.tsx): no clock and no prizes, the level in
+// place of the clock, the difficulty in place of the slider, and the lock.
+export type Endless = {
+  level: number;
+  difficulty: number; // DifficultyMeter.tsx DIFFICULTIES
+  setDifficulty: (d: number) => void; // deals the level again
+  back: () => void; // to a run of the game, from round 1
+  game: string; // its name, for the way back
+  locked: boolean;
+  lock: () => void;
+  unlock: () => void;
 };
 
 export const RoundCtx = createContext<RoundCtxValue | null>(null);

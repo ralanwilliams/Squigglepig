@@ -6,7 +6,9 @@ import { font } from '../theme/tokens';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { useFieldColors } from './fieldColors';
 import { PotLadder } from './PotLadder';
-import { RoundCard, WON_CARD_DELAY_MS, useFieldCardLook } from './RoundCard';
+import { DifficultyMeter } from './DifficultyMeter';
+import { Padlock } from './Padlock';
+import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, useFieldCardLook } from './RoundCard';
 import { RoundCountdown, useStarted } from './RoundCountdown';
 import { RoundCtx } from './RoundCtx';
 import type { Frame } from './games';
@@ -31,6 +33,15 @@ import type { Frame } from './games';
 // happened, with Play again / Done, a beat later so the game can show what
 // was missed first.
 //
+// A game with an endless hunt of its own (RoundCtx toEndless) has a way into
+// it under the slider: Change to Endless Hunt. In the hunt (RoundCtx
+// endless) there's no clock and no count in: the level is in the clock's
+// place, and the slider is the difficulty meter (DifficultyMeter.tsx), with
+// the way back to the game's run under it. A padlock (Padlock.tsx) sits
+// beside the dark-mode toggle. Locked, the meter, Leave and the toggle go
+// (still taking up their room, so the field between the chips doesn't move
+// and its truffles stay put) and only the game's field takes a tap.
+//
 // The game learns where it may put things through useFieldArea(): the whole
 // field's size, and the box between the chips at the top and the bottom.
 
@@ -47,8 +58,6 @@ const AreaCtx = createContext<FieldArea | null>(null);
 
 // The field's size and clear box, once the frame has been laid out (null before).
 export const useFieldArea = () => useContext(AreaCtx);
-
-const LOST_CARD_DELAY_MS = 1400; // the game rings what was missed first
 
 export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
   const ui = useUi();
@@ -88,7 +97,29 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
 
   const wide = size.w > size.h;
   const chip = [styles.chip, { backgroundColor: fc.panel, borderColor: fc.line, paddingVertical: ui.sp(5), paddingHorizontal: ui.sp(12), gap: ui.sp(7) }];
-  const clock = (
+  const { endless } = ctx;
+  const locked = !!endless?.locked;
+  // Still there while locked, but not to be seen or tapped.
+  const unlockedOnly = locked ? { opacity: 0 } : null;
+  const pill = (label: string, onPress: () => void, quiet?: boolean) => (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      hitSlop={6}
+      style={[styles.pill, { minHeight: ui.sp(28), paddingHorizontal: ui.sp(12), marginTop: ui.sp(4), marginBottom: ui.sp(2), borderColor: quiet ? fc.line : fc.amber }]}
+    >
+      <Text style={[quiet ? styles.pillQuiet : styles.pillText, { color: quiet ? fc.muted : fc.amber, fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+  const clock = endless ? (
+    <View style={chip} accessible accessibilityLabel={`Level ${endless.level}`}>
+      <Text style={[styles.level, { color: fc.muted, fontSize: ui.f(16) }]} maxFontSizeMultiplier={FONT_CAP}>
+        Level <Text style={[styles.levelNum, { color: fc.text }]}>{endless.level}</Text>
+      </Text>
+    </View>
+  ) : (
     <View style={chip}>
       <Countdown
         seconds={ctx.seconds}
@@ -100,13 +131,27 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
       />
     </View>
   );
-  const ladder = (
-    <View style={[chip, styles.ladder, { borderRadius: ui.sp(14), paddingTop: ui.sp(4), paddingBottom: ui.sp(3) }, wide && { width: ui.sp(290) }]}>
+  const ladderChip = [chip, styles.ladder, { borderRadius: ui.sp(14), paddingTop: ui.sp(4), paddingBottom: ui.sp(3) }, wide && { width: ui.sp(290) }];
+  const ladder = endless ? (
+    <View pointerEvents={locked ? 'none' : 'auto'} importantForAccessibility={locked ? 'no-hide-descendants' : 'auto'} style={[ladderChip, unlockedOnly]}>
+      <DifficultyMeter value={endless.difficulty} onChange={endless.setDifficulty} />
+      {pill(`Back to ${endless.game}`, endless.back, true)}
+    </View>
+  ) : (
+    <View style={ladderChip}>
       <PotLadder look="field" won={settled && !settled.lost ? ctx.round : ctx.round - 1} />
+      {ctx.toEndless ? pill('Change to Endless Hunt', ctx.toEndless) : null}
     </View>
   );
   const leave = (
-    <Pressable accessibilityRole="button" onPress={ctx.leave} hitSlop={8} style={[chip, { minHeight: ui.sp(36) }]}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={ctx.leave}
+      disabled={locked}
+      importantForAccessibility={locked ? 'no-hide-descendants' : 'auto'}
+      hitSlop={8}
+      style={[chip, { minHeight: ui.sp(36) }, unlockedOnly]}
+    >
       <Text style={[styles.leave, { color: fc.muted, fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
         Leave
       </Text>
@@ -120,11 +165,12 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
         <AreaCtx.Provider value={area}>{focus}</AreaCtx.Provider>
       </View>
       {ctx.startsAt ? <RoundCountdown startsAt={ctx.startsAt} /> : null}
-      {/* Behind the app's dark-mode toggle (ThemeToggleOverlay), a disc like the chips. */}
+      {/* Behind the app's dark-mode toggle (ThemeToggleOverlay), a disc like the chips; gone with the toggle while locked. */}
       <View
         pointerEvents="none"
         style={[
           styles.disc,
+          unlockedOnly,
           {
             backgroundColor: fc.panel,
             borderColor: fc.line,
@@ -136,6 +182,11 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
           },
         ]}
       />
+      {endless ? (
+        <View style={[styles.padlock, { top: ui.insets.top + ui.sp(5), right: ui.insets.right + ui.pad - ui.sp(9) + ui.sp(44) + ui.sp(2) }]}>
+          <Padlock locked={locked} onLock={endless.lock} onUnlock={endless.unlock} />
+        </View>
+      ) : null}
       <View
         pointerEvents="box-none"
         style={[
@@ -207,4 +258,10 @@ const styles = StyleSheet.create({
   ladder: { flexDirection: 'column', alignItems: 'stretch' },
   disc: { position: 'absolute', borderWidth: 1 },
   leave: { fontFamily: font.regular, textDecorationLine: 'underline' },
+  level: { fontFamily: font.medium },
+  levelNum: { fontFamily: font.bold },
+  pill: { alignSelf: 'center', justifyContent: 'center', borderRadius: 999, borderWidth: 1.5 },
+  pillText: { fontFamily: font.bold },
+  pillQuiet: { fontFamily: font.medium },
+  padlock: { position: 'absolute', zIndex: 10 },
 });

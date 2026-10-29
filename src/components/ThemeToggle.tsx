@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useSyncExternalStore } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Mask, Path, Rect } from 'react-native-svg';
 import { glyph } from '../theme/tokens';
@@ -105,12 +105,30 @@ export function ThemeToggle({ size = 26 }: { size?: number }) {
   );
 }
 
+// Whether the toggle is hidden: by a screen that's locked so a child can
+// only play (Truffle Hunter's endless hunt, src/arcade/RunShell.tsx).
+let hidden = false;
+const watchers = new Set<() => void>();
+export function hideThemeToggle(on: boolean) {
+  if (on === hidden) return;
+  hidden = on;
+  watchers.forEach((w) => w());
+}
+const watch = (w: () => void) => {
+  watchers.add(w);
+  return () => {
+    watchers.delete(w);
+  };
+};
+export const useThemeToggleHidden = () => useSyncExternalStore(watch, () => hidden);
+
 // Floats the toggle over every screen, in the header band's top-right corner:
 // vertically centred on a one-line title, its icon flush with the band's
 // horizontal padding. Stage reserves that corner so header text never runs
-// underneath it.
+// underneath it. Gone while a screen hides it (hideThemeToggle).
 export function ThemeToggleOverlay() {
   const ui = useUi();
+  if (useThemeToggleHidden()) return null;
   return (
     <View
       pointerEvents="box-none"

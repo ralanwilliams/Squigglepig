@@ -1,6 +1,7 @@
-import { SLOTS } from '../theme/skins/layout';
-import { PROPS, type PropName } from '../theme/skins/props';
+import { HAT_ROOM, SLOTS } from '../theme/skins/layout';
+import { PROPS, type Prop, type PropName } from '../theme/skins/props';
 import type { Placement } from '../theme/skins';
+import { OUTFITS } from '../avatar/outfits';
 import { LADDER, type Prize } from './engine';
 import { rng } from './rng';
 
@@ -8,31 +9,37 @@ import { rng } from './rng';
 // exactly the same pigs (previews/_build-skins.mjs).
 //
 // First place in the middle, second on its left, third on its right. On each
-// step stands the join art's pig, which holds up a sign: dressed for its tier
-// (a chef's hat, a top hat, a crown), with the "Join Game" on the sign
-// covered by a card showing the wins in a row the tier takes (props.ts
-// signCard). Fractions of the light-mode image, as everywhere in
-// src/theme/skins.
+// step stands the join art's pig, which holds up a sign, the "Join Game" on
+// it covered by a card showing the wins in a row the tier takes (props.ts
+// signCard). The pig in first place is the player's (RewardPodium.tsx); the
+// other two wear a hat each (HATS, hatOn). Fractions of the light-mode image,
+// as everywhere in src/theme/skins.
 
 // The pig and its tail (the curl that makes the wordmark's S), with room
-// above for the tallest hat. RewardPodium clips the art to it. The right
+// above for the tallest hat (layout.ts HAT_ROOM) and its feet a little
+// below. RewardPodium clips the art to it. The right
 // edge, x 0.665, is short of the "quigglepig" (it starts at 0.673,
 // measured) by more than Logo's rounding can move the art at podium size
 // (half a dp), so none of the q shows wherever a pig lands; the tail's tip,
 // which curls over to meet it, is cut off too.
-export const PODIUM_PIG = { x: -0.02, y: -0.16, w: 0.685, h: 1.18 };
+export const PODIUM_PIG = { x: -0.02, y: -HAT_ROOM, w: 0.685, h: 1.02 + HAT_ROOM };
 
 // The face of the sign the join art's pig holds, measured from the image.
 const SIGN = { x: 0.3215, y: 0.658, w: 0.219 };
 const HEAD = SLOTS.join.head!;
 
-function dressed(hat: PropName, won: number): Placement[] {
-  return [
-    // As layout.ts dress(): the slot's w is for a 100-unit-wide hat.
-    { prop: hat, ...HEAD, w: (HEAD.w * PROPS[hat].w) / 100 },
-    { prop: 'signCard', ...SIGN, text: String(won) },
-  ];
-}
+// The hats the pigs in second and third place wear, picked at random each
+// time: the hats a player can win (src/avatar/outfits.ts), so they show off
+// what's to be had.
+export const HATS = Object.values(OUTFITS)
+  .map((o) => o.prop)
+  .filter((prop) => !!(PROPS[prop] as Prop).head);
+
+// A hat on a podium pig. As layout.ts dress(): the slot's w is for a
+// 100-unit-wide hat.
+export const hatOn = (hat: PropName): Placement => ({ prop: hat, ...HEAD, w: (HEAD.w * PROPS[hat].w) / 100 });
+
+const signed = (won: number): Placement[] => [{ prop: 'signCard', ...SIGN, text: String(won) }];
 
 // The podium is marble: veins wander across each face, down and to the
 // right, most of them grey, some white; every other one a hairline, and the
@@ -81,13 +88,13 @@ function veins(seed: number, n: number, rise: number): Vein[] {
 export const BASE_VEINS = veins(7, 12, 1.2);
 
 // `rise` is each step's height, as a share of first place's.
-const STEPS: { prize: Prize; rise: number; hat: PropName; seed: number }[] = [
-  { prize: 'rare', rise: 0.72, hat: 'topHat', seed: 3 },
-  { prize: 'premium', rise: 1, hat: 'crown', seed: 11 },
-  { prize: 'common', rise: 0.5, hat: 'chefHat', seed: 5 },
+const STEPS: { prize: Prize; rise: number; seed: number }[] = [
+  { prize: 'rare', rise: 0.72, seed: 3 },
+  { prize: 'premium', rise: 1, seed: 11 },
+  { prize: 'common', rise: 0.5, seed: 5 },
 ];
 
-export const PODIUM = STEPS.map(({ prize, rise, hat, seed }) => {
+export const PODIUM = STEPS.map(({ prize, rise, seed }) => {
   const step = LADDER.find((s) => s.prize === prize)!;
-  return { prize, label: step.label, won: step.won, rise, first: rise === 1, decor: dressed(hat, step.won), veins: veins(seed, 9, 2.4) };
+  return { prize, label: step.label, won: step.won, rise, first: rise === 1, decor: signed(step.won), veins: veins(seed, 9, 2.4) };
 });

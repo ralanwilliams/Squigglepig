@@ -6,16 +6,23 @@ import { Logo } from '../components/Logo';
 import { IMAGES } from '../assets/assets';
 import { assetSize } from '../lib/assetSize';
 import type { Placement } from '../theme/skins';
+import type { PropName } from '../theme/skins/props';
+import { useMyAvatar } from '../avatar/avatar';
+import { OUTFITS } from '../avatar/outfits';
+import { onHead, partOf } from '../avatar/themeParts';
 import { font, type Theme } from '../theme/tokens';
 import { useTheme, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
-import { BASE_VEINS, PODIUM, PODIUM_PIG, type Vein } from './podium';
+import { BASE_VEINS, HATS, PODIUM, PODIUM_PIG, hatOn, type Vein } from './podium';
 
 // The reward tiers (engine.ts LADDER), for a game's intro: a winners'
 // podium, Premium on top in the middle, Rare second, Common third. Each
-// step's front says its tier, and on it stands a pig dressed for it holding
-// up a sign with the wins in a row it takes (podium.ts). The season's props
-// stay off these pigs: each wears its own. Explains the run before it
+// step's front says its tier, and on it stands a pig holding up a sign with
+// the wins in a row it takes (podium.ts). The pig in first place is the
+// player's, wearing what their pig has on its head (src/avatar) and the
+// season's hat if it has none of its own; the other two wear a hat each,
+// picked at random from the hats there are to win, none the same as another
+// pig's, and nothing of the season's. Explains the run before it
 // starts; once it has, the pot ladder slider (PotLadder.tsx) shows where
 // it's up to.
 //
@@ -28,23 +35,41 @@ import { BASE_VEINS, PODIUM, PODIUM_PIG, type Vein } from './podium';
 // into it (CarvedText): each step's tier, and "Consecutive Wins" on the
 // base, under the signs it explains. High contrast drops the marble and the
 // gloss, and prints the words plainly.
+//
+// `scale` draws all of it bigger or smaller (the intro draws it half as big
+// again, as the screen's picture).
 
 const omitAll = () => true;
+const ART_DP = 100; // the pig art's height on a step, base dp (its window is taller: room for a hat)
+// First place, holding its sign, wears only what's on its head.
+const offHead = (p: Placement) => !onHead(partOf(p));
+
+// Two different hats for second and third, at random, neither the one the
+// player's pig has on.
+function pickHats(theirs: string[]): (PropName | null)[] {
+  const worn = theirs.map((id) => OUTFITS[id]?.prop);
+  const pool = HATS.filter((h) => !worn.includes(h));
+  const first = pool.splice(Math.floor(Math.random() * pool.length), 1)[0] ?? null;
+  return [first, pool[Math.floor(Math.random() * pool.length)] ?? null];
+}
 const LIGHT = 'rgba(255, 255, 255, 0.35)'; // over a step's color: its cap, lit from above
 // The marble, over a face's color: grey veins and white ones, each a thin
 // line in a faint halo, and the gloss.
 const VEIN = { dark: ['rgba(0, 0, 0, 0.16)', 'rgba(0, 0, 0, 0.05)'], light: ['rgba(255, 255, 255, 0.32)', 'rgba(255, 255, 255, 0.09)'] };
 const GLOSS = '#ffffff';
 
-export function RewardPodium() {
+export function RewardPodium({ scale = 1 }: { scale?: number }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const t = useTheme();
   const marble = t.contrast !== 'high';
-  const base = ui.sp(52);
-  const cap = ui.sp(7);
-  const over = ui.sp(3); // how far a cap overhangs its step, and the gap between second or third and first
+  const base = ui.sp(52 * scale);
+  const cap = ui.sp(7 * scale);
+  const over = ui.sp(3 * scale); // how far a cap overhangs its step, and the gap between second or third and first
   const firstAt = PODIUM.findIndex((s) => s.first);
+  const { outfits } = useMyAvatar();
+  // Picked once: the hats don't change while the screen is up.
+  const [hats] = useState(() => pickHats(outfits));
   return (
     <View
       accessible
@@ -53,16 +78,16 @@ export function RewardPodium() {
         .map((s) => `${s.won} wins: a ${s.label.toLowerCase()} prize.`)
         .join(' ')}`}
     >
-      <View style={[styles.podium, { paddingHorizontal: ui.sp(10) }]}>
+      <View style={[styles.podium, { paddingHorizontal: ui.sp(10 * scale) }]}>
         {PODIUM.map((s, i) => (
           <View key={s.prize} style={styles.column}>
-            <Pig decor={s.decor} height={ui.sp(118)} />
+            <Pig decor={s.decor} hat={s.first ? undefined : hats[i < firstAt ? 0 : 1]} height={ui.sp(ART_DP * PODIUM_PIG.h * scale)} />
             <View
               style={[
                 styles.face,
                 s.first && styles.first,
                 // Across the gap to first place, else out past the step.
-                { height: cap, marginLeft: i > firstAt ? 0 : -over, marginRight: i < firstAt ? 0 : -over, borderRadius: ui.sp(3) },
+                { height: cap, marginLeft: i > firstAt ? 0 : -over, marginRight: i < firstAt ? 0 : -over, borderRadius: ui.sp(3 * scale) },
               ]}
             >
               <View style={[StyleSheet.absoluteFill, { backgroundColor: LIGHT }]} />
@@ -72,13 +97,13 @@ export function RewardPodium() {
                 styles.face,
                 s.first && styles.first,
                 styles.front,
-                { height: base * s.rise, paddingTop: ui.sp(5), marginLeft: i > firstAt ? over : 0, marginRight: i < firstAt ? over : 0 },
+                { height: base * s.rise, paddingTop: ui.sp(5 * scale), marginLeft: i > firstAt ? over : 0, marginRight: i < firstAt ? over : 0 },
               ]}
             >
               {marble ? <Marble id={s.prize} veins={s.veins} /> : null}
               <CarvedText
                 ink={s.first || t.name === 'dark' ? 'light' : 'dark'}
-                style={[styles.tier, s.first && styles.firstText, { fontSize: ui.f(14) }]}
+                style={[styles.tier, s.first && styles.firstText, { fontSize: ui.f(14 * scale) }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 maxFontSizeMultiplier={FONT_CAP}
@@ -89,9 +114,9 @@ export function RewardPodium() {
           </View>
         ))}
       </View>
-      <View style={[styles.base, { minHeight: ui.sp(25), paddingVertical: ui.sp(3), paddingHorizontal: ui.sp(8), borderRadius: ui.sp(4) }]}>
+      <View style={[styles.base, { minHeight: ui.sp(25 * scale), paddingVertical: ui.sp(3 * scale), paddingHorizontal: ui.sp(8 * scale), borderRadius: ui.sp(4 * scale) }]}>
         {marble ? <Marble id="base" veins={BASE_VEINS} /> : null}
-        <CarvedText ink="light" style={[styles.carved, { fontSize: ui.f(15) }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={FONT_CAP}>
+        <CarvedText ink="light" style={[styles.carved, { fontSize: ui.f(15 * scale) }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={FONT_CAP}>
           Consecutive Wins
         </CarvedText>
       </View>
@@ -147,14 +172,19 @@ function veinPath(pts: [number, number][], w: number, h: number) {
   return d + ` L${last[0]} ${last[1]}`;
 }
 
-// The join art's pig, dressed, in the podium's window (podium.ts), clipped
-// to it so the wordmark doesn't spill.
-function Pig({ decor, height }: { decor: Placement[]; height: number }) {
+// The join art's pig in the podium's window (podium.ts), clipped to it so
+// the wordmark doesn't spill: with `decor` (its sign), and a `hat`, or with
+// none given, the player's pig.
+function Pig({ decor, hat, height }: { decor: Placement[]; hat?: PropName | null; height: number }) {
   const { width: srcW, height: srcH } = assetSize(IMAGES.join);
   const width = (height * PODIUM_PIG.w * srcW) / (PODIUM_PIG.h * srcH);
   return (
     <View style={{ width, height, overflow: 'hidden' }}>
-      <Logo source={IMAGES.join} window={PODIUM_PIG} omit={omitAll} extra={decor} />
+      {hat === undefined ? (
+        <Logo source={IMAGES.join} window={PODIUM_PIG} omit={offHead} extra={decor} headOnly />
+      ) : (
+        <Logo source={IMAGES.join} window={PODIUM_PIG} omit={omitAll} extra={hat ? [hatOn(hat), ...decor] : decor} avatar={null} />
+      )}
     </View>
   );
 }

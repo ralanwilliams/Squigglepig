@@ -39,8 +39,8 @@ export type RoundProps<S> = {
   onResult: (won: boolean, detail?: string, timedOut?: boolean) => void;
   Frame: Frame;
   // Set once the round is over and its screen is staying up: won, under the
-  // choice to keep going or bank it, or for a full-screen game lost, under
-  // the news. `at` is when (epoch ms). A round stops taking input then.
+  // choice to keep going or bank it, or lost, under the news. `at` is when
+  // (epoch ms). A round stops taking input then.
   ended?: { won: boolean; at: number };
   // Set while a full-screen game's round counts in (RoundCountdown.tsx): the
   // field is under a curtain and its clock hasn't started. Take no input.
@@ -65,6 +65,11 @@ export type Game<S = unknown> = {
   // its clock starts, and the end of the round, won or lost, comes up on it
   // rather than on a screen of its own.
   fullScreen?: true;
+  // An endless hunt of the game's own, switched on from a round's pot ladder
+  // slider (RunShell.tsx): levels with no clock and no prizes that never
+  // end. Level n's puzzle (from 1) at difficulty d (0 … 4, easiest first:
+  // DifficultyMeter.tsx DIFFICULTIES). A full-screen game's only.
+  endless?: (level: number, difficulty: number) => S;
   dev?: true; // a test game, for development builds only
 };
 

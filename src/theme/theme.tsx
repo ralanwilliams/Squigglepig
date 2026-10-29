@@ -4,7 +4,7 @@ import { captureRef } from 'react-native-view-shot';
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { themes, type Theme } from './tokens';
-import { UNLOCKABLE, paletteFor, skinFor, type Birthday, type Skin } from './skins';
+import { UNLOCKABLE, dayKey, paletteFor, seasonEnd, skinFor, type Birthday, type Skin } from './skins';
 import { BIRTHDAYS_KEY, fetchBirthdays, parseBirthdays } from '../lib/birthdays';
 import { useInventory } from '../rewards/inventory';
 
@@ -27,7 +27,10 @@ type ThemeName = 'light' | 'dark';
 //
 // The skin showing is, first to last: a birthday or holiday (while Seasonal
 // themes is on), else the theme the player chose from what they've won (the
-// inventory, src/rewards/inventory.tsx), else classic.
+// inventory, src/rewards/inventory.tsx), else classic. Choosing a theme puts
+// it on at once, over the birthday or holiday on now (`pinChoice`): it stays
+// until that one ends, so the next one shows, and once that's over the
+// chosen theme is back.
 export type ContrastMode = 'system' | 'normal' | 'high';
 export type MotionMode = 'system' | 'full' | 'reduced';
 
@@ -35,6 +38,7 @@ const STORAGE_KEY = 'squigglepig.theme';
 const CONTRAST_KEY = 'squigglepig.contrast';
 const MOTION_KEY = 'squigglepig.motion';
 const SEASONAL_KEY = 'squigglepig.seasonal';
+const PIN_KEY = 'squigglepig.themePin';
 const WIPE_MS = 700; // the sweep
 const FLIP_AT_MS = 90; // how far into the sweep the palette flips under the photo
 const EDGE = 0.18; // soft leading edge, as a share of the screen height
@@ -62,6 +66,9 @@ type ThemeCtx = {
   setSeasonal: (on: boolean) => void;
   skin: Skin | null; // the skin showing (seasonal or chosen), if any
   season: Skin | null; // the birthday or holiday in season today, showing or not
+  // A theme was just chosen: show it over the birthday or holiday on today
+  // until that one ends. With none on, it shows until the next one starts.
+  pinChoice: () => void;
   // A screen whose art changes with the light itself (useFadesWithTheme)
   // registers while it's up (+1) and leaves (-1).
   fadesItself: (delta: number) => void;
@@ -71,6 +78,18 @@ type ThemeCtx = {
 // covers (run once the photo is showing).
 type Wipe = { uri: string; up: boolean; apply: () => void };
 type Size = { width: number; height: number };
+// The birthday or holiday a chosen theme shows over (its skin id), and the
+// last day of it (seasonEnd), so a pin made this Halloween is over by next.
+type Pin = { id: string; until: string };
+
+function parsePin(raw: string | null): Pin | null {
+  try {
+    const p = raw ? JSON.parse(raw) : null;
+    return p && typeof p.id === 'string' && typeof p.until === 'string' ? { id: p.id, until: p.until } : null;
+  } catch {
+    return null;
+  }
+}
 
 const Ctx = createContext<ThemeCtx | null>(null);
 const WipeCtx = createContext<{
@@ -150,7 +169,8 @@ function useSeasonSkin(saved: Birthday[] | null) {
     };
   }, []);
   const birthdays = fetched ?? saved;
-  return useMemo(() => skinFor(today, birthdays ?? []), [today, birthdays]);
+  const season = useMemo(() => skinFor(today, birthdays ?? []), [today, birthdays]);
+  return { season, today };
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -162,7 +182,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [motion, setMotionState] = useState<MotionMode>('system');
   const [seasonal, setSeasonalState] = useState(true);
   const [savedBirthdays, setSavedBirthdays] = useState<Birthday[] | null>(null);
-  const season = useSeasonSkin(savedBirthdays);
+  const { season, today } = useSeasonSkin(savedBirthdays);
+  const [pin, setPin] = useState<Pin | null>(null);
   const chosen = UNLOCKABLE[useInventory().chosen('theme') ?? ''] ?? null;
   const [loaded, setLoaded] = useState(false);
 
@@ -170,13 +191,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // dark-mode player never sees a teal flash at launch (the splash screen
   // covers the wait).
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, CONTRAST_KEY, MOTION_KEY, SEASONAL_KEY, BIRTHDAYS_KEY])
-      .then(([[, v], [, c], [, m], [, z], [, b]]) => {
+    AsyncStorage.multiGet([STORAGE_KEY, CONTRAST_KEY, MOTION_KEY, SEASONAL_KEY, BIRTHDAYS_KEY, PIN_KEY])
+      .then(([[, v], [, c], [, m], [, z], [, b], [, p]]) => {
         if (v === 'light' || v === 'dark') setModeState(v);
         if (c === 'normal' || c === 'high') setContrastState(c);
         if (m === 'full' || m === 'reduced') setMotionState(m);
         if (z === 'off') setSeasonalState(false);
         setSavedBirthdays(parseBirthdays(b));
+        setPin(parsePin(p));
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -185,7 +207,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const name: ThemeName = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const highContrast = contrast === 'system' ? osHighContrast : contrast === 'high';
   const reducedMotion = motion === 'system' ? osReduceMotion : motion === 'reduced';
-  const skin = (seasonal ? season : null) ?? chosen;
+  // The season gives way to a theme chosen while it was on.
+  const pinned = !!season && pin?.id === season.id && dayKey(today) <= pin.until;
+  const skin = (seasonal && !pinned ? season : null) ?? chosen;
   const theme = paletteFor(skin, name, highContrast);
 
   const setMode = useCallback((m: ThemeMode) => {
@@ -207,6 +231,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setSeasonalState(on);
     AsyncStorage.setItem(SEASONAL_KEY, on ? 'on' : 'off').catch(() => {});
   }, []);
+
+  const pinChoice = useCallback(() => {
+    const next = season ? { id: season.id, until: seasonEnd(season, today) } : null;
+    setPin(next);
+    (next ? AsyncStorage.setItem(PIN_KEY, JSON.stringify(next)) : AsyncStorage.removeItem(PIN_KEY)).catch(() => {});
+  }, [season, today]);
 
   // The transition: the OLD screen is photographed
   // (react-native-view-shot), the palette flips underneath the photo, and the
@@ -289,12 +319,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setSeasonal,
       skin,
       season,
+      pinChoice,
       fadesItself,
     }),
     [
       theme, mode, pending, name, setMode, toggle, sweep,
       contrast, highContrast, setContrast, motion, reducedMotion, setMotion,
-      seasonal, setSeasonal, skin, season, fadesItself,
+      seasonal, setSeasonal, skin, season, pinChoice, fadesItself,
     ]
   );
   const wipeValue = useMemo(() => ({ shotRef, size, setSize, wipe, onReady, onDone }), [size, wipe, onReady, onDone]);

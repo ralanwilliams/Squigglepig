@@ -3,7 +3,7 @@ import { Animated, Easing, LayoutChangeEvent, Platform, Pressable, StyleSheet, T
 import Svg, { G, Path } from 'react-native-svg';
 import { Strokes } from '../../../components/DrawingArt';
 import { Heading } from '../../../components/Heading';
-import { PigButton } from '../../../components/PigButton';
+import { PeekOver } from '../../../components/PeekPig';
 import { RuleBadge } from '../../../components/RuleBadge';
 import { SPACE, STROKE } from '../../../lib/drawing';
 import { FONT_CAP, useUi } from '../../../theme/responsive';
@@ -14,18 +14,20 @@ import { fitAspect } from './DrawPad';
 import { fit, inkLength } from './score';
 
 // After Done (or the clock running out): how the drawing did, before the run
-// moves on. The clock stops. The pad stays where it was, now still, and the
+// moves on. The clock stops. The pad stays where it was (the pig still
+// peeking over it), now still, and the
 // drawing that was flashed comes back over the player's as a ghost, in a
 // color of the rainbow, that draws itself on, laid over theirs the way
 // score.ts compared them (same centre of ink, same spread), so what lines up
 // is what was scored. In the rail a flag drops onto the bar at the pass mark
 // and the bar fills to the score in bursts, each pause longer than the last,
 // the number shaking harder the nearer it gets. Then the ✓ or ✗ lands on the
-// drawing (RuleBadge, as on the reveal screen) and a pass throws confetti. Then a pass goes to the run
-// by itself, which leaves this up, with its choice over it at a new tier
-// (keep going, or bank it, on a card: RunShell.tsx), else for a moment before the next
-// round; a miss waits for Continue. Tapping the drawing
-// skips to the end; with reduced motion it starts there.
+// drawing (RuleBadge, as on the reveal screen) and a pass throws confetti.
+// Then it goes to the run by itself, which leaves this up: a pass with its
+// choice over it at a new tier (keep going, or bank it, on a card:
+// RunShell.tsx), else for a moment before the next round; a miss under the
+// news, on the same card. Tapping the drawing skips to the end; with reduced
+// motion it starts there.
 //
 // The show runs on one clock, `start`: each part works out where it is from
 // the time since, so skipping is just moving `start` back.
@@ -39,7 +41,7 @@ const FLAG_MS = 320;
 const BAR_AT = 1400; // the bar starts to fill; barKeys from here
 const SETTLE_MS = 80; // the bar at rest, then the verdict
 const POP_MS = 450; // the number's pop (and a miss's shake) at the verdict
-const CONTINUE_MS = 700; // the verdict, then the end: a miss's Continue, a pass's handover
+const CONTINUE_MS = 700; // the verdict, then the end: the handover to the run
 
 // The ghost's ink: a color of the rainbow, a different one each time. It's
 // on white paper in every palette, so these aren't themed; each is deep
@@ -139,7 +141,7 @@ export function ScoreReveal({
   pass: number;
   answer: string; // "a snowman"
   at: number; // when Done was pressed (epoch ms)
-  onContinue: () => void; // ends the round: by itself on a pass, from Continue on a miss
+  onContinue: () => void; // ends the round, by itself at the end
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -149,13 +151,13 @@ export function ScoreReveal({
   const [start, setStart] = useState(() => (reduced ? at - end : at));
   const over = useReached(start, end);
   const won = score >= pass;
-  const passed = useRef(false);
+  const handed = useRef(false);
   useEffect(() => {
-    if (over && won && !passed.current) {
-      passed.current = true;
+    if (over && !handed.current) {
+      handed.current = true;
       onContinue();
     }
-  }, [over, won, onContinue]);
+  }, [over, onContinue]);
 
   return (
     <Frame
@@ -168,25 +170,15 @@ export function ScoreReveal({
           accessibilityRole="button"
           accessibilityLabel="Skip to the score"
         >
-          <Ghosted start={start} shown={shown} drawn={drawn} won={won} verdict={verdictAt(keys)} />
+          <PeekOver>
+            <Ghosted start={start} shown={shown} drawn={drawn} won={won} verdict={verdictAt(keys)} />
+          </PeekOver>
         </Pressable>
       }
       controls={
         <View style={{ gap: ui.sp(10) }}>
           <Heading>{over ? `It was ${answer}${won ? '!' : '.'}` : 'How close?'}</Heading>
           <ScoreBar start={start} keys={keys} score={score} pass={pass} />
-          {/* A miss's Continue, kept in the layout from the start so the rail
-              doesn't move when it shows. */}
-          {won ? null : (
-            <View
-              style={!over && styles.hidden}
-              pointerEvents={over ? 'auto' : 'none'}
-              importantForAccessibility={over ? 'auto' : 'no-hide-descendants'}
-              accessibilityElementsHidden={!over}
-            >
-              <PigButton name="Continue" onPress={onContinue} />
-            </View>
-          )}
         </View>
       }
     />
@@ -377,7 +369,6 @@ const styles = StyleSheet.create({
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   fill: { flex: 1 },
-  hidden: { opacity: 0 },
   row: { flexDirection: 'row', alignItems: 'flex-end' },
   track: {
     borderRadius: 999,

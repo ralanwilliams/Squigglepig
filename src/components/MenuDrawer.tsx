@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { FitBox } from './FitBox';
 import { Glyph, type GlyphName } from './Glyph';
 import { Switch } from './Switch';
 import { showToast } from './Toast';
-import { IMAGES } from '../assets/assets';
+import { AppMark } from './AppMark';
 import { GROUPS, type Group } from '../rewards/catalog';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
@@ -217,7 +216,7 @@ function MenuDrawer({
         >
           <View style={styles.head}>
             <View style={[styles.identity, { gap: ui.sp(14) }]}>
-              <Image source={IMAGES.icon} style={{ width: icon, height: icon, borderRadius: Math.round(icon * 0.22) }} />
+              <AppMark size={icon} rounded />
               <View style={{ gap: ui.sp(2) }}>
                 <Text style={[styles.name, { fontSize: ui.f(ui.twoPane ? 22 : 26) }]} maxFontSizeMultiplier={FONT_CAP}>
                   Squigglepig

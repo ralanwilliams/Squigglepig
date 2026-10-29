@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { assetSize } from '../lib/assetSize';
 import { artFor, artName, darkInset } from '../assets/assets';
 import { useTheme } from '../theme/theme';
 import { SkinDecor } from './SkinDecor';
+import { avatarDecor, useMyAvatar, wearsAll, type Avatar } from '../avatar/avatar';
 import type { Placement } from '../theme/skins';
 
 // A window into the source image, as fractions of its width/height. Used for
@@ -35,24 +36,42 @@ const FULL: ImageWindow = { x: 0, y: 0, w: 1, h: 1 };
 // In season, the skin's props are drawn over the frame (SkinDecor), under
 // `children` so hotspots like the snout stay on top; any meant to peek out
 // from behind the pig are drawn under the image. `omit` and `extra` pass to
-// SkinDecor: the winner pig drops some of the season's props for the
-// player's own outfit and speech bubble (src/avatar).
+// SkinDecor.
+//
+// The pig is the player's own (src/avatar): it wears their avatar, all of it
+// or (on a pig holding something) only what's on its head, in place of the
+// season's props it stands in for. `avatar` dresses it as another player
+// (the scoreboard's winner), or with null as nobody's; `headOnly` keeps it
+// to what's on the head on any art.
 export function Logo({
   source,
   window = FULL,
   children,
   omit,
   extra,
+  avatar,
+  headOnly,
 }: {
   source: number;
   window?: ImageWindow;
   children?: React.ReactNode;
   omit?: (p: Placement) => boolean;
   extra?: Placement[];
+  avatar?: Avatar | null;
+  headOnly?: boolean;
 }) {
   const [box, setBox] = useState({ w: 0, h: 0 });
   const art = artFor(source, useTheme().name === 'dark');
   const name = artName(source);
+  const mine = useMyAvatar();
+  const wearer = avatar === undefined ? mine : avatar;
+  const dressed = useMemo(
+    () => (wearer && name ? avatarDecor(wearer, name, headOnly ?? !wearsAll(name)) : null),
+    [wearer, name, headOnly]
+  );
+  const without = dressed?.omit;
+  const leaveOff = useMemo(() => (omit && without ? (p: Placement) => omit(p) || without(p) : (omit ?? without)), [omit, without]);
+  const putOn = useMemo(() => (dressed ? [...(extra ?? []), ...dressed.extra] : extra), [extra, dressed]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -85,7 +104,7 @@ export function Logo({
     <View style={styles.host} onLayout={onLayout}>
       {box.w > 0 && box.h > 0 ? (
         <View style={[styles.frame, { width: Math.round(fw), height: Math.round(fh) }]}>
-          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} layer="behind" omit={omit} extra={extra} /> : null}
+          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} layer="behind" omit={leaveOff} extra={putOn} /> : null}
           <Image
             source={art}
             style={{
@@ -97,7 +116,7 @@ export function Logo({
             }}
             contentFit="fill"
           />
-          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} omit={omit} extra={extra} /> : null}
+          {name ? <SkinDecor art={name} width={fw} height={fh} window={window} omit={leaveOff} extra={putOn} /> : null}
           {children}
         </View>
       ) : null}

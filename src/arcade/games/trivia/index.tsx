@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { font, verdict, type Theme } from '../../../theme/tokens';
 import { useThemedStyles } from '../../../theme/theme';
 import { FONT_CAP, useUi } from '../../../theme/responsive';
+import { BOARD_INK, PigBoard } from '../../../components/PigBoard';
 import { playSound } from '../../../lib/sound';
 import { SOUNDS } from '../../../assets/assets';
 import type { Game, RoundProps } from '../index';
@@ -10,15 +11,18 @@ import { shuffleAnswers } from './questions';
 import { questionsForRun } from './store';
 
 // Multiple-choice trivia: a question, four answers, one right. Easy questions
-// first, hard ones last (questions.ts PLAN). The questions come from the Open
+// first, hard ones last (questions.ts PLAN). The pig holds the question up
+// on a board (PigBoard.tsx). The questions come from the Open
 // Trivia Database, kept on the phone between runs, with a pack of our own for
 // when it can't be reached (store.ts).
 //
 // Once an answer is picked the answers lock and say how it went: the right
 // one green with a ✓, a wrong pick red with a ✗ (the verdict colors, told
-// apart by the mark), the rest faded. A right answer leaves the question up,
-// with the run's choice over it at a new tier (keep going, or bank it, on a
-// card: RunShell.tsx), else for a moment before the next round.
+// apart by the mark), the rest faded. Out of time with none picked, the right
+// one is marked the same way. A right answer leaves the question up, with
+// the run's choice over it at a new tier (keep going, or bank it, on a card:
+// RunShell.tsx), else for a moment before the next round; a lost round
+// leaves it up under the news, on the same card.
 
 type Spec = { text: string; category: string; answers: string[]; correct: number };
 
@@ -26,28 +30,28 @@ async function makeRun(): Promise<Spec[]> {
   return (await questionsForRun()).map((q) => ({ text: q.text, category: q.category, ...shuffleAnswers(q) }));
 }
 
-function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
+function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const [picked, setPicked] = useState<number | null>(null);
   const pick = (i: number) => {
-    if (picked !== null) return;
+    if (picked !== null || ended) return;
     setPicked(i);
     onResult(i === spec.correct, `The answer was ${spec.answers[spec.correct]}.`);
   };
-  const mark = (i: number) => (picked === null ? undefined : i === spec.correct ? 'right' : i === picked ? 'wrong' : 'other');
+  const mark = (i: number) => (picked === null && !ended ? undefined : i === spec.correct ? 'right' : i === picked ? 'wrong' : 'other');
   return (
     <Frame
       fitFocus
       focus={
-        <View style={{ gap: ui.sp(10) }}>
+        <PigBoard>
           <Text style={[styles.category, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
             {spec.category}
           </Text>
-          <Text style={[styles.question, { fontSize: ui.f(22) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityRole="header">
+          <Text style={[styles.question, { fontSize: ui.f(24) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityRole="header">
             {spec.text}
           </Text>
-        </View>
+        </PigBoard>
       }
       controls={
         // Two by two: a long answer gets half the rail and two lines, and the
@@ -107,8 +111,9 @@ function Answer({ label, mark, onPress }: { label: string; mark?: 'right' | 'wro
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  category: { color: t.textMuted, fontFamily: font.bold, letterSpacing: 1.2, textTransform: 'uppercase', textAlign: 'center' },
-  question: { color: t.text, fontFamily: font.medium, textAlign: 'center' },
+  // On the board, which is never themed.
+  category: { color: BOARD_INK.muted, fontFamily: font.bold, letterSpacing: 1.2, textTransform: 'uppercase', textAlign: 'center' },
+  question: { color: BOARD_INK.text, fontFamily: font.medium, textAlign: 'center' },
   row: { flexDirection: 'row' },
   answer: {
     flex: 1,
