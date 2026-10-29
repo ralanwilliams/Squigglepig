@@ -20,13 +20,29 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { cloud, likeness } from '../src/arcade/games/memory/score.ts';
 
+// Things anyone could draw from a glance, by the dataset's own names
+// (github.com/googlecreativelab/quickdraw-dataset categories.txt). Not
+// snowflake or stop sign: their doodles are scribbles and handwriting.
 const CATEGORIES = [
-  'apple', 'banana', 'bicycle', 'birthday cake', 'butterfly', 'cactus', 'candle', 'car', 'castle', 'cat',
-  'clock', 'cloud', 'crown', 'cup', 'donut', 'door', 'envelope', 'eyeglasses', 'fish', 'flower',
-  'hot air balloon', 'house', 'house plant', 'ice cream', 'key', 'ladder', 'leaf', 'light bulb', 'lightning', 'lighthouse',
-  'lollipop', 'moon', 'mountain', 'mushroom', 'octopus', 'pear', 'pig', 'rainbow', 'sailboat', 'scissors',
-  'smiley face', 'snail', 'snowman', 'spider', 'star', 'sun', 't-shirt', 'tent', 'tree', 'umbrella',
+  'airplane', 'alarm clock', 'ant', 'apple', 'backpack', 'banana', 'barn', 'basket', 'basketball', 'bear',
+  'bed', 'bee', 'bench', 'bicycle', 'bird', 'birthday cake', 'book', 'bowtie', 'bread', 'bridge',
+  'broccoli', 'broom', 'bucket', 'bus', 'butterfly', 'cactus', 'camera', 'campfire', 'candle', 'canoe',
+  'car', 'carrot', 'castle', 'cat', 'chair', 'church', 'clock', 'cloud', 'cookie', 'couch',
+  'cow', 'crab', 'crayon', 'crown', 'cup', 'diamond', 'dog', 'dolphin', 'donut', 'door',
+  'drums', 'duck', 'elephant', 'envelope', 'eye', 'eyeglasses', 'feather', 'fence', 'fire hydrant', 'fish',
+  'flamingo', 'flashlight', 'flip flops', 'flower', 'flying saucer', 'fork', 'frog', 'giraffe', 'grapes', 'guitar',
+  'hamburger', 'hammer', 'hand', 'hat', 'headphones', 'hedgehog', 'helicopter', 'hot air balloon', 'hot dog', 'hourglass',
+  'house', 'house plant', 'ice cream', 'key', 'ladder', 'lantern', 'laptop', 'leaf', 'light bulb', 'lightning',
+  'lighthouse', 'lion', 'lollipop', 'mailbox', 'microphone', 'monkey', 'moon', 'mountain', 'mouse', 'mushroom',
+  'necklace', 'octopus', 'owl', 'paintbrush', 'palm tree', 'panda', 'pants', 'paper clip', 'parachute', 'pear',
+  'pencil', 'penguin', 'piano', 'pig', 'pineapple', 'pizza', 'popsicle', 'rabbit', 'rainbow', 'sailboat',
+  'sandwich', 'scissors', 'sea turtle', 'sheep', 'shoe', 'shovel', 'skateboard', 'smiley face', 'snail', 'snake',
+  'snowman', 'soccer ball', 'sock', 'spider', 'spoon', 'star', 'strawberry', 'submarine',
+  'suitcase', 'sun', 'swan', 't-shirt', 'teapot', 'teddy-bear', 'television', 'tent', 'tooth', 'toothbrush',
+  'tractor', 'traffic light', 'train', 'tree', 'truck', 'umbrella', 'watermelon', 'whale', 'windmill', 'zebra',
 ];
+// What the game calls a category, where the dataset's name won't do.
+const NAMES: Record<string, string> = { 'teddy-bear': 'teddy bear' };
 const BASE = 'https://storage.googleapis.com/quickdraw_dataset/full/simplified/';
 const BYTES = 1_500_000; // the start of each file: a few thousand doodles
 const SAMPLE = 150; // doodles per category compared for typicality
@@ -100,7 +116,7 @@ async function build() {
   for (const word of CATEGORIES) {
     const sample = (await doodles(word)).slice(0, SAMPLE).map(toPaths);
     const best = typical(sample).slice(0, PER);
-    for (const { i, mean } of best) pack.push({ word, strokes: sample[i], effort: effort(sample[i]) });
+    for (const { i } of best) pack.push({ word: NAMES[word] ?? word, strokes: sample[i], effort: effort(sample[i]) });
     console.log(`${word.padEnd(16)} ${sample.length} doodles, kept ${best.map((b) => Math.round(b.mean)).join(' / ')}`);
   }
   pack.sort((a, b) => a.effort - b.effort);

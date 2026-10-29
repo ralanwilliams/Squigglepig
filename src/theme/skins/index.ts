@@ -37,7 +37,8 @@ export const SKINS: Skin[] = [
 
 // Themes a player wins in solo play and then chooses (src/rewards/catalog.ts),
 // by the reward's id. They have no season: the chosen one shows whenever no
-// birthday or holiday is on (or always, with Seasonal themes off). To add
+// birthday or holiday is on (or always, with Seasonal themes off), and over
+// the one that was on when it was chosen (theme.tsx pinChoice). To add
 // one, write it beside railroad.ts, list it here, and take `soon` off its
 // reward in the catalog.
 export const UNLOCKABLE: Record<string, Skin> = {
@@ -91,6 +92,23 @@ export function skinFor(date: Date, birthdays: Birthday[] = []): Skin | null {
   const today = md(month, day);
   const year = date.getFullYear();
   return SKINS.find((s) => s.season && inSeason(typeof s.season === 'function' ? s.season(year) : s.season, today)) ?? null;
+}
+
+// A date as "YYYY-MM-DD", so two compare as strings.
+export const dayKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+// The last day of `skin`'s season that `date` falls in (skinFor returned it
+// for that date), as a dayKey: this Halloween's, not next year's. A season
+// that runs across New Year ends next year when `date` is before it. A skin
+// with no season (an unlockable one previewed in a dev build) ends that day.
+export function seasonEnd(skin: Skin, date: Date): string {
+  if (!skin.season) return dayKey(date);
+  const year = date.getFullYear();
+  const season = typeof skin.season === 'function' ? skin.season(year) : skin.season;
+  const wraps = md(...season.from) > md(...season.to);
+  const endYear = wraps && md(date.getMonth() + 1, date.getDate()) >= md(...season.from) ? year + 1 : year;
+  return dayKey(new Date(endYear, season.to[0] - 1, season.to[1]));
 }
 
 // The palette to show: classic, with the skin's colors laid over it. Built

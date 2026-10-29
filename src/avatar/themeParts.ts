@@ -1,5 +1,5 @@
 import { PROPS, type Prop, type PropName } from '../theme/skins/props';
-import { ALL_SKINS, type Placement, type Skin } from '../theme/skins';
+import { ALL_SKINS, type ArtName, type Placement, type Skin } from '../theme/skins';
 import { birthday } from '../theme/skins/birthday';
 
 // A theme's props on the winner pig, in the parts a player can put on or take
@@ -22,6 +22,9 @@ export type ThemePart = { key: string; label: string; prop: PropName };
 export function partOf(p: Placement): string {
   const prop = PROPS[p.prop] as Prop;
   if (prop.head) return 'head';
+  // Easter's ears are drawn for each piece of art; they're one part, kept by
+  // the winner art's name.
+  if (p.prop.startsWith('ears')) return 'earsWinner';
   if (prop.eyes) return 'eyes';
   if (p.rim === false || p.prop.startsWith('hoof')) return 'hold';
   if (p.bob || p.twinkle) return 'sky';
@@ -94,8 +97,9 @@ export function partsOf(skin: Skin): ThemePart[] {
   return [...parts.values()];
 }
 
-// The placements of one part of a theme on the winner pig.
-export const placementsOf = (skin: Skin, key: string) => (skin.decor.winner ?? []).filter((p) => partOf(p) === key);
+// The placements of one part of a theme on a piece of pig art (the winner
+// pig, unless another is given).
+export const placementsOf = (skin: Skin, key: string, art: ArtName = 'winner') => (skin.decor[art] ?? []).filter((p) => partOf(p) === key);
 
 // A theme by its id, for a part worn from it: any holiday or won theme, or a
 // birthday's (its parts on the winner pig don't carry the name).
@@ -122,3 +126,8 @@ export function placeRank(key: string): number {
   const i = PLACES.indexOf(SITS[key] ?? key);
   return i < 0 ? PLACES.indexOf('feet') : i;
 }
+
+// Whether a part (or an outfit's slot) is worn on the pig's head: a hat,
+// eyewear, Easter's ears. A pig holding something, or peeking over it, wears
+// only these (avatar.ts avatarDecor).
+export const onHead = (key: string) => placeRank(key) <= PLACES.indexOf('eyes');

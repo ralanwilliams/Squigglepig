@@ -29,6 +29,15 @@ export const LADDER: { won: number; prize: Prize; label: string }[] = [
   { won: ROUNDS, prize: 'premium', label: 'Premium' },
 ];
 
+// The run's rules in a line each, the same for every game, for the intro
+// under the game's own line (RunShell.tsx). A choice comes at every step
+// short of the last, which banks itself.
+export const RULES = [
+  'Win rounds in a row to earn a prize.',
+  `At ${LADDER.filter((s) => s.won < ROUNDS).map((s) => s.won).join(' and ')} wins, bank your prize or risk it for a bigger one.`,
+  'Lose a round and you lose the pot.',
+];
+
 // The prize in the pot after `won` rounds won, if any.
 export function prizeFor(won: number): Prize | null {
   let prize: Prize | null = null;

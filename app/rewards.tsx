@@ -10,7 +10,8 @@ import { GROUPS, KINDS, REWARDS, isNone, noneOf, rewardsOf, type Group, type Kin
 import { useInventory } from '../src/rewards/inventory';
 import { useChoose } from '../src/rewards/useChoose';
 import { font, type Theme } from '../src/theme/tokens';
-import { useTheme, useThemeMode, useThemedStyles } from '../src/theme/theme';
+import { useSkin, useTheme, useThemeMode, useThemedStyles } from '../src/theme/theme';
+import { UNLOCKABLE } from '../src/theme/skins';
 import { FONT_CAP, useUi, type Ui } from '../src/theme/responsive';
 
 // Rewards, from the menu drawer (src/components/MenuDrawer.tsx): what there
@@ -24,9 +25,10 @@ import { FONT_CAP, useUi, type Ui } from '../src/theme/responsive';
 //
 // Of a kind the player picks one of (a theme), tapping an owned card puts it
 // to use; the kind's default (Classic) leads the grid once there's anything
-// to choose instead of it. Birthdays and holidays show
-// over a chosen theme while Seasonal themes is on: the Themes tab has its
-// switch under the tabs, the same setting as the menu's (src/theme/theme.tsx).
+// to choose instead of it. Birthdays and holidays show over a chosen theme
+// while Seasonal themes is on, but one chosen during a birthday or holiday
+// shows over it until it ends (src/theme/theme.tsx). The Themes tab has the
+// switch under the tabs, the same setting as the menu's.
 //
 // Development builds add Unlock all / Reset under the tabs, to see every card
 // both ways.
@@ -47,10 +49,15 @@ export default function Rewards() {
   const inUse = chosen(kind);
   const cards = none && list.some((r) => !r.soon) ? [none, ...list] : list;
   const { seasonal, setSeasonal } = useThemeMode();
+  // A theme is in use while it's showing: the chosen one, unless a birthday
+  // or holiday is on over it, when no card is, and tapping it brings it back.
+  const showing = useSkin();
+  const covered = kind === 'theme' && showing !== (UNLOCKABLE[inUse ?? ''] ?? null);
+  const used = (id: string | null) => !covered && id === (inUse ?? null);
 
   // Put a card to use (a theme with the sweep: useChoose).
   const use = (id: string | null) => {
-    if (id !== inUse) putToUse(kind, id);
+    if (!used(id)) putToUse(kind, id);
   };
 
   const grid = (
@@ -65,7 +72,7 @@ export default function Rewards() {
             key={r.id}
             reward={r}
             owned={isNone(r) || owns(r.id)}
-            chosen={usable && (isNone(r) ? !inUse : inUse === r.id)}
+            chosen={usable && used(isNone(r) ? null : r.id)}
             onPress={usable ? () => use(isNone(r) ? null : r.id) : undefined}
           />
         );

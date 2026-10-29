@@ -295,8 +295,13 @@ export function makeField(w: number, h: number, box: Box, look: Look, s: number)
   }
   ground.push(<Path key="dk" d={dk} fill={mix(soil, '#1f140c', 0.55)} />, <Path key="lt" d={lt} fill={mix(soil, '#d2b08a', 0.45)} />);
 
-  const spots = place(look.count, look.r * s, box, [], 18 * s, rand);
-  const decoys = place(look.decoys, look.r * s * 1.05, box, spots, 10 * s, rand);
+  // A crowded field (the endless hunt's later levels) draws them smaller and
+  // closer together, to fit; a round's few are never crowded enough for this.
+  const room = Math.sqrt(((box.x1 - box.x0) * (box.y1 - box.y0)) / Math.max(1, look.count));
+  const r = Math.min(look.r * s, room * 0.3);
+  const gap = Math.min(18 * s, room * 0.22);
+  const spots = place(look.count, r, box, [], gap, rand);
+  const decoys = place(look.decoys, r * 1.05, box, spots, Math.min(10 * s, gap), rand);
 
   for (let i = 0; i < (3 + 6 * e) * A; i++) {
     const mx = rand() * w;

@@ -1,23 +1,10 @@
-import { dress, held } from './layout';
+import { EYES, dress, held } from './layout';
 import type { ArtName, Placement, Skin } from './types';
 
 // The shield sunglasses (props.ts visor) over the pig's eyes on each piece of
-// art, the middle of the lens on the point midway between them, measured from
-// the art: the stills share one drawing of the pig (the phone art sits a
-// little lower), and the drawing-screen pig's head is tilted.
-const STILL = { prop: 'visor', x: 0.3085, y: 0.1765, w: 0.21 } as const;
-const VISOR: Partial<Record<ArtName, Placement>> = {
-  home: STILL,
-  join: STILL,
-  lobby: STILL,
-  cell: { ...STILL, x: 0.308, y: 0.207, w: 0.19, rotate: -2 },
-  waiting: { prop: 'visor', x: 0.487, y: 0.369, w: 0.15, rotate: -4 },
-  winner: { prop: 'visor', x: 0.316, y: 0.18, w: 0.19, rotate: -4 },
-  canvasPig: { prop: 'visor', x: 0.5035, y: 0.383, w: 0.175, rotate: -10 },
-};
-
+// art (layout.ts EYES).
 function withVisor(decor: Skin['decor']): Skin['decor'] {
-  for (const [art, visor] of Object.entries(VISOR) as [ArtName, Placement][]) decor[art] = [...(decor[art] ?? []), visor];
+  for (const [art, eyes] of Object.entries(EYES) as [ArtName, Omit<Placement, 'prop'>][]) decor[art] = [...(decor[art] ?? []), { ...eyes, prop: 'visor' }];
   return decor;
 }
 

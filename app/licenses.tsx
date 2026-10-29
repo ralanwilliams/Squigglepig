@@ -1,6 +1,7 @@
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Heading } from '../src/components/Heading';
+import { AppMark } from '../src/components/AppMark';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
@@ -20,9 +21,11 @@ const SUMMARY = Object.entries(
 // every package that ships with the app, its version and its license type.
 // The list is generated from node_modules by `npm run licenses`
 // (scripts/licenses.mjs). The one screen in the game that scrolls: it is a
-// reference list, hundreds of rows long. Above it, the credits the trivia
-// questions' and the memory drawings' licences ask for (src/arcade/games/trivia,
-// src/arcade/games/memory).
+// reference list, hundreds of rows long. It opens like the website's Help &
+// FAQ page: the logo, then the title (they scroll away with the list; the
+// band above stays clear of the dark-mode switch, as on every screen). Then
+// the credits the trivia questions' and the memory drawings' licences ask for
+// (src/arcade/games/trivia, src/arcade/games/memory), and the list.
 export default function Licenses() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -34,9 +37,7 @@ export default function Licenses() {
         { paddingTop: ui.insets.top, paddingLeft: ui.insets.left, paddingRight: ui.insets.right },
       ]}
     >
-      <View style={{ minHeight: ui.headerBand, paddingTop: ui.sp(10), paddingHorizontal: ui.pad + ui.sp(36), justifyContent: 'center' }}>
-        <Heading size="h3" lines={1}>Open-source licenses</Heading>
-      </View>
+      <View style={{ minHeight: ui.headerBand }} />
 
       <FlatList
         data={LICENSES as Pkg[]}
@@ -44,6 +45,10 @@ export default function Licenses() {
         contentContainerStyle={{ paddingHorizontal: ui.pad, paddingTop: ui.sp(8), paddingBottom: ui.insets.bottom + ui.pad }}
         ListHeaderComponent={
           <View style={{ gap: ui.sp(6), paddingBottom: ui.sp(12) }}>
+            <View style={[styles.mast, { gap: ui.sp(12), paddingBottom: ui.sp(10) }]}>
+              <AppMark size={ui.sp(88)} label="Squigglepig" />
+              <Heading size="h3">Open-source licenses</Heading>
+            </View>
             <Text style={[styles.intro, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
               Squigglepig is built with {LICENSES.length} open-source packages. Thank you to everyone who made them.
             </Text>
@@ -78,6 +83,7 @@ export default function Licenses() {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: t.background },
+  mast: { alignItems: 'center' },
   intro: { color: t.text, fontFamily: font.regular, textAlign: 'center' },
   summary: { color: t.link, fontFamily: font.medium, textAlign: 'center' },
   rule: { height: 1, backgroundColor: t.divider },

@@ -1,14 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 import { Countdown, deadlineIn } from './Countdown';
 import { FitBox } from './FitBox';
-import { SkinDecor } from './SkinDecor';
-import { IMAGES, artFor, darkInset } from '../assets/assets';
-import { assetSize } from '../lib/assetSize';
+import { PeekPig, peekPigHeight } from './PeekPig';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
-import { useTheme, useThemedStyles } from '../theme/theme';
+import { useThemedStyles } from '../theme/theme';
 
 // The layout shared by the two "work" screens — drawing and guessing — so that
 // moving from one to the other doesn't feel like a jump. The rail is pinned to
@@ -37,9 +34,6 @@ const PIG_OVERLAP = 10;
 // usable; below this the focus pane gives up height instead.
 const RAIL_MIN = 280;
 
-const pigSize = assetSize(IMAGES.canvasPig);
-const PIG_ASPECT = pigSize.width / pigSize.height;
-
 export function WorkStage({
   focus,
   timeLimit,
@@ -59,8 +53,6 @@ export function WorkStage({
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const pigArt = artFor(IMAGES.canvasPig, useTheme().name === 'dark');
-  const pigPad = darkInset(IMAGES.canvasPig, pigArt);
 
   // The deadline is fixed here, once per screen: the rail below is rebuilt
   // (and the Countdown remounted) whenever the layout flips between one and
@@ -95,7 +87,7 @@ export function WorkStage({
   const railInner = ui.twoPane ? railW : ui.w - ui.pad * 2;
   const inset = ui.sp(24);
   const pigW = Math.round((railInner - inset) * PIG_SHARE);
-  const pigH = Math.round(pigW / PIG_ASPECT);
+  const pigH = peekPigHeight(pigW);
   const overlap = ui.sp(PIG_OVERLAP);
   const rowH = pigH - overlap; // the element starts here; the pig hangs over it
   const slotH = ui.sp(TOP_H);
@@ -113,23 +105,7 @@ export function WorkStage({
     <View>
       <View style={[styles.pigRow, { paddingLeft: inset, height: rowH }]}>
         <View style={{ width: pigW, height: rowH, overflow: 'visible' }}>
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: pigW, height: pigH }}>
-            <SkinDecor art="canvasPig" width={pigW} height={pigH} layer="behind" />
-          </View>
-          <Image
-            source={pigArt}
-            style={{
-              width: pigW * (pigPad.width / pigPad.src.width),
-              height: pigH * (pigPad.height / pigPad.src.height),
-              // The dark version's margin (for its border) hangs outside the pig's box.
-              marginLeft: -pigW * (pigPad.x / pigPad.src.width),
-              marginTop: -pigH * (pigPad.y / pigPad.src.height),
-            }}
-            contentFit="fill"
-          />
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: pigW, height: pigH }}>
-            <SkinDecor art="canvasPig" width={pigW} height={pigH} />
-          </View>
+          <PeekPig width={pigW} />
         </View>
         <View style={[styles.timer, { height: rowH }]}>
           {timeLimit ? <Countdown seconds={timeLimit} until={until} onExpire={expire} size={32} /> : null}

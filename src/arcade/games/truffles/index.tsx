@@ -24,7 +24,13 @@ import { Cheer, Hop } from '../../Cheer';
 // Running out of time loses it, and the ones not found are ringed.
 //
 // Later rounds bring more truffles, smaller, closer to the soil's color,
-// with more clutter, leaves over their edges, and look-alike stones. The
+// with more clutter, leaves over their edges, and look-alike stones.
+//
+// It has an endless hunt too (Game.endless), for younger players: level n
+// hides n truffles, up to MAX_TRUFFLES, with no clock and no prizes, and the
+// difficulty picks where on that ramp they are (how big, how close to the
+// soil's colour, the clutter, the look-alikes). A crowded field draws them
+// smaller to fit (art.tsx). The
 // round fills the screen (Game.fullScreen): the run's clock, pot and Leave
 // float over the field (FieldFrame.tsx), with the count here bottom left.
 // In dark mode it's night in the woods, and switching fades the light
@@ -41,19 +47,33 @@ const ease = (round: number) => (round - 1) / (ROUNDS - 1); // 0 on round 1, 1 o
 // zigzags and doubles back runs out.
 const seconds = (round: number) => Math.max(16, 26 - round);
 
-function makeRun(): Spec[] {
-  return Array.from({ length: ROUNDS }, (_, i) => {
-    const e = ease(i + 1);
-    return {
-      seed: Math.floor(Math.random() * 2 ** 31),
-      e,
-      count: 3 + Math.round(6 * e), // 3 … 9
-      r: 26 - 15 * e, // radius in dp: 26 … 11, each ±20%
-      contrast: 1 - 0.5 * e, // how far the truffles' browns are from the soil's
-      decoys: Math.round(8 * Math.max(0, e - 0.3)), // look-alike stones from round 5, up to 6
-    };
-  });
+// A field at e (0 easiest … 1 hardest) with `count` truffles.
+function look(e: number, count: number): Spec {
+  return {
+    seed: Math.floor(Math.random() * 2 ** 31),
+    e,
+    count,
+    r: 26 - 15 * e, // radius in dp: 26 … 11, each ±20%
+    contrast: 1 - 0.5 * e, // how far the truffles' browns are from the soil's
+    decoys: Math.round(8 * Math.max(0, e - 0.3)), // look-alike stones from round 5, up to 6
+  };
 }
+
+function makeRun(): Spec[] {
+  return Array.from({ length: ROUNDS }, (_, i) => look(ease(i + 1), 3 + Math.round(6 * ease(i + 1)))); // 3 … 9 truffles
+}
+
+// The endless hunt: level n's n truffles (at most MAX_TRUFFLES), at
+// difficulty 0 … 4; among only a few truffles, fewer look-alikes than a
+// round of nine would have.
+const MAX_TRUFFLES = 100;
+function endless(level: number, difficulty: number): Spec {
+  const field = look(difficulty / 4, Math.min(level, MAX_TRUFFLES));
+  return { ...field, decoys: Math.round((field.decoys * Math.min(field.count, 9)) / 9) };
+}
+
+// Pips for the count while they fit in its chip; past that, just the count.
+const MAX_PIPS = 12;
 
 const NATIVE = Platform.OS !== 'web';
 const HIT_DP = 22; // a tap counts this near a truffle's centre at least (a 44 dp target)
@@ -104,7 +124,7 @@ function Round({ spec, onResult, Frame, ended, held }: RoundProps<Spec>) {
             <Text style={[styles.countNum, { color: fc.text }]}>{found.length}</Text> of {total} found
           </Text>
           <View style={[styles.row, { gap: ui.sp(3) }]}>
-            {Array.from({ length: total }, (_, i) => (
+            {Array.from({ length: total <= MAX_PIPS ? total : 0 }, (_, i) => (
               <Svg key={i} width={ui.sp(17)} height={ui.sp(14)} viewBox="-12 -10 24 20">
                 <Path
                   d={PIP}
@@ -422,4 +442,5 @@ export const truffles: Game<Spec> = {
   Round,
   seconds,
   fullScreen: true,
+  endless,
 };

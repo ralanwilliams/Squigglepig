@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { PigButton } from '../../../components/PigButton';
 import { Heading } from '../../../components/Heading';
 import { DrawingImage } from '../../../components/DrawingImage';
+import { PeekOver } from '../../../components/PeekPig';
 import { SPACE } from '../../../lib/drawing';
 import { useUi } from '../../../theme/responsive';
 import { ROUNDS } from '../../engine';
@@ -17,6 +18,8 @@ import PACK from './pack.json';
 // drawing against the one shown (score.ts), and the round is won at the
 // round's pass mark or better. Before the run moves on, ScoreReveal.tsx shows
 // how it went: the one shown over theirs, and the score against the mark.
+// The pig peeks over the pad the whole time (PeekOver), as on the drawing
+// screen.
 //
 // The drawings are doodles from Google's Quick, Draw! (CC BY 4.0, credited on
 // app/licenses.tsx), chosen and converted by scripts/quickdraw.mts. The pack
@@ -51,7 +54,10 @@ function makeRun(): Spec[] {
   });
 }
 
-const article = (word: string) => (/^[aeiou]/.test(word) ? 'an' : 'a');
+// What the drawing was: "a cat", "an owl", "an hourglass"; a pair or a
+// bunch as it is ("grapes").
+const PLURAL = new Set(['drums', 'eyeglasses', 'flip flops', 'grapes', 'headphones', 'pants']);
+const answerFor = (word: string) => (PLURAL.has(word) ? word : `${/^(?:[aeiou]|hour)/.test(word) ? 'an' : 'a'} ${word}`);
 
 function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
   const ui = useUi();
@@ -77,7 +83,7 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
   };
 
   if (result) {
-    const answer = `${article(spec.word)} ${spec.word}`;
+    const answer = answerFor(spec.word);
     const { score, at } = result;
     return (
       <ScoreReveal
@@ -94,12 +100,26 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
   }
 
   if (looking) {
-    return <Frame onExpire={done} focus={<DrawingImage data={shown} />} controls={<Heading>Remember this!</Heading>} />;
+    return (
+      <Frame
+        onExpire={done}
+        focus={
+          <PeekOver>
+            <DrawingImage data={shown} />
+          </PeekOver>
+        }
+        controls={<Heading>Remember this!</Heading>}
+      />
+    );
   }
   return (
     <Frame
       onExpire={done}
-      focus={<DrawPad strokes={strokes} onStroke={(d) => setStrokes((s) => [...s, d])} />}
+      focus={
+        <PeekOver>
+          <DrawPad strokes={strokes} onStroke={(d) => setStrokes((s) => [...s, d])} />
+        </PeekOver>
+      }
       controls={
         <View style={{ gap: ui.sp(10) }}>
           <Heading>Now draw it!</Heading>
