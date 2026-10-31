@@ -8,6 +8,7 @@ import { useFieldColors } from './fieldColors';
 import { PotLadder } from './PotLadder';
 import { DifficultyMeter } from './DifficultyMeter';
 import { Padlock } from './Padlock';
+import { ChoiceRow, type Choice } from './ChoiceRow';
 import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, useFieldCardLook } from './RoundCard';
 import { RoundCountdown, useStarted } from './RoundCountdown';
 import { RoundCtx } from './RoundCtx';
@@ -34,13 +35,17 @@ import type { Frame } from './games';
 // was missed first.
 //
 // A game with an endless hunt of its own (RoundCtx toEndless) has a way into
-// it under the slider: Change to Endless Hunt. In the hunt (RoundCtx
-// endless) there's no clock and no count in: the level is in the clock's
-// place, and the slider is the difficulty meter (DifficultyMeter.tsx), with
-// the way back to the game's run under it. A padlock (Padlock.tsx) sits
-// beside the dark-mode toggle. Locked, the meter, Leave and the toggle go
-// (still taking up their room, so the field between the chips doesn't move
-// and its truffles stay put) and only the game's field takes a tap.
+// it beside Leave: Change to Endless Hunt. In the hunt (RoundCtx endless)
+// there's no clock and no count in: the level is in the clock's place, and
+// the slider is the difficulty meter (DifficultyMeter.tsx) with the play time
+// under it (ChoiceRow.tsx: PLAY_TIMES). Once one's chosen, what's left of it
+// shows beside the level; when it's up, the piggy's rest comes up as a card
+// (REST_CARDS).
+// Back to the game's run is beside Leave. A padlock (Padlock.tsx) sits
+// beside the dark-mode toggle. Locked, the meter and play time, the way
+// back, Leave and the toggle go (still taking up their room, so the field
+// between the chips doesn't move and its truffles stay put) and only the
+// game's field takes a tap.
 //
 // The game learns where it may put things through useFieldArea(): the whole
 // field's size, and the box between the chips at the top and the bottom.
@@ -55,6 +60,20 @@ export type FieldArea = {
 };
 
 const AreaCtx = createContext<FieldArea | null>(null);
+
+// The endless hunt's play times, in minutes (0: no limit). Development
+// builds also have 5 seconds, to see the piggy's rest without waiting.
+const PLAY_TIMES: Choice[] = [
+  { value: 0, label: 'Off', spoken: 'No limit' },
+  ...(__DEV__ ? [{ value: 5 / 60, label: '5s', spoken: '5 seconds' }] : []),
+  ...[10, 15, 20, 30].map((m) => ({ value: m, label: String(m), spoken: `${m} minutes` })),
+];
+// The piggy's rest (Endless rest): when the play time's up, and if it was
+// locked then, back in the game until it's unlocked.
+const REST_CARDS = {
+  up: { title: 'This piggy needs a rest!', lines: ['Thanks for playing!'] },
+  still: { title: 'The piggy is still resting', lines: [] },
+};
 
 // The field's size and clear box, once the frame has been laid out (null before).
 export const useFieldArea = () => useContext(AreaCtx);
@@ -101,23 +120,37 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
   const locked = !!endless?.locked;
   // Still there while locked, but not to be seen or tapped.
   const unlockedOnly = locked ? { opacity: 0 } : null;
-  const pill = (label: string, onPress: () => void, quiet?: boolean) => (
+  // The chips along the bottom that are buttons: Leave, an underlined link,
+  // and the way into the endless hunt (amber) or back out (quiet). Gone while
+  // locked.
+  const button = (label: string, onPress: () => void, look: 'link' | 'amber' | 'quiet') => (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      hitSlop={6}
-      style={[styles.pill, { minHeight: ui.sp(28), paddingHorizontal: ui.sp(12), marginTop: ui.sp(4), marginBottom: ui.sp(2), borderColor: quiet ? fc.line : fc.amber }]}
+      disabled={locked}
+      importantForAccessibility={locked ? 'no-hide-descendants' : 'auto'}
+      hitSlop={8}
+      style={[chip, { minHeight: ui.sp(36) }, look === 'amber' && { borderColor: fc.amber, borderWidth: 1.5 }, unlockedOnly]}
     >
-      <Text style={[quiet ? styles.pillQuiet : styles.pillText, { color: quiet ? fc.muted : fc.amber, fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
+      <Text style={[styles[look], { color: look === 'amber' ? fc.amber : fc.muted, fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
   );
   const clock = endless ? (
-    <View style={chip} accessible accessibilityLabel={`Level ${endless.level}`}>
+    <View style={chip} accessible accessibilityLabel={endless.restAt ? undefined : `Level ${endless.level}`}>
       <Text style={[styles.level, { color: fc.muted, fontSize: ui.f(16) }]} maxFontSizeMultiplier={FONT_CAP}>
         Level <Text style={[styles.levelNum, { color: fc.text }]}>{endless.level}</Text>
       </Text>
+      {endless.restAt ? (
+        <Countdown
+          seconds={endless.playTime * 60}
+          until={endless.restAt}
+          size={16}
+          stoppedAt={endless.rest ? endless.restAt : undefined}
+          colors={{ text: fc.text, urgent: fc.urgent }}
+        />
+      ) : null}
     </View>
   ) : (
     <View style={chip}>
@@ -135,28 +168,21 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
   const ladder = endless ? (
     <View pointerEvents={locked ? 'none' : 'auto'} importantForAccessibility={locked ? 'no-hide-descendants' : 'auto'} style={[ladderChip, unlockedOnly]}>
       <DifficultyMeter value={endless.difficulty} onChange={endless.setDifficulty} />
-      {pill(`Back to ${endless.game}`, endless.back, true)}
+      <View style={{ marginTop: ui.sp(5), marginBottom: ui.sp(3) }}>
+        <ChoiceRow label="Play time" unit="min" choices={PLAY_TIMES} value={endless.playTime} onChange={endless.setPlayTime} />
+      </View>
     </View>
   ) : (
     <View style={ladderChip}>
       <PotLadder look="field" won={settled && !settled.lost ? ctx.round : ctx.round - 1} />
-      {ctx.toEndless ? pill('Change to Endless Hunt', ctx.toEndless) : null}
     </View>
   );
-  const leave = (
-    <Pressable
-      accessibilityRole="button"
-      onPress={ctx.leave}
-      disabled={locked}
-      importantForAccessibility={locked ? 'no-hide-descendants' : 'auto'}
-      hitSlop={8}
-      style={[chip, { minHeight: ui.sp(36) }, unlockedOnly]}
-    >
-      <Text style={[styles.leave, { color: fc.muted, fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
-        Leave
-      </Text>
-    </Pressable>
-  );
+  const modeSwitch = endless
+    ? button(`Back to ${endless.game}`, endless.back, 'quiet')
+    : ctx.toEndless
+      ? button('Change to Endless Hunt', ctx.toEndless, 'amber')
+      : null;
+  const leave = button('Leave', ctx.leave, 'link');
   const disc = ui.sp(36);
 
   return (
@@ -218,7 +244,13 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
           )}
         </View>
         <View pointerEvents="box-none" style={styles.middle}>
-          {settled && (settled.lost || settled.actions.length) ? (
+          {endless?.rest ? (
+            <FitBox style={styles.fill}>
+              <View style={styles.center}>
+                <RoundCard key={endless.rest} look={look} delay={0} {...REST_CARDS[endless.rest]} actions={[]} />
+              </View>
+            </FitBox>
+          ) : settled && (settled.lost || settled.actions.length) ? (
             <FitBox style={styles.fill}>
               <View style={styles.center}>
                 <RoundCard
@@ -239,7 +271,10 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
           style={wide ? [styles.row, styles.between] : [styles.column, { gap: ui.sp(8) }]}
         >
           {controls ? <View style={chip}>{controls}</View> : <View />}
-          {leave}
+          <View pointerEvents="box-none" style={[styles.buttons, { gap: ui.sp(8) }]}>
+            {modeSwitch}
+            {leave}
+          </View>
         </View>
       </View>
     </View>
@@ -256,12 +291,12 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center' },
   chip: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, borderWidth: 1 },
   ladder: { flexDirection: 'column', alignItems: 'stretch' },
+  buttons: { flexDirection: 'row', alignItems: 'center' },
   disc: { position: 'absolute', borderWidth: 1 },
-  leave: { fontFamily: font.regular, textDecorationLine: 'underline' },
+  link: { fontFamily: font.regular, textDecorationLine: 'underline' },
+  amber: { fontFamily: font.bold },
+  quiet: { fontFamily: font.medium },
   level: { fontFamily: font.medium },
   levelNum: { fontFamily: font.bold },
-  pill: { alignSelf: 'center', justifyContent: 'center', borderRadius: 999, borderWidth: 1.5 },
-  pillText: { fontFamily: font.bold },
-  pillQuiet: { fontFamily: font.medium },
   padlock: { position: 'absolute', zIndex: 10 },
 });
