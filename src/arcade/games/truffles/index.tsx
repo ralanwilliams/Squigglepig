@@ -27,10 +27,10 @@ import { Cheer, Hop } from '../../Cheer';
 // with more clutter, leaves over their edges, and look-alike stones.
 //
 // It has an endless hunt too (Game.endless), for younger players: level n
-// hides n truffles, up to MAX_TRUFFLES, with no clock and no prizes, and the
-// difficulty picks where on that ramp they are (how big, how close to the
-// soil's colour, the clutter, the look-alikes). A crowded field draws them
-// smaller to fit (art.tsx). The
+// hides n truffles, with no end, no clock and no prizes, and the difficulty
+// picks where on that ramp they are (how big, how close to the soil's
+// colour, the clutter, the look-alikes). A crowded field draws them smaller
+// to fit them all (art.tsx). The
 // round fills the screen (Game.fullScreen): the run's clock, pot and Leave
 // float over the field (FieldFrame.tsx), with the count here bottom left.
 // In dark mode it's night in the woods, and switching fades the light
@@ -63,12 +63,10 @@ function makeRun(): Spec[] {
   return Array.from({ length: ROUNDS }, (_, i) => look(ease(i + 1), 3 + Math.round(6 * ease(i + 1)))); // 3 … 9 truffles
 }
 
-// The endless hunt: level n's n truffles (at most MAX_TRUFFLES), at
-// difficulty 0 … 4; among only a few truffles, fewer look-alikes than a
-// round of nine would have.
-const MAX_TRUFFLES = 100;
+// The endless hunt: level n's n truffles, at difficulty 0 … 4; among only a
+// few truffles, fewer look-alikes than a round of nine would have.
 function endless(level: number, difficulty: number): Spec {
-  const field = look(difficulty / 4, Math.min(level, MAX_TRUFFLES));
+  const field = look(difficulty / 4, level);
   return { ...field, decoys: Math.round((field.decoys * Math.min(field.count, 9)) / 9) };
 }
 

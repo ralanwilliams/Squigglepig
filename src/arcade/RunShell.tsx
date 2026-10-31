@@ -56,30 +56,56 @@ import type { Game } from './games';
 // the app is in the background — the timer goes by the wall clock.
 //
 // A game with an endless hunt of its own (Game.endless: Truffle Hunter) can
-// be switched to it from any round, with Change to Endless Hunt on the pot
-// ladder slider (FieldFrame.tsx). The run just ends, pot and all, and the
+// be switched to it from any round, with Change to Endless Hunt beside Leave
+// (FieldFrame.tsx). The run just ends, pot and all, and the
 // hunt starts at level 1, at the difficulty nearest the round's. A level has
 // no clock: it's cleared when it's won, cheered, and after HOLD_MS the next
 // fades in, one level up. Changing the difficulty deals the level again at
 // once. Back to <game> starts a run of it from round 1, and Leave leaves.
 // None of the hunt is saved either.
 //
+// A grown-up can set how long it may be played (its play time, from when
+// it's chosen), so the game is what stops, not them: when it's up, "This
+// piggy needs a rest!" comes up over the field, no more taps, and REST_MS
+// later the game ends (as Leave). If it was locked when the time ran out,
+// that's remembered (until the app is closed: STILL_RESTING), so a child
+// can't just start it again: going back into the game finds it locked,
+// saying "The piggy is still resting", and unlocking starts the hunt afresh
+// from level 1, with no play time. The time goes by the wall clock, so it
+// runs on while the app is in the background.
+//
 // Its padlock locks the screen for a child: only the game's field takes a
-// tap. The meter, Leave and the dark-mode toggle go, the back button and the
-// back swipe do nothing, and on Android the app asks to be pinned
-// (src/lib/screenPin.ts: Android asks the person first). An iPhone can't be
-// pinned by an app, so the first lock suggests Guided Access, once a launch,
-// unless it's on. Holding the padlock for 3 s unlocks (Padlock.tsx).
+// tap. The meter and play time, Leave and the dark-mode toggle go, the back
+// button and the back swipe do nothing, and on Android the app asks to be
+// pinned (src/lib/screenPin.ts: Android asks the person first). An iPhone
+// can't be pinned by an app, so the first lock suggests Guided Access, once a
+// launch, unless it's on. Holding the padlock for 3 s unlocks (Padlock.tsx).
 const HOLD_MS = 1800; // a won round with no choice stays up this long (the slider's pig climbs a step in it)
 const FADE_MS = 300; // then it fades out, and the next round in
+const REST_MS = 5000; // the piggy's rest stays up this long, then the game ends
 const NATIVE = Platform.OS !== 'web';
 
 // The endless hunt in play: the level, the difficulty, which deal of them
 // this is (a new one each level and each change of difficulty, so the round
-// starts afresh), and once it's won, when.
-type Hunt = { level: number; difficulty: number; deal: number; cleared?: number };
+// starts afresh), and once it's won, when. With a play time: its minutes,
+// when it's up, and once it is, when and whether it was locked then. Back in
+// a game whose rest began locked, it's still resting.
+type Hunt = {
+  level: number;
+  difficulty: number;
+  deal: number;
+  cleared?: number;
+  playTime?: number;
+  restAt?: number;
+  rested?: number;
+  restLocked?: boolean;
+  stillResting?: boolean;
+};
 const GUIDED_ACCESS_TIP = 'To lock the whole phone too, triple-click the side button for Guided Access (Settings › Accessibility).';
 let guidedTipShown = false; // once a launch
+// The games whose hunt's play time ran out while locked, each with its
+// difficulty (kept for the fresh hunt on unlocking): until the app's closed.
+const STILL_RESTING = new Map<string, number>();
 
 export function RunShell({ game }: { game: Game<any> }) {
   const [run, dispatch] = useReducer(runReducer, START);
@@ -102,9 +128,13 @@ export function RunShell({ game }: { game: Game<any> }) {
     []
   );
 
-  // The endless hunt, when it's on (it covers the run, which waits at its intro).
-  const [hunt, setHunt] = useState<Hunt | null>(null);
-  const [locked, setLocked] = useState(false);
+  // The endless hunt, when it's on (it covers the run, which waits at its
+  // intro). Still resting, the game opens on it, locked.
+  const [hunt, setHunt] = useState<Hunt | null>(() => {
+    const difficulty = STILL_RESTING.get(game.id);
+    return difficulty === undefined ? null : { level: 1, difficulty, deal: 1, rested: Date.now(), restLocked: true, stillResting: true };
+  });
+  const [locked, setLocked] = useState(() => STILL_RESTING.has(game.id));
   const navigation = useNavigation();
   const huntSpec = useMemo(
     () => (hunt && game.endless ? game.endless(hunt.level, hunt.difficulty) : null),
@@ -150,7 +180,7 @@ export function RunShell({ game }: { game: Game<any> }) {
   const cleared = hunt?.cleared;
   useEffect(() => {
     if (!cleared) return;
-    const next = () => setHunt((h) => h && { level: h.level + 1, difficulty: h.difficulty, deal: h.deal + 1 });
+    const next = () => setHunt((h) => (h && !h.rested ? { ...h, level: h.level + 1, deal: h.deal + 1, cleared: undefined } : h));
     const timer = setTimeout(() => {
       if (reduced) return next();
       Animated.timing(fade, { toValue: 0, duration: FADE_MS, useNativeDriver: NATIVE }).start(({ finished }) => {
@@ -161,6 +191,40 @@ export function RunShell({ game }: { game: Game<any> }) {
     }, HOLD_MS);
     return () => clearTimeout(timer);
   }, [cleared]);
+
+  // The play time: checked each second against the wall clock (a long
+  // timer would wait out the app's time in the background). When it's up the
+  // piggy rests, and REST_MS later the game ends; if it was locked then, the
+  // piggy is still resting when the game's opened again, until it's unlocked.
+  const restAt = hunt?.restAt;
+  const lockedNow = useRef(locked);
+  lockedNow.current = locked;
+  useEffect(() => {
+    if (!restAt) return;
+    const check = () => {
+      if (Date.now() < restAt) return;
+      setHunt((h) => (h && h.restAt === restAt && !h.rested ? { ...h, rested: Date.now(), restLocked: lockedNow.current } : h));
+    };
+    const timer = setInterval(check, 1000);
+    check();
+    return () => clearInterval(timer);
+  }, [restAt]);
+  const rested = hunt?.rested;
+  useEffect(() => {
+    if (!rested || hunt?.stillResting) return;
+    const timer = setTimeout(() => {
+      if (hunt?.restLocked) STILL_RESTING.set(game.id, hunt.difficulty);
+      setLocked(false);
+      done();
+    }, REST_MS);
+    return () => clearTimeout(timer);
+  }, [rested]);
+  // Unlocked: once the piggy's rest began locked, the hunt starts afresh.
+  const unlock = () => {
+    setLocked(false);
+    STILL_RESTING.delete(game.id);
+    setHunt((h) => (h?.rested && h.restLocked ? { level: 1, difficulty: h.difficulty, deal: h.deal + 1 } : h));
+  };
 
   // Locked: no dark-mode toggle, no back button or back swipe, and on
   // Android the app pinned; all of it undone on unlocking or leaving.
@@ -207,15 +271,20 @@ export function RunShell({ game }: { game: Game<any> }) {
     const endless: Endless = {
       level: hunt.level,
       difficulty: hunt.difficulty,
-      setDifficulty: (d) => setHunt((h) => h && { level: h.level, difficulty: d, deal: h.deal + 1 }),
+      setDifficulty: (d) => setHunt((h) => h && { ...h, difficulty: d, deal: h.deal + 1, cleared: undefined }),
+      playTime: hunt.playTime ?? 0,
+      setPlayTime: (minutes) =>
+        setHunt((h) => h && { ...h, playTime: minutes || undefined, restAt: minutes ? deadlineIn(minutes * 60) : undefined }),
+      restAt: hunt.restAt,
+      rest: hunt.stillResting ? 'still' : hunt.rested ? 'up' : undefined,
       back: backToRun,
       game: game.label,
       locked,
       lock,
-      unlock: () => setLocked(false),
+      unlock,
     };
     const won = (ok: boolean) => {
-      if (ok) setHunt((h) => (h && !h.cleared ? { ...h, cleared: Date.now() } : h));
+      if (ok) setHunt((h) => (h && !h.cleared && !h.rested ? { ...h, cleared: Date.now() } : h));
     };
     return (
       <RoundCtx.Provider
@@ -237,6 +306,7 @@ export function RunShell({ game }: { game: Game<any> }) {
             onResult={won}
             Frame={FieldFrame}
             ended={hunt.cleared ? { won: true, at: hunt.cleared } : undefined}
+            held={!!hunt.rested}
           />
         </Animated.View>
       </RoundCtx.Provider>

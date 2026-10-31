@@ -247,11 +247,12 @@ function twig(x: number, y: number, len: number, rot: number, rand: Rand) {
 // `gap`; gives up on any it can't fit.
 function place(n: number, rr: number, box: Box, taken: Spot[], gap: number, rand: Rand): Spot[] {
   const out: Spot[] = [];
-  for (let tries = 0; out.length < n && tries < 5000; tries++) {
+  for (let tries = 0; out.length < n && tries < Math.max(5000, 50 * n); tries++) {
     const r = rr * (0.8 + 0.4 * rand());
     const x = box.x0 + r + 6 + rand() * Math.max(0, box.x1 - box.x0 - 2 * r - 12);
     const y = box.y0 + r + 6 + rand() * Math.max(0, box.y1 - box.y0 - 2 * r - 12);
-    if ([...taken, ...out].some((t) => Math.hypot(t.x - x, t.y - y) < t.r + r + gap)) continue;
+    const near = (t: Spot) => Math.hypot(t.x - x, t.y - y) < t.r + r + gap;
+    if (taken.some(near) || out.some(near)) continue;
     out.push({ x, y, r });
   }
   return out;
@@ -297,10 +298,17 @@ export function makeField(w: number, h: number, box: Box, look: Look, s: number)
 
   // A crowded field (the endless hunt's later levels) draws them smaller and
   // closer together, to fit; a round's few are never crowded enough for this.
+  // All of them are placed (the hunt's level n is n truffles): one that
+  // doesn't fit them all is laid again a little smaller and closer.
   const room = Math.sqrt(((box.x1 - box.x0) * (box.y1 - box.y0)) / Math.max(1, look.count));
-  const r = Math.min(look.r * s, room * 0.3);
-  const gap = Math.min(18 * s, room * 0.22);
-  const spots = place(look.count, r, box, [], gap, rand);
+  let r = Math.min(look.r * s, room * 0.27);
+  let gap = Math.min(18 * s, room * 0.2);
+  let spots = place(look.count, r, box, [], gap, rand);
+  for (let shrink = 0; spots.length < look.count && shrink < 20; shrink++) {
+    r *= 0.9;
+    gap *= 0.9;
+    spots = place(look.count, r, box, [], gap, rand);
+  }
   const decoys = place(look.decoys, r * 1.05, box, spots, Math.min(10 * s, gap), rand);
 
   for (let i = 0; i < (3 + 6 * e) * A; i++) {

@@ -32,11 +32,19 @@ export type RoundCtxValue = {
 };
 
 // The endless hunt (RunShell.tsx): no clock and no prizes, the level in
-// place of the clock, the difficulty in place of the slider, and the lock.
+// place of the clock, the difficulty and play time in place of the slider,
+// and the lock.
 export type Endless = {
   level: number;
   difficulty: number; // DifficultyMeter.tsx DIFFICULTIES
   setDifficulty: (d: number) => void; // deals the level again
+  playTime: number; // minutes, 0 for no limit (FieldFrame.tsx PLAY_TIMES)
+  setPlayTime: (minutes: number) => void; // counted from now
+  restAt?: number; // when the play time is up (epoch ms)
+  // Once it's up, the piggy's rest: 'up', and then the game ends. If it was
+  // locked then, going back into the game finds it 'still' (resting), locked,
+  // until it's unlocked.
+  rest?: 'up' | 'still';
   back: () => void; // to a run of the game, from round 1
   game: string; // its name, for the way back
   locked: boolean;
