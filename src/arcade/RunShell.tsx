@@ -12,11 +12,12 @@ import { hideThemeToggle } from '../components/ThemeToggle';
 import { guidedAccessOn, pinScreen, unpinScreen } from '../lib/screenPin';
 import { useUi } from '../theme/responsive';
 import { useReducedMotion, useTheme } from '../theme/theme';
-import { LADDER, ROUNDS, RULES, START, newTier, prizeFor, roundSeconds, runReducer } from './engine';
+import { LADDER, LIVES, ROUNDS, RULES, START, newTier, prizeFor, roundSeconds, runReducer } from './engine';
 import { PotLadder } from './PotLadder';
 import { RewardPodium } from './RewardPodium';
 import { PayoutScreen } from './PayoutScreen';
 import { FieldFrame } from './FieldFrame';
+import { Lives } from './Lives';
 import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, useCardIn, useStageCardLook } from './RoundCard';
 import { COUNT_IN_MS, useStarted } from './RoundCountdown';
 import { RoundCtx, type Endless, type Settled } from './RoundCtx';
@@ -39,9 +40,13 @@ import type { Game } from './games';
 //             pot. Any other win has nothing new to bank: the screen stays
 //             up for HOLD_MS (the slider's pig climbs a step), fades out,
 //             and the next round fades in
-//   lost    — wrong, or out of time: the round's screen stays up the same
-//             way, showing what was missed (the right answer, the drawing
-//             scored), and the news comes up over it on the same card: the
+//   missed  — wrong, or out of time, with a life in reserve (engine.ts
+//             LIVES), used up: the round's screen stays up the same way,
+//             showing what was missed, with the news on the same card and a
+//             heart beside the clock emptied (Lives.tsx), for MISSED_MS;
+//             then it fades out and the round starts again (a fresh puzzle,
+//             if the game has Game.replay)
+//   lost    — the same with no lives left: the news on the card is that the
 //             pot is gone; Play again, or Done. So the player only leaves
 //             the round when the run ends
 //   payout  — choose the prize (PayoutScreen.tsx)
@@ -83,6 +88,7 @@ import type { Game } from './games';
 const HOLD_MS = 1800; // a won round with no choice stays up this long (the slider's pig climbs a step in it)
 const FADE_MS = 300; // then it fades out, and the next round in
 const REST_MS = 5000; // the piggy's rest stays up this long, then the game ends
+const MISSED_MS = LOST_CARD_DELAY_MS + 2400; // a life used: the news stays up this long, then the round again
 const NATIVE = Platform.OS !== 'web';
 
 // The endless hunt in play: the level, the difficulty, which deal of them
@@ -266,6 +272,39 @@ export function RunShell({ game }: { game: Game<any> }) {
     return () => clearTimeout(timer);
   }, [autoNext]);
 
+  // A life used: after the news, the round fades out and starts again. A
+  // game with a fresh puzzle for it (Game.replay) starts getting it at once,
+  // and it's put in the round's place as the round starts; one that fails
+  // to come leaves the same puzzle.
+  const missed = run.phase === 'missed' ? run.at : 0;
+  useEffect(() => {
+    if (!missed || run.phase !== 'missed' || !specs) return;
+    const round = run.round;
+    const same = specs[round - 1];
+    const fresh = Promise.resolve()
+      .then(() => (game.replay ? game.replay(round, specs) : same))
+      .catch(() => same);
+    let gone = false;
+    const retry = (spec: unknown) => {
+      setSpecs((all) => all && all.map((s, i) => (i === round - 1 ? spec : s)));
+      dispatch({ type: 'retry', until: deadline(round) });
+    };
+    const timer = setTimeout(async () => {
+      const spec = await fresh;
+      if (gone || !live.current) return;
+      if (reduced) return retry(spec);
+      Animated.timing(fade, { toValue: 0, duration: FADE_MS, useNativeDriver: NATIVE }).start(({ finished }) => {
+        if (!finished || !live.current) return;
+        retry(spec);
+        Animated.timing(fade, { toValue: 1, duration: FADE_MS, useNativeDriver: NATIVE }).start();
+      });
+    }, MISSED_MS);
+    return () => {
+      gone = true;
+      clearTimeout(timer);
+    };
+  }, [missed]);
+
   if (hunt && huntSpec) {
     const Round = game.Round;
     const endless: Endless = {
@@ -332,10 +371,11 @@ export function RunShell({ game }: { game: Game<any> }) {
 
   // A round, and once it's over the same round left up (same key, so the
   // game keeps its state: what was picked, the score) with the choice or
-  // the news added.
-  if ((run.phase === 'round' || run.phase === 'between' || run.phase === 'lost') && specs) {
+  // the news added. Played again on a life, it's a new key: a fresh
+  // start.
+  if ((run.phase === 'round' || run.phase === 'between' || run.phase === 'missed' || run.phase === 'lost') && specs) {
     const Round = game.Round;
-    const round = run.phase === 'round' ? run.round : run.phase === 'between' ? run.won : run.won + 1;
+    const round = run.phase === 'round' || run.phase === 'missed' ? run.round : run.phase === 'between' ? run.won : run.won + 1;
     const finish = (won: boolean, detail?: string, timedOut?: boolean) =>
       dispatch({ type: 'result', won, detail, timeout: timedOut, at: Date.now() });
     let settled: Settled | undefined;
@@ -353,8 +393,26 @@ export function RunShell({ game }: { game: Game<any> }) {
             ],
           }
         : { at: run.at, lost: false, lines: [], actions: [] };
+    } else if (run.phase === 'missed') {
+      const lives = run.lives ? `${run.lives} ${run.lives === 1 ? 'life' : 'lives'}` : 'No lives';
+      settled = {
+        at: run.at,
+        lost: true,
+        again: true,
+        title: run.timeout ? 'Out of time!' : 'Not quite!',
+        lines: [
+          ...(run.detail ? [run.detail] : []),
+          `You used a life. ${lives} left. ${game.replay ? `Here's a new round ${round}.` : `Round ${round} starts again.`}`,
+        ],
+        actions: [],
+      };
     } else if (run.phase === 'lost') {
-      settled = { at: run.at, lost: true, ...lostNews(run), actions: [{ name: 'Play again', onPress: again }, { name: 'Done', onPress: done }] };
+      settled = {
+        at: run.at,
+        lost: true,
+        ...lostNews(run),
+        actions: [{ name: 'Play again', onPress: again }, { name: 'Done', onPress: done }],
+      };
     }
     return (
       <RoundCtx.Provider
@@ -366,17 +424,18 @@ export function RunShell({ game }: { game: Game<any> }) {
           expire: () => dispatch({ type: 'result', won: false, timeout: true, at: Date.now() }),
           leave: done,
           settled,
+          lives: { left: run.lives, of: LIVES },
           toEndless: game.endless && game.fullScreen ? toEndless(round) : undefined,
         }}
       >
         <Animated.View style={{ flex: 1, opacity: fade }}>
           <Round
-            key={round}
+            key={`${round}.${run.attempt}`}
             spec={specs[round - 1]}
             round={round}
             onResult={finish}
             Frame={game.fullScreen ? FieldFrame : RoundFrame}
-            ended={settled ? { won: !settled.lost, at: settled.at } : undefined}
+            ended={settled ? { won: !settled.lost, at: settled.at, again: settled.again } : undefined}
             held={!started}
           />
         </Animated.View>
@@ -388,13 +447,15 @@ export function RunShell({ game }: { game: Game<any> }) {
   return null;
 }
 
-// What a lost run says: wrong or out of time, why, and what went with it.
+// What a lost run says: wrong or out of time, why, and what went with it
+// (it was lost with no lives left).
 function lostNews(run: { won: number; timeout: boolean; detail?: string }) {
   const lostPrize = LADDER.find((s) => s.prize === prizeFor(run.won));
   return {
     title: run.timeout ? 'Out of time!' : 'Not quite!',
     lines: [
       ...(run.detail ? [run.detail] : []),
+      'No lives left.',
       lostPrize ? `The ${lostPrize.label.toLowerCase()} prize in the pot is gone.` : `You won ${run.won} of ${ROUNDS}.`,
     ],
   };
@@ -422,8 +483,19 @@ function RoundFrame({
   stoppedAt?: number;
 }) {
   const ctx = useContext(RoundCtx);
+  const ui = useUi();
+  const t = useTheme();
   if (!ctx) throw new Error('RoundFrame is drawn by RunShell');
   const { settled } = ctx;
+  const clock = (
+    <Countdown
+      seconds={ctx.seconds}
+      until={ctx.until}
+      onExpire={onExpire ?? ctx.expire}
+      size={32}
+      stoppedAt={stoppedAt ?? settled?.at}
+    />
+  );
   return (
     <View style={styles.fill}>
       <Stage
@@ -431,20 +503,21 @@ function RoundFrame({
         fitFocus={fitFocus}
         actions={
           <>
-            <Countdown
-              seconds={ctx.seconds}
-              until={ctx.until}
-              onExpire={onExpire ?? ctx.expire}
-              size={32}
-              stoppedAt={stoppedAt ?? settled?.at}
-            />
+            {ctx.lives ? (
+              <View style={[styles.clockRow, { gap: ui.sp(10) }]}>
+                {clock}
+                <Lives left={ctx.lives.left} of={ctx.lives.of} line={t.textMuted} size={24} />
+              </View>
+            ) : (
+              clock
+            )}
             {controls}
             <PotLadder won={settled && !settled.lost ? ctx.round : ctx.round - 1} />
             <TextLink label="Leave" onPress={ctx.leave} />
           </>
         }
       />
-      {settled && settled.actions.length ? <Choice settled={settled} /> : null}
+      {settled && (settled.lost || settled.actions.length) ? <Choice settled={settled} /> : null}
     </View>
   );
 }
@@ -482,4 +555,5 @@ function Choice({ settled }: { settled: Settled }) {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   center: { alignItems: 'center' },
+  clockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 });

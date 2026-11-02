@@ -9,6 +9,7 @@ import { PotLadder } from './PotLadder';
 import { DifficultyMeter } from './DifficultyMeter';
 import { Padlock } from './Padlock';
 import { ChoiceRow, type Choice } from './ChoiceRow';
+import { Lives } from './Lives';
 import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, useFieldCardLook } from './RoundCard';
 import { RoundCountdown, useStarted } from './RoundCountdown';
 import { RoundCtx } from './RoundCtx';
@@ -17,7 +18,8 @@ import type { Frame } from './games';
 // What a full-screen game's round is drawn into (Game.fullScreen), in place
 // of RunShell's RoundFrame on Stage. The game's `focus` fills the whole
 // screen, edge to edge and under the system bars; the run's parts float over
-// it as quiet chips (fieldColors.ts): the clock top left, the pot ladder
+// it as quiet chips (fieldColors.ts): the clock top left (with the run's
+// lives beside it: Lives.tsx), the pot ladder
 // slider top centre (in portrait, under the clock), the game's `controls`
 // bottom left and Leave bottom right. There's no title; the slider says
 // where the run is, as on every arcade screen.
@@ -162,6 +164,7 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
         stoppedAt={stoppedAt ?? settled?.at ?? (started ? undefined : ctx.startsAt)}
         colors={{ text: fc.text, urgent: fc.urgent }}
       />
+      {ctx.lives ? <Lives left={ctx.lives.left} of={ctx.lives.of} line={fc.muted} /> : null}
     </View>
   );
   const ladderChip = [chip, styles.ladder, { borderRadius: ui.sp(14), paddingTop: ui.sp(4), paddingBottom: ui.sp(3) }, wide && { width: ui.sp(290) }];

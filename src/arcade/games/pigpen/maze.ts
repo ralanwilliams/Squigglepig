@@ -78,6 +78,65 @@ export function corridor(m: Maze, from: Cell, dir: Dir, goal: Cell): Cell[] {
   return out;
 }
 
+// The same maze turned on its side (the top-left cell stays put), for a
+// field wider than it's tall.
+export function transpose(m: Maze): Maze {
+  const flip = (g: boolean[][]) => Array.from({ length: m.cols }, (_, y) => Array.from({ length: m.rows }, (_, x) => g[x][y]));
+  return { cols: m.rows, rows: m.cols, e: flip(m.s), s: flip(m.e) };
+}
+
+// How long players take from the gate (the top-left cell) to each cell, in
+// seconds, the pig trotting a cell in `step` s. A steady player swipes once
+// the pig has stopped, taking a moment at each stop, and now and then tries
+// a wrong way first, turning the pig round (index.tsx) once they see it, or
+// at the corridor's end if that comes first; `waiting` is the same player
+// making no wrong turns. A
+// player who plays ahead swipes the next turn while the pig still trots, so
+// a stop costs nothing unless the run to it was too short to swipe in, and
+// takes no wrong turns. Pigpen places its baskets by these (index.tsx).
+export const PLAYER = {
+  look: 1.5, // finding the basket and the way there, before the first swipe
+  stop: 0.6, // seeing where the pig has stopped, and swiping on
+  wrong: 0.2, // the chance, at a branch, of trying a wrong way first
+  notice: 0.7, // how long into a wrong way before turning the pig round
+  swipe: 0.4, // the quickest a player swipes again, playing ahead
+};
+export type Pace = { cell: Cell; steady: number; waiting: number; ahead: number };
+
+export function paces(m: Maze, step: number): Pace[] {
+  const out: Pace[] = [];
+  // The cell reached, the one before it, the times up to the last stop, and
+  // the cells trotted since.
+  type At = { c: Cell; from: Cell | null; steady: number; waiting: number; ahead: number; run: number };
+  const todo: At[] = [{ c: [0, 0], from: null, steady: 0, waiting: 0, ahead: 0, run: 0 }];
+  while (todo.length) {
+    const { c, from, steady, waiting, ahead, run } = todo.pop()!;
+    const t = run * step;
+    if (from) out.push({ cell: c, steady: steady + t, waiting: waiting + t, ahead: ahead + Math.max(t, PLAYER.swipe) });
+    const on = exits(m, c).filter(([dx, dy]) => !from || !same([c[0] + dx, c[1] + dy], from));
+    const next = (d: Dir): Cell => [c[0] + d[0], c[1] + d[1]];
+    if (from && on.length === 1) {
+      todo.push({ c: next(on[0]), from: c, steady, waiting, ahead, run: run + 1 });
+      continue;
+    }
+    // A stop (corridor's): the run to it, then a swipe on. A steady player
+    // tries each wrong way as often as `wrong`, there and back: turned round
+    // part way, or from the end after a stop there, then a swipe on again.
+    const think = from ? PLAYER.stop : PLAYER.look;
+    const ahead0 = ahead + (from ? Math.max(t, PLAYER.swipe) : PLAYER.look);
+    const back = (o: Dir) => {
+      const out = corridor(m, c, o, [-1, -1]).length * step;
+      return out < PLAYER.notice ? 2 * out + 2 * PLAYER.stop : 2 * PLAYER.notice + PLAYER.stop;
+    };
+    for (const d of on) {
+      const others = on.filter((o) => o !== d);
+      const astray = others.length ? (PLAYER.wrong * others.reduce((sum, o) => sum + back(o), 0)) / others.length : 0;
+      todo.push({ c: next(d), from: c, steady: steady + t + think + astray, waiting: waiting + t + think, ahead: ahead0, run: 1 });
+    }
+  }
+  return out;
+}
+
 // The way from `from` to `to` (breadth first), not counting `from`.
 export function route(m: Maze, from: Cell, to: Cell): Cell[] {
   const key = ([x, y]: Cell) => y * m.cols + x;

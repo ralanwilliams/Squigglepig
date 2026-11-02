@@ -1,22 +1,21 @@
 import React from 'react';
 import Svg, { Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { rng } from '../../rng';
+import { layout, type Box, type Layout, type Look, type Pile, type Spot } from './layout';
 
 // The forest floor, made up fresh for each round from its seed: soil, leaf
-// litter, twigs, pebbles and moss, the truffles, and from round 5 smooth dark
-// stones that pass for one at a glance. Nothing is authored. Sizes are in dp
-// times the UI scale, so a truffle is the same size on any phone and a bigger
-// field just has more floor; the clutter grows with the field's area.
+// litter, twigs, pebbles and moss, the truffles, from round 5 smooth dark
+// stones that pass for one at a glance, and piles of leaves, some over a
+// truffle (where things lie is layout.ts). Nothing is authored. Sizes are in
+// dp times the UI scale, so a truffle is the same size on any phone and a
+// bigger field just has more floor; the clutter grows with the field's area.
 //
-// It comes in layers so the round can animate the truffles on their own: the
-// ground (everything under the truffles), each truffle, and the leaves lying
-// over them (later rounds let those cover a truffle's edge).
+// It comes in layers so the round can animate things on their own: the
+// ground (everything under the truffles), each truffle, the leaves lying over
+// them (later rounds let those cover a truffle's edge), and each pile, which
+// the pig noses apart.
 
-export type Spot = { x: number; y: number; r: number };
-export type Box = { x0: number; y0: number; x1: number; y1: number };
-
-// One round's tuning (index.tsx): `e` runs 0 on round 1 to 1 on the last.
-export type Look = { seed: number; e: number; count: number; r: number; contrast: number; decoys: number };
+export type { Box, Look, Spot };
 
 // A truffle's drawing, centred on 0,0.
 export type TruffleArt = Spot & {
@@ -29,10 +28,14 @@ export type TruffleArt = Spot & {
   light: string;
 };
 
+// A pile of leaves, drawn in an Svg of its own, 2R across, centred on it.
+export type PileArt = Pile & { R: number; art: React.ReactElement };
+
 export type Field = {
   ground: React.ReactElement;
   over: React.ReactElement;
   truffles: TruffleArt[];
+  piles: PileArt[];
 };
 
 // ---- Helpers -----------------------------------------------------------------
@@ -192,28 +195,34 @@ const SPECIES: { shape: Shape; colors: [string, string][]; big?: boolean }[] = [
   { shape: pinnate((t) => 0.6 * Math.pow(Math.sin(Math.PI * t), 0.95), () => 1, [0.2, 0.38, 0.56, 0.74]), colors: [['#4f7a2a', '#b51d2a'], ['#6b8a2a', '#c8361c']] },
 ];
 
-// A layer's leaves: its gradients (faded toward the ground as rounds go on)
-// and leaf() to scatter one. Gradient ids carry the layer's prefix, since the
-// ground and the leaves over the truffles are two drawings.
+// A layer's leaves: leaf() to scatter one, and the gradients (faded toward
+// the ground as rounds go on) of those scattered, in `defs`, filled in as
+// they're used. Gradient ids carry the layer's prefix, since the ground, the
+// leaves over the truffles and each pile are drawings of their own. `solid`
+// leaves out the ash's leaflets, which a truffle would show between.
 function leafKit(prefix: string, ground: string, fade: number, rand: Rand) {
   const defs: React.ReactElement[] = [];
-  const picks: { shape: Shape; id: string; vein: string; big?: boolean }[] = [];
+  const picks: { shape: Shape; id: string; a: string; b: string; vein: string; big?: boolean }[] = [];
   SPECIES.forEach((sp, i) =>
     sp.colors.forEach((c, j) => {
-      const id = `${prefix}${i}_${j}`;
       const a = mix(c[0], ground, fade);
       const b = mix(c[1], ground, fade);
-      defs.push(
-        <LinearGradient key={id} id={id} x1="0" y1="1" x2="0" y2="0">
-          <Stop offset="0" stopColor={a} />
-          <Stop offset="1" stopColor={b} />
-        </LinearGradient>
-      );
-      picks.push({ shape: sp.shape, id, vein: mix(mix(a, b, 0.5), '#2a0f05', 0.55), big: sp.big });
+      picks.push({ shape: sp.shape, id: `${prefix}${i}_${j}`, a, b, vein: mix(mix(a, b, 0.5), '#2a0f05', 0.55), big: sp.big });
     })
   );
-  const leaf = (key: number, x: number, y: number, L: number, rot: number) => {
-    const p = picks[Math.floor(rand() * picks.length)];
+  const used = new Set<string>();
+  const leaf = (key: number, x: number, y: number, L: number, rot: number, solid = false) => {
+    const from = solid ? picks.filter((q) => !q.big) : picks;
+    const p = from[Math.floor(rand() * from.length)];
+    if (!used.has(p.id)) {
+      used.add(p.id);
+      defs.push(
+        <LinearGradient key={p.id} id={p.id} x1="0" y1="1" x2="0" y2="0">
+          <Stop offset="0" stopColor={p.a} />
+          <Stop offset="1" stopColor={p.b} />
+        </LinearGradient>
+      );
+    }
     const k = p.big ? L * 1.2 : L;
     const flip = rand() < 0.5 ? -1 : 1;
     return (
@@ -243,19 +252,25 @@ function twig(x: number, y: number, len: number, rot: number, rand: Rand) {
   );
 }
 
-// Places `n` things of radius about `rr` in the box, clear of `taken` by
-// `gap`; gives up on any it can't fit.
-function place(n: number, rr: number, box: Box, taken: Spot[], gap: number, rand: Rand): Spot[] {
-  const out: Spot[] = [];
-  for (let tries = 0; out.length < n && tries < Math.max(5000, 50 * n); tries++) {
-    const r = rr * (0.8 + 0.4 * rand());
-    const x = box.x0 + r + 6 + rand() * Math.max(0, box.x1 - box.x0 - 2 * r - 12);
-    const y = box.y0 + r + 6 + rand() * Math.max(0, box.y1 - box.y0 - 2 * r - 12);
-    const near = (t: Spot) => Math.hypot(t.x - x, t.y - y) < t.r + r + gap;
-    if (taken.some(near) || out.some(near)) continue;
-    out.push({ x, y, r });
+// A pile of leaves over `p`: a few broad leaves heaped on its shadow, the
+// middle well covered.
+function pileArt(p: Pile, i: number, seed: number, soil: string, fade: number, rand: Rand): PileArt {
+  const R = p.r * 1.3;
+  const kit = leafKit(`p${seed}_${i}_`, soil, fade, rand);
+  const leaves: React.ReactElement[] = [];
+  for (let k = 0; k < 5; k++) {
+    const a = rand() * 6.28;
+    const d = k ? p.r * (0.25 + 0.2 * rand()) : 0;
+    leaves.push(kit.leaf(k, Math.cos(a) * d, Math.sin(a) * d * 0.8, p.r * (0.7 + 0.2 * rand()), rand() * 360, true));
   }
-  return out;
+  const art = (
+    <Svg width={2 * R} height={2 * R} viewBox={`${f1(-R)} ${f1(-R)} ${f1(2 * R)} ${f1(2 * R)}`}>
+      <Defs>{kit.defs}</Defs>
+      <Ellipse cx={p.r * 0.08} cy={p.r * 0.22} rx={p.r * 0.95} ry={p.r * 0.7} fill="#000000" opacity={0.25} />
+      {leaves}
+    </Svg>
+  );
+  return { ...p, R, art };
 }
 
 const LEAF_UNDER = (e: number) => 8 + 34 * e;
@@ -263,7 +278,9 @@ const LEAF_OVER = (e: number) => 2 + 14 * e;
 
 // The field for a w × h screen, truffles inside `box`. `s` is the UI scale.
 export function makeField(w: number, h: number, box: Box, look: Look, s: number): Field {
-  const rand = rng(look.seed);
+  const lay: Layout = layout(box, look, s);
+  const spots = lay.truffles;
+  const rand = rng(look.seed + 1); // the drawing's own, so where things lie doesn't hang on it
   const { e } = look;
   const A = (w * h) / (411 * 306); // how many of the reference field fit
   const soil = mix('#8c6a47', '#5c432c', e);
@@ -295,21 +312,6 @@ export function makeField(w: number, h: number, box: Box, look: Look, s: number)
     else lt += p;
   }
   ground.push(<Path key="dk" d={dk} fill={mix(soil, '#1f140c', 0.55)} />, <Path key="lt" d={lt} fill={mix(soil, '#d2b08a', 0.45)} />);
-
-  // A crowded field (the endless hunt's later levels) draws them smaller and
-  // closer together, to fit; a round's few are never crowded enough for this.
-  // All of them are placed (the hunt's level n is n truffles): one that
-  // doesn't fit them all is laid again a little smaller and closer.
-  const room = Math.sqrt(((box.x1 - box.x0) * (box.y1 - box.y0)) / Math.max(1, look.count));
-  let r = Math.min(look.r * s, room * 0.27);
-  let gap = Math.min(18 * s, room * 0.2);
-  let spots = place(look.count, r, box, [], gap, rand);
-  for (let shrink = 0; spots.length < look.count && shrink < 20; shrink++) {
-    r *= 0.9;
-    gap *= 0.9;
-    spots = place(look.count, r, box, [], gap, rand);
-  }
-  const decoys = place(look.decoys, r * 1.05, box, spots, Math.min(10 * s, gap), rand);
 
   for (let i = 0; i < (3 + 6 * e) * A; i++) {
     const mx = rand() * w;
@@ -344,7 +346,7 @@ export function makeField(w: number, h: number, box: Box, look: Look, s: number)
     );
   }
   // The look-alikes: about truffle-sized and as dark, but smooth and glossy.
-  for (const d of decoys) {
+  for (const d of lay.decoys) {
     const col = mix(soil, '#37302b', look.contrast);
     ground.push(
       <G key={key++} transform={`translate(${f1(d.x)} ${f1(d.y)}) rotate(${f1(rand() * 180)})`}>
@@ -377,7 +379,7 @@ export function makeField(w: number, h: number, box: Box, look: Look, s: number)
   });
 
   // Leaves on top: early rounds keep clear of every truffle, later ones lie
-  // over their edges (never the middle).
+  // over their edges (never the middle). None on a pile, which has its own.
   const top = leafKit(`o${look.seed}_`, soil, 0.15 + 0.3 * e, rand);
   const over: React.ReactElement[] = [];
   const want = Math.round(LEAF_OVER(e) * A);
@@ -386,8 +388,10 @@ export function makeField(w: number, h: number, box: Box, look: Look, s: number)
     const x = rand() * w;
     const y = rand() * h;
     if (spots.some((t) => Math.hypot(t.x - x, t.y - y) < L + t.r * (e > 0.4 ? 0.45 : 1.3))) continue;
+    if (lay.piles.some((p) => Math.hypot(p.x - x, p.y - y) < L + p.r)) continue;
     over.push(top.leaf(key++, x, y, L, rand() * 360));
   }
+  const piles = lay.piles.map((p, i) => pileArt(p, i, look.seed, soil, 0.15 + 0.3 * e, rand));
 
   return {
     ground: (
@@ -403,6 +407,7 @@ export function makeField(w: number, h: number, box: Box, look: Look, s: number)
       </Svg>
     ),
     truffles,
+    piles,
   };
 }
 

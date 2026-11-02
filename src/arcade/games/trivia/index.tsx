@@ -7,8 +7,8 @@ import { BOARD_INK, PigBoard } from '../../../components/PigBoard';
 import { playSound } from '../../../lib/sound';
 import { SOUNDS } from '../../../assets/assets';
 import type { Game, RoundProps } from '../index';
-import { shuffleAnswers } from './questions';
-import { questionsForRun } from './store';
+import { PLAN, questionKey, shuffleAnswers, type Question } from './questions';
+import { questionFor, questionsForRun } from './store';
 
 // Multiple-choice trivia: a question, four answers, one right. Easy questions
 // first, hard ones last (questions.ts PLAN). The pig holds the question up
@@ -22,12 +22,21 @@ import { questionsForRun } from './store';
 // one is marked the same way. A right answer leaves the question up, with
 // the run's choice over it at a new tier (keep going, or bank it, on a card:
 // RunShell.tsx), else for a moment before the next round; a lost round
-// leaves it up under the news, on the same card.
+// leaves it up under the news, on the same card, and played again on a life
+// (engine.ts LIVES) it's a new question as hard (replay).
 
 type Spec = { text: string; category: string; answers: string[]; correct: number };
 
+const toSpec = (q: Question): Spec => ({ text: q.text, category: q.category, ...shuffleAnswers(q) });
+
 async function makeRun(): Promise<Spec[]> {
-  return (await questionsForRun()).map((q) => ({ text: q.text, category: q.category, ...shuffleAnswers(q) }));
+  return (await questionsForRun()).map(toSpec);
+}
+
+// Round n again on a life: the right answer's been shown, so another
+// question as hard, none already in the run.
+async function replay(round: number, run: Spec[]): Promise<Spec> {
+  return toSpec(await questionFor(PLAN[round - 1], new Set(run.map(questionKey))));
 }
 
 function Round({ spec, onResult, Frame, ended }: RoundProps<Spec>) {
@@ -137,5 +146,6 @@ export const trivia: Game<Spec> = {
   glyph: 'help',
   blurb: 'The further you go, the harder it gets.',
   makeRun,
+  replay,
   Round,
 };
