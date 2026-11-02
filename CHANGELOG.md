@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0]
+
+### Added
+- Play Solo on the home screen: a solo arcade of quick games played in runs of 10 rounds. Win rounds in a row to climb the pig slider — 3 wins earns a common reward, 6 a rare one and all 10 a premium one. When a win reaches a new tier, choose to bank the reward or risk it on the next round; a wrong answer or the clock running out loses it. The start screen shows the rewards on a marble podium, and a finished run lets you pick your prize
+- Trivia: the pig holds each question up on a board. Questions come from the Open Trivia Database and are kept on the phone between runs, with a pack of our own when it can't be reached
+- Draw from memory: a drawing flashes up and hides, then you draw it from memory. The one shown comes back as a ghost over yours to score the match. Later rounds flash the drawing for less time and need a closer match
+- Truffle Hunter: tap every truffle on a forest floor before the clock runs out, and a little pig trots over to snuffle each one up. Later rounds bring more truffles, smaller and harder to spot, with more leaves, twigs and look-alike stones
+- Pigpen: swipe the pig through a freshly made maze, from the gate to the basket of apples, before the clock runs out. The mazes get bigger as the run goes on
+- Truffle Hunter and Pigpen fill the screen, count in with 3, 2, 1, Go! before each round, and turn to night in dark mode
+- Truffle Hunter's endless hunt, for younger players: switched on from any round, with no clock and no prizes. Level 1 hides one truffle, level 2 two, and so on with no end, and a slider sets how well hidden they are, from Easy to Very tricky
+- Play time for the endless hunt: a grown-up can choose 10, 15, 20 or 30 minutes, and the time left shows beside the level. When it's up, "This piggy needs a rest! Thanks for playing!" comes up and the game ends on its own, so the game says when to stop
+- A padlock in the endless hunt locks the screen for a child: only the truffles can be tapped, and Leave, the settings and the back button go away. On Android the app asks to pin itself; on an iPhone it suggests Guided Access. Holding the padlock for 3 seconds unlocks it. If the play time runs out while it's locked, going back in finds the piggy still resting until a grown-up unlocks it
+- Rewards, won by playing solo and never bought: 8 brush colors, 4 sticker packs (Eyes, Mouths, Hats and Characters), 3 themes (Railroad, Paul and Bobby), 6 outfits for your pig (a crown, a top hat, a cowboy hat, a chef's hat, sunglasses and a bow tie) and 5 speech bubbles. They're kept on the phone and listed in the menu under Rewards
+- Colored brushes: once you've won some, pick the ink from the top-left corner of the canvas
+- Stickers: once you've won a pack, stamp its stickers onto your drawing, then move, resize, turn or remove them
+- Your pig: dress your pig in the outfits you've won, plus pieces of the holiday in season and the themes you've won, and give it a speech bubble saying whatever you like. When you win a game, everyone in the room sees your pig on the scoreboard; a tie lines up every winner's pig
+- Themes you've won can be chosen in the menu under Rewards › Themes, beside the switch for seasonal themes
+
+### Changed
+- Drawings can now carry colors and stickers. Players on an older version of the app still see them, in black and without the stickers
+- In dark mode the pigs and the Squigglepig artwork have a light border instead of the teal outline, so they stand out from any background
+- The menu is grouped into Support, Accessibility and Rewards
+- The web version, when added to the home screen, has black status and navigation bars
+
 ## [2.5.0]
 
 ### Added
