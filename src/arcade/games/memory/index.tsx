@@ -25,7 +25,8 @@ import PACK from './pack.json';
 // app/licenses.tsx), chosen and converted by scripts/quickdraw.mts. The pack
 // lists them easiest first; a run takes one from each tenth of it, in order,
 // no subject twice. Later rounds also flash the drawing for less time and
-// need a closer match.
+// need a closer match. A round played again on a life (engine.ts LIVES) is
+// a new drawing from the same tenth (replay).
 
 type Entry = { word: string; strokes: string[] };
 type Spec = Entry & { flashMs: number; pass: number };
@@ -40,19 +41,28 @@ const passMark = (round: number) => Math.round(40 + 20 * ease(round));
 // round, never under 15 (the engine's 23 down to 6 is too short to draw in).
 const seconds = (round: number) => Math.max(15, 32 - 2 * round);
 
-function makeRun(): Spec[] {
+// Round n's drawing: one from its tenth of the pack, of a subject not in `used`.
+function pick(round: number, used: Set<string>): Spec {
   const pack = PACK as Entry[];
   const band = pack.length / ROUNDS;
+  const slice = pack.slice(Math.round((round - 1) * band), Math.round(round * band));
+  const fresh = slice.filter((e) => !used.has(e.word));
+  const pool = fresh.length ? fresh : slice;
+  const entry = pool[Math.floor(Math.random() * pool.length)];
+  return { ...entry, flashMs: flashMs(round), pass: passMark(round) };
+}
+
+function makeRun(): Spec[] {
   const used = new Set<string>();
   return Array.from({ length: ROUNDS }, (_, i) => {
-    const slice = pack.slice(Math.round(i * band), Math.round((i + 1) * band));
-    const fresh = slice.filter((e) => !used.has(e.word));
-    const pool = fresh.length ? fresh : slice;
-    const entry = pool[Math.floor(Math.random() * pool.length)];
-    used.add(entry.word);
-    return { ...entry, flashMs: flashMs(i + 1), pass: passMark(i + 1) };
+    const spec = pick(i + 1, used);
+    used.add(spec.word);
+    return spec;
   });
 }
+
+// Round n again on a life: the drawing's been shown, so another as hard.
+const replay = (round: number, run: Spec[]) => pick(round, new Set(run.map((s) => s.word)));
 
 // What the drawing was: "a cat", "an owl", "an hourglass"; a pair or a
 // bunch as it is ("grapes").
@@ -149,6 +159,7 @@ export const memory: Game<Spec> = {
   glyph: 'brush',
   blurb: 'A drawing flashes up, then hides. Draw it as close as you can.',
   makeRun,
+  replay,
   Round,
   seconds,
 };

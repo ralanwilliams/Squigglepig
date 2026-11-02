@@ -14,12 +14,15 @@ import type { Game, RoundProps } from '../index';
 
 type Spec = { left: number; right: number };
 
+// Round n's pair, the gap between them closing as n grows.
+function pair(round: number): Spec {
+  const gap = Math.max(1, Math.round(40 / round));
+  const low = 10 + Math.floor(Math.random() * (89 - gap));
+  return Math.random() < 0.5 ? { left: low, right: low + gap } : { left: low + gap, right: low };
+}
+
 function makeRun(): Spec[] {
-  return Array.from({ length: ROUNDS }, (_, i) => {
-    const gap = Math.max(1, Math.round(40 / (i + 1)));
-    const low = 10 + Math.floor(Math.random() * (89 - gap));
-    return Math.random() < 0.5 ? { left: low, right: low + gap } : { left: low + gap, right: low };
-  });
+  return Array.from({ length: ROUNDS }, (_, i) => pair(i + 1));
 }
 
 function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
@@ -71,6 +74,7 @@ export const bigger: Game<Spec> = {
   glyph: 'code',
   blurb: 'Tap the bigger number. They get closer every round.',
   makeRun,
+  replay: pair, // the answer's been shown: a new pair, as close
   Round,
   dev: true,
 };

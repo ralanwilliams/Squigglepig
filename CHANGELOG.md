@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0]
+
+### Added
+- Lives in every solo game: each run starts with 2 spare lives, shown as hearts beside the clock. Lose a round — a wrong answer, a drawing that doesn't match closely enough, or the clock running out — and you use a life to play it again. Trivia and Draw from memory give you a new question or drawing just as hard; Pigpen and Truffle Hunter give you the same maze or field again, with the answer kept hidden. Lose a round with no lives left and the reward is gone
+- Truffle Hunter: in later rounds some truffles hide under piles of leaves, among empty piles that look just the same. A pile with a truffle under it gives off wisps of scent, quicker and brighter the nearer the pig is. Tap a pile to send the pig nosing through it: a truffle there counts as found straight away, but an empty one is a wasted trip. At the trickier settings of the endless hunt, some truffles hide under piles too
+- Pigpen: swipe back the way the pig is going to turn it around mid-step and undo a wrong turn
+
+### Changed
+- Pigpen: the basket of apples can be anywhere in the pen, not always the far corner. Each round has 15 seconds, and the rounds get harder in even steps, with bigger mazes and a quicker pig. By the last rounds you'll need to swipe your next turn while the pig is still trotting, and the hint says so
+- Pigpen's mazes are the same size on every phone, so a round is just as hard on any screen; on a phone turned on its side, the maze turns with it
+- Truffle Hunter: each round has 12 seconds, and the rounds get harder in even steps up to the last. The pig's pace is fitted to each field, so a round is just as hard on any screen
+- When a run is lost, Truffle Hunter clears the leaves off any truffles you missed, so you can see where they were
+
+### Fixed
+- The pig's head no longer disappears when it puts its head down to eat in Truffle Hunter and Pigpen
+
 ## [2.6.0]
 
 ### Added

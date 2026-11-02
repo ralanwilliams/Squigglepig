@@ -40,8 +40,10 @@ export type RoundProps<S> = {
   Frame: Frame;
   // Set once the round is over and its screen is staying up: won, under the
   // choice to keep going or bank it, or lost, under the news. `at` is when
-  // (epoch ms). A round stops taking input then.
-  ended?: { won: boolean; at: number };
+  // (epoch ms). A round stops taking input then. `again`: lost, but a life
+  // used, so the round will be played again: a game that plays the same
+  // puzzle again (no Game.replay) shouldn't give away the answer.
+  ended?: { won: boolean; at: number; again?: boolean };
   // Set while a full-screen game's round counts in (RoundCountdown.tsx): the
   // field is under a curtain and its clock hasn't started. Take no input.
   held?: boolean;
@@ -59,6 +61,11 @@ export type Game<S = unknown> = {
   // Seconds for round n (1-based), for a game whose rounds need longer than
   // the engine's roundSeconds.
   seconds?: (round: number) => number;
+  // A fresh puzzle for round n (1-based), of the same difficulty, when it's
+  // played again on a life (engine.ts LIVES): for a game whose lost round
+  // shows its answer. `run` is the run's puzzles so far, to keep from
+  // repeating one. May load. Without it, the same puzzle is played again.
+  replay?: (round: number, run: S[]) => S | Promise<S>;
   // The round fills the screen (FieldFrame.tsx) instead of Stage's two panes:
   // `focus` is drawn edge to edge, the run's clock, pot and Leave float over
   // it with the game's `controls`, each round counts in (3, 2, 1, Go!) before

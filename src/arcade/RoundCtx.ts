@@ -10,6 +10,7 @@ import { createContext } from 'react';
 export type Settled = {
   at: number; // when the round ended (epoch ms): the clock stops there
   lost: boolean;
+  again?: boolean; // lost on time, but a life used: the round will be played again
   title?: string; // heads a lost round's card ("Out of time!")
   lines: string[];
   actions: { name: string; onPress: () => void }[];
@@ -25,6 +26,7 @@ export type RoundCtxValue = {
   expire: () => void;
   leave: () => void;
   settled?: Settled;
+  lives?: { left: number; of: number }; // in a run (engine.ts LIVES), those in reserve, shown beside the clock
   // A game with an endless hunt of its own (Game.endless): in a run, the way
   // into it, on the pot ladder slider; in it, the hunt.
   toEndless?: () => void;

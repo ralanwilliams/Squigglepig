@@ -2,17 +2,19 @@ import React from 'react';
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 import { rng } from '../../rng';
 import type { FieldArea } from '../../FieldFrame';
-import { makeMaze, walls, type Cell, type Maze } from './maze';
+import { transpose, walls, type Cell, type Maze } from './maze';
 
-// The pen, made up fresh for each round from its seed: a grassy pasture
-// fenced into a maze with post-and-rail fences, the trodden ground inside
-// it, and a woven basket of apples in the far corner. The gate is open on
-// the left of the top-left cell, where the pig starts. Drawn twice, by day
+// The pen for a round's maze (index.tsx makes it, and puts the basket): a
+// grassy pasture fenced into the maze with post-and-rail fences, the trodden
+// ground inside it, and a woven basket of apples. The gate is open on the
+// left of the top-left cell, where the pig starts. The maze is made upright;
+// in a field wider than it's tall it's laid on its side, the same maze with
+// the basket the same way from the gate. Drawn twice, by day
 // and by night (FieldLight fades between them), from the same seed so the two
 // line up exactly. Each kind of thing is one path where it can be (all the
 // rails, all the posts, all the tufts), so a big pen stays cheap to draw.
 
-export type Look = { seed: number; e: number }; // e: 0 on round 1, 1 on the last
+export type Look = { seed: number; maze: Maze; goal: Cell }; // the maze upright, and where the basket is
 
 type Palette = {
   grass: string;
@@ -83,21 +85,19 @@ const f1 = (v: number) => v.toFixed(1);
 const ellipse = (cx: number, cy: number, rx: number, ry: number) =>
   `M${f1(cx - rx)} ${f1(cy)}a${f1(rx)} ${f1(ry)} 0 1 0 ${f1(2 * rx)} 0a${f1(rx)} ${f1(ry)} 0 1 0 ${f1(-2 * rx)} 0Z`;
 
-// The pen for a field `w` × `h`, the maze fitted inside `box` (the clear box
-// between the chips), its cells from about 64 dp on round 1 to about 30 on
-// the last (times the UI scale `s`), so later rounds are bigger mazes.
+// The pen for a field `w` × `h`, the maze as big as fits inside `box` (the
+// clear box between the chips), `s` the UI scale.
 export function makePen(w: number, h: number, box: FieldArea, look: Look, s: number): Pen {
   const margin = 6 * s;
   const bw = box.x1 - box.x0 - 2 * margin;
   const bh = box.y1 - box.y0 - 2 * margin;
-  const want = (64 - 34 * look.e) * s;
-  const cols = Math.max(3, Math.floor(bw / want));
-  const rows = Math.max(3, Math.floor(bh / want));
+  const side = bw > bh && look.maze.rows > look.maze.cols;
+  const maze = side ? transpose(look.maze) : look.maze;
+  const goal: Cell = side ? [look.goal[1], look.goal[0]] : look.goal;
+  const { cols, rows } = maze;
   const c = Math.min(bw / cols, bh / rows);
   const ox = (box.x0 + box.x1 - cols * c) / 2;
   const oy = (box.y0 + box.y1 - rows * c) / 2;
-  const maze = makeMaze(cols, rows, rng(look.seed));
-  const goal: Cell = [cols - 1, rows - 1];
   const centre = ([x, y]: Cell) => ({ x: ox + (x + 0.5) * c, y: oy + (y + 0.5) * c });
 
   // Fences and posts don't depend on the palette: work them out once.

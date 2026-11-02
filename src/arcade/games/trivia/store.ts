@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PACK } from './pack';
-import { covers, fromOpenTdb, pickRun, questionKey, type Question } from './questions';
+import { covers, fromOpenTdb, pickRun, questionKey, type Difficulty, type Question } from './questions';
 
 // Where a trivia run's questions come from. The Open Trivia Database
 // (opentdb.com, CC BY-SA 4.0, credited on the licenses screen) gives 50 at a
@@ -47,6 +47,23 @@ async function fetchBatch(): Promise<Question[]> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Another question of `difficulty`, for a round played again on a life
+// (Game.replay), none of those in `avoid` (questionKey): one of those kept,
+// else one of the pack's. Never fetches, so it's quick.
+export async function questionFor(difficulty: Difficulty, avoid: Set<string>): Promise<Question> {
+  const saved = await load();
+  const kept = saved.pool.filter((q) => q.difficulty === difficulty && !avoid.has(questionKey(q)));
+  if (kept.length) {
+    const q = kept[Math.floor(Math.random() * kept.length)];
+    save({ pool: saved.pool.filter((p) => p !== q), seen: [...saved.seen, questionKey(q)].slice(-SEEN_MAX) });
+    return q;
+  }
+  const ours = PACK.filter((q) => q.difficulty === difficulty);
+  const fresh = ours.filter((q) => !avoid.has(questionKey(q)));
+  const from = fresh.length ? fresh : ours;
+  return from[Math.floor(Math.random() * from.length)];
 }
 
 // The ten questions for one run, easiest first (questions.ts PLAN).
