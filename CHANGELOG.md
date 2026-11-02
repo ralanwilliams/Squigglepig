@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1]
+
+### Added
+- Credits for Lukas Hirsch, Chris Wells and Maxwell Hanker, who built the original Squigglepig with me as a school project, in the app and on the website's Help & FAQ page. The menu's Open-source licenses screen is now Credits & licenses
+
+### Changed
+- New app icon: the pig on a teal square. On Android the whole pig now shows, ears and all, whatever shape your phone gives its icons. The website's home-screen icons match
+- New splash screen: the whole pig and its name while the app starts, as big as each phone shows it without cutting any of it off
+- After you take a prize, a button opens where it's kept: See your themes, See art supplies, or Dress your pig for an outfit or speech bubble (which replaces Use it there, so you see it on your pig). A line underneath says your rewards are always in the ☰ menu on the home screen
+
 ## [2.7.0]
 
 ### Added

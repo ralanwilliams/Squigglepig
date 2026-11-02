@@ -1,6 +1,6 @@
 // Writes src/assets/licenses.json: every open-source package that ships with
 // the app (the production dependency tree, as npm resolves it) with its
-// version and license type, for the "Open-source licenses" screen
+// version and license type, for the "Credits & licenses" screen
 // (app/licenses.tsx). Run after adding, removing or upgrading a dependency:
 //
 //   npm run licenses

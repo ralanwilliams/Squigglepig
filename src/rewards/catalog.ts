@@ -43,12 +43,26 @@ export type Kind = keyof typeof KINDS;
 // The menu's Rewards rows that open a Rewards screen, each with just these
 // kinds' tabs (app/rewards.tsx ?group=), named in the menu by the label.
 // Outfits and speech bubbles are the menu's third row, Your pig (app/pig.tsx).
+// `go` names a button that opens the screen (homeOf, below).
 export const GROUPS = {
-  art: { label: 'Art supplies', kinds: ['brush', 'sticker'] },
-  theme: { label: 'Themes', kinds: ['theme'] },
-} as const satisfies Record<string, { label: string; kinds: readonly Kind[] }>;
+  art: { label: 'Art supplies', kinds: ['brush', 'sticker'], go: 'See art supplies' },
+  theme: { label: 'Themes', kinds: ['theme'], go: 'See your themes' },
+} as const satisfies Record<string, { label: string; kinds: readonly Kind[]; go: string }>;
 
 export type Group = keyof typeof GROUPS;
+
+// Where a kind's rewards are kept: the Rewards screen for a GROUPS kind, else
+// Your pig, where outfits and speech bubbles are put on. `path` is the route
+// (the menu's Rewards rows, src/components/MenuDrawer.tsx) and `go` names a
+// button that opens it (the payout's, src/arcade/PayoutScreen.tsx).
+export type RewardsPath = '/pig' | `/rewards?group=${Group}`;
+
+export function homeOf(kind: Kind): { path: RewardsPath; go: string } {
+  for (const group of Object.keys(GROUPS) as Group[]) {
+    if ((GROUPS[group].kinds as readonly Kind[]).includes(kind)) return { path: `/rewards?group=${group}`, go: GROUPS[group].go };
+  }
+  return { path: '/pig', go: 'Dress your pig' };
+}
 
 // `soon` lists a reward before the feature that uses it is built: the Rewards
 // screen shows it as coming soon, and nothing can award it yet. Remove the

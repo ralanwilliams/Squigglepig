@@ -17,15 +17,17 @@ const SUMMARY = Object.entries(
   .map(([license, count]) => `${count} ${license}`)
   .join(' · ');
 
-// Open-source licenses, from the menu drawer (src/components/MenuDrawer.tsx):
-// every package that ships with the app, its version and its license type.
-// The list is generated from node_modules by `npm run licenses`
-// (scripts/licenses.mjs). The one screen in the game that scrolls: it is a
-// reference list, hundreds of rows long. It opens like the website's Help &
-// FAQ page: the logo, then the title (they scroll away with the list; the
-// band above stays clear of the dark-mode switch, as on every screen). Then
-// the credits the trivia questions' and the memory drawings' licences ask for
-// (src/arcade/games/trivia, src/arcade/games/memory), and the list.
+// Credits & licenses, from the menu drawer (src/components/MenuDrawer.tsx):
+// the people the original game was built with, then every package that ships
+// with the app, its version and its license type. The list is generated from
+// node_modules by `npm run licenses` (scripts/licenses.mjs). The one screen in
+// the game that scrolls: it is a reference list, hundreds of rows long. It
+// opens like the website's Help & FAQ page: the logo, then the title (they
+// scroll away with the list; the band above stays clear of the dark-mode
+// switch, as on every screen). Then the original team (the website's Help &
+// FAQ page, site/help.html, says the same), the credits the trivia questions'
+// and the memory drawings' licences ask for (src/arcade/games/trivia,
+// src/arcade/games/memory), and the list.
 export default function Licenses() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -47,8 +49,12 @@ export default function Licenses() {
           <View style={{ gap: ui.sp(6), paddingBottom: ui.sp(12) }}>
             <View style={[styles.mast, { gap: ui.sp(12), paddingBottom: ui.sp(10) }]}>
               <AppMark size={ui.sp(88)} label="Squigglepig" />
-              <Heading size="h3">Open-source licenses</Heading>
+              <Heading size="h3">Credits &amp; licenses</Heading>
             </View>
+            <Text style={[styles.intro, { fontSize: ui.f(14), paddingBottom: ui.sp(6) }]} maxFontSizeMultiplier={FONT_CAP}>
+              Squigglepig began years ago as a school project with Lukas Hirsch, Chris Wells and Maxwell Hanker. I
+              couldn't have built the original without them, and it's been a lot of fun bringing our game back to life.
+            </Text>
             <Text style={[styles.intro, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
               Squigglepig is built with {LICENSES.length} open-source packages. Thank you to everyone who made them.
             </Text>
