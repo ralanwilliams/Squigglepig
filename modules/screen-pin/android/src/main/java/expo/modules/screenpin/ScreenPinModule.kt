@@ -13,13 +13,14 @@ class ScreenPinModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ScreenPin")
 
+    // A Function's body must give a value (Any?): with no activity, null.
     Function("pin") {
-      val activity = appContext.currentActivity ?: return@Function
+      val activity = appContext.currentActivity ?: return@Function null
       activity.runOnUiThread { runCatching { activity.startLockTask() } }
     }
 
     Function("unpin") {
-      val activity = appContext.currentActivity ?: return@Function
+      val activity = appContext.currentActivity ?: return@Function null
       activity.runOnUiThread { runCatching { activity.stopLockTask() } }
     }
 
