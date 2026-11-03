@@ -8,7 +8,7 @@ import { PigButton } from '../components/PigButton';
 import { TextLink } from '../components/TextLink';
 import { Countdown, deadlineIn } from '../components/Countdown';
 import { showToast } from '../components/Toast';
-import { hideThemeToggle } from '../components/ThemeToggle';
+import { hideCornerControls } from '../components/CornerControls';
 import { guidedAccessOn, pinScreen, unpinScreen } from '../lib/screenPin';
 import { useUi } from '../theme/responsive';
 import { useReducedMotion, useTheme } from '../theme/theme';
@@ -80,7 +80,7 @@ import type { Game } from './games';
 // runs on while the app is in the background.
 //
 // Its padlock locks the screen for a child: only the game's field takes a
-// tap. The meter and play time, Leave and the dark-mode toggle go, the back
+// tap. The meter and play time, Leave and the sound and dark-mode switches go, the back
 // button and the back swipe do nothing, and on Android the app asks to be
 // pinned (src/lib/screenPin.ts: Android asks the person first). An iPhone
 // can't be pinned by an app, so the first lock suggests Guided Access, once a
@@ -232,11 +232,11 @@ export function RunShell({ game }: { game: Game<any> }) {
     setHunt((h) => (h?.rested && h.restLocked ? { level: 1, difficulty: h.difficulty, deal: h.deal + 1 } : h));
   };
 
-  // Locked: no dark-mode toggle, no back button or back swipe, and on
+  // Locked: no sound or dark-mode switch, no back button or back swipe, and on
   // Android the app pinned; all of it undone on unlocking or leaving.
   useEffect(() => {
     if (!locked) return;
-    hideThemeToggle(true);
+    hideCornerControls(true);
     pinScreen();
     navigation.setOptions({ gestureEnabled: false });
     const back = BackHandler.addEventListener('hardwareBackPress', () => true);
@@ -244,7 +244,7 @@ export function RunShell({ game }: { game: Game<any> }) {
       back.remove();
       navigation.setOptions({ gestureEnabled: true });
       unpinScreen();
-      hideThemeToggle(false);
+      hideCornerControls(false);
     };
   }, [locked]);
   const lock = () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { FitBox } from './FitBox';
+import { cornerReserve } from './CornerControls';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
@@ -46,13 +47,13 @@ export function Stage({
 
   // The band is always reserved (even when empty) so the row below — and with it
   // the pig — sits in the same place on every screen. Its sides keep clear of
-  // the dark-mode toggle floating in the top-right corner (ThemeToggleOverlay);
-  // both sides, so a centred title stays centred.
+  // the sound and dark-mode switches floating in the top-right corner
+  // (CornerControls.tsx); both sides, so a centred title stays centred.
   const band = (
     <View
       style={[
         styles.header,
-        { minHeight: ui.headerBand, paddingHorizontal: ui.pad + ui.sp(36), paddingTop: ui.sp(10) },
+        { minHeight: ui.headerBand, paddingHorizontal: cornerReserve(ui), paddingTop: ui.sp(10) },
       ]}
     >
       {header}

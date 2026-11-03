@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Countdown } from '../components/Countdown';
+import { CORNER_SLOTS, cornerSlot, useCornerInk } from '../components/CornerControls';
 import { FitBox } from '../components/FitBox';
 import { font } from '../theme/tokens';
 import { FONT_CAP, useUi } from '../theme/responsive';
@@ -44,8 +45,8 @@ import type { Frame } from './games';
 // shows beside the level; when it's up, the piggy's rest comes up as a card
 // (REST_CARDS).
 // Back to the game's run is beside Leave. A padlock (Padlock.tsx) sits
-// beside the dark-mode toggle. Locked, the meter and play time, the way
-// back, Leave and the toggle go (still taking up their room, so the field
+// beside the sound and dark-mode switches. Locked, the meter and play time,
+// the way back, Leave and the switches go (still taking up their room, so the field
 // between the chips doesn't move and its truffles stay put) and only the
 // game's field takes a tap.
 //
@@ -83,6 +84,7 @@ export const useFieldArea = () => useContext(AreaCtx);
 export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
   const ui = useUi();
   const fc = useFieldColors();
+  useCornerInk(fc.text); // the corner's switches in cream, on the discs below
   const look = useFieldCardLook();
   const ctx = useContext(RoundCtx);
   if (!ctx) throw new Error('FieldFrame is drawn by RunShell');
@@ -187,6 +189,7 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
       : null;
   const leave = button('Leave', ctx.leave, 'link');
   const disc = ui.sp(36);
+  const padlockSlot = cornerSlot(ui, CORNER_SLOTS); // just inside the corner's switches
 
   return (
     <View style={styles.fill} onLayout={onRoot}>
@@ -194,25 +197,31 @@ export const FieldFrame: Frame = ({ focus, controls, onExpire, stoppedAt }) => {
         <AreaCtx.Provider value={area}>{focus}</AreaCtx.Provider>
       </View>
       {ctx.startsAt ? <RoundCountdown startsAt={ctx.startsAt} /> : null}
-      {/* Behind the app's dark-mode toggle (ThemeToggleOverlay), a disc like the chips; gone with the toggle while locked. */}
-      <View
-        pointerEvents="none"
-        style={[
-          styles.disc,
-          unlockedOnly,
-          {
-            backgroundColor: fc.panel,
-            borderColor: fc.line,
-            width: disc,
-            height: disc,
-            borderRadius: disc / 2,
-            top: ui.insets.top + ui.sp(5) + (ui.sp(44) - disc) / 2,
-            right: ui.insets.right + ui.pad - ui.sp(9) + (ui.sp(44) - disc) / 2,
-          },
-        ]}
-      />
+      {/* Behind each of the app's corner switches (CornerControls.tsx), a disc like the chips; gone with them while locked. */}
+      {Array.from({ length: CORNER_SLOTS }, (_, i) => {
+        const slot = cornerSlot(ui, i);
+        return (
+          <View
+            key={i}
+            pointerEvents="none"
+            style={[
+              styles.disc,
+              unlockedOnly,
+              {
+                backgroundColor: fc.panel,
+                borderColor: fc.line,
+                width: disc,
+                height: disc,
+                borderRadius: disc / 2,
+                top: slot.top + (slot.size - disc) / 2,
+                right: slot.right + (slot.size - disc) / 2,
+              },
+            ]}
+          />
+        );
+      })}
       {endless ? (
-        <View style={[styles.padlock, { top: ui.insets.top + ui.sp(5), right: ui.insets.right + ui.pad - ui.sp(9) + ui.sp(44) + ui.sp(2) }]}>
+        <View style={[styles.padlock, { top: padlockSlot.top, right: padlockSlot.right + ui.sp(2) }]}>
           <Padlock locked={locked} onLock={endless.lock} onUnlock={endless.unlock} />
         </View>
       ) : null}

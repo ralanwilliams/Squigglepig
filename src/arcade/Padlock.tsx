@@ -5,8 +5,8 @@ import { font } from '../theme/tokens';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { useFieldColors } from './fieldColors';
 
-// The endless hunt's lock (RunShell.tsx), on a chip's disc beside the light /
-// dark switch. A tap locks it. Locked, it's amber, and only holding it for
+// The endless hunt's lock (RunShell.tsx), on a chip's disc beside the sound and
+// light / dark switches. A tap locks it. Locked, it's amber, and only holding it for
 // HOLD_MS lets go: a ring fills round it as it's held, "Keep holding…" under
 // it; let go sooner and the ring empties and it stays locked. A child can tap
 // it all they like.
