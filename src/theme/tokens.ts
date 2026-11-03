@@ -229,12 +229,6 @@ export const themes = {
   dark: { normal: dark, high: darkHC },
 };
 
-// Deliberately NOT themed: the dark-mode toggle's sun / moon is one amber on
-// both palettes, so it reads as a sun and a moon rather than as text.
-export const glyph = {
-  sun: '#F4B400',
-};
-
 // Deliberately NOT themed: a drawing is white paper with black ink in both
 // modes, so a picture looks the same on every player's phone and in the reveal.
 export const canvas = {

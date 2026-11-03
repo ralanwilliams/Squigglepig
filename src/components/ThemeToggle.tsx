@@ -1,19 +1,20 @@
-import React, { useEffect, useRef, useSyncExternalStore } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Insets, View } from 'react-native';
 import Svg, { Circle, G, Mask, Path, Rect } from 'react-native-svg';
-import { glyph } from '../theme/tokens';
-import { useReducedMotion, useThemeMode } from '../theme/theme';
+import { GlyphSwitch } from './GlyphSwitch';
+import { useReducedMotion, useTheme, useThemeMode } from '../theme/theme';
 import { useUi } from '../theme/responsive';
 
-// The dark-mode switch: one amber glyph in the top-right corner. A sun with
+// The dark-mode switch: one glyph in the top-right corner, outermost of the
+// corner's switches (CornerControls.tsx). A sun with
 // eight triangular rays; tap it and the rays spin away as they fade, the disc
 // swells and a hole slides in from the top-right to carve it into a thick
 // crescent, then two stars pop into the opening one after the other. The
 // screen follows with the wipe in ThemeProvider (night rises from the bottom,
-// day comes down from the top). Same amber on both palettes, so it reads as a
-// sun and a moon rather than as text. Sized from the UI
-// scale, 44dp hit target. With reduced motion it jumps straight to the other
-// glyph.
+// day comes down from the top). Drawn in `color`, by default the theme's
+// link color like the menu's ☰, so it shows on every palette and seasonal
+// theme. Sized from the UI scale, 44dp hit target. With reduced motion it
+// jumps straight to the other glyph.
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedG = Animated.createAnimatedComponent(G);
 
@@ -30,8 +31,10 @@ const STAR_B = star(1.5);
 const MORPH_MS = 450;
 const NO_NATIVE = { useNativeDriver: false }; // SVG attributes can't go through the native driver
 
-export function ThemeToggle({ size = 26 }: { size?: number }) {
+export function ThemeToggle({ size = 26, hitSlop, color }: { size?: number; hitSlop?: number | Insets; color?: string }) {
   const ui = useUi();
+  const theme = useTheme();
+  const ink = color ?? theme.link;
   const { showing, toggle } = useThemeMode();
   const reduced = useReducedMotion();
   const dark = showing === 'dark';
@@ -65,84 +68,35 @@ export function ThemeToggle({ size = 26 }: { size?: number }) {
 
   const px = ui.sp(size);
   return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityLabel="Dark mode"
-      accessibilityState={{ checked: dark }}
-      onPress={toggle}
-      hitSlop={6}
-      style={({ pressed }) => [styles.hit, { width: ui.sp(44), height: ui.sp(44), opacity: pressed ? 0.6 : 1 }]}
-    >
+    <GlyphSwitch label="Dark mode" on={dark} onPress={toggle} hitSlop={hitSlop}>
       <View>
-        <Svg width={px} height={px} viewBox="0 0 24 24" fill={glyph.sun}>
+        <Svg width={px} height={px} viewBox="0 0 24 24" fill={ink}>
           <Mask id="moon-hole">
             <Rect width="24" height="24" fill="#fff" />
             <AnimatedCircle cx={holeX} cy={holeY} r={7.2} fill="#000" />
           </Mask>
           <AnimatedG opacity={rays} rotation={raySpin} scale={rayScale} originX={12} originY={12}>
             {RAYS.map((deg) => (
-              <Path key={deg} d={RAY} fill={glyph.sun} transform={`rotate(${deg} 12 12)`} />
+              <Path key={deg} d={RAY} fill={ink} transform={`rotate(${deg} 12 12)`} />
             ))}
           </AnimatedG>
-          <AnimatedCircle cx={discX} cy={12} r={disc} fill={glyph.sun} mask="url(#moon-hole)" />
+          <AnimatedCircle cx={discX} cy={12} r={disc} fill={ink} mask="url(#moon-hole)" />
           {/* Position with a transform on a plain group, scale on an inner one:
               react-native-svg drops x/y from a group on a normal render (they are
               text props there) while its animation fast path honours them, so
               a group carrying both would jump once an animation settled. */}
           <G transform="translate(17.4 7.2)">
             <AnimatedG scale={starA}>
-              <Path d={STAR_A} fill={glyph.sun} />
+              <Path d={STAR_A} fill={ink} />
             </AnimatedG>
           </G>
           <G transform="translate(20.2 11.6)">
             <AnimatedG scale={starB}>
-              <Path d={STAR_B} fill={glyph.sun} />
+              <Path d={STAR_B} fill={ink} />
             </AnimatedG>
           </G>
         </Svg>
       </View>
-    </Pressable>
+    </GlyphSwitch>
   );
 }
-
-// Whether the toggle is hidden: by a screen that's locked so a child can
-// only play (Truffle Hunter's endless hunt, src/arcade/RunShell.tsx).
-let hidden = false;
-const watchers = new Set<() => void>();
-export function hideThemeToggle(on: boolean) {
-  if (on === hidden) return;
-  hidden = on;
-  watchers.forEach((w) => w());
-}
-const watch = (w: () => void) => {
-  watchers.add(w);
-  return () => {
-    watchers.delete(w);
-  };
-};
-export const useThemeToggleHidden = () => useSyncExternalStore(watch, () => hidden);
-
-// Floats the toggle over every screen, in the header band's top-right corner:
-// vertically centred on a one-line title, its icon flush with the band's
-// horizontal padding. Stage reserves that corner so header text never runs
-// underneath it. Gone while a screen hides it (hideThemeToggle).
-export function ThemeToggleOverlay() {
-  const ui = useUi();
-  if (useThemeToggleHidden()) return null;
-  return (
-    <View
-      pointerEvents="box-none"
-      style={[
-        styles.overlay,
-        { top: ui.insets.top + ui.sp(5), right: ui.insets.right + ui.pad - ui.sp(9) },
-      ]}
-    >
-      <ThemeToggle />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  hit: { alignItems: 'center', justifyContent: 'center' },
-  overlay: { position: 'absolute', zIndex: 10 },
-});

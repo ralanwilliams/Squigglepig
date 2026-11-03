@@ -28,7 +28,7 @@ const CLOSE_MS = 180;
 const NATIVE = Platform.OS !== 'web';
 
 // The menu: a ☰ in the header band's top-LEFT corner of the home screen,
-// mirroring the dark-mode toggle in the top-right (Stage already keeps both
+// mirroring the sound and dark-mode switches in the top-right (Stage already keeps both
 // corners clear, so nothing moves to make room). It slides a drawer in from
 // the left holding the About information: the app icon, name and version,
 // then the Support / Accessibility / Rewards groups (Support ends with the

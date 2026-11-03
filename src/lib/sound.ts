@@ -1,4 +1,6 @@
+import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { SOUNDS } from '../assets/assets';
 
@@ -39,8 +41,10 @@ export function preloadSounds() {
   }
 }
 
-// Play a clip from the start. A clip already playing restarts.
+// Play a clip from the start. A clip already playing restarts. Silent while
+// the sound switch is off (see the end of this file).
 export function playSound(mod: number, volume = 0.3) {
+  if (!soundOn || !soundLoaded) return;
   try {
     const p = player(mod);
     p.volume = volume;
@@ -101,7 +105,7 @@ function blockedUntilGesture(): boolean {
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     const p = players.get(SOUNDS.theme);
-    if (!p || !musicWanted) return;
+    if (!p || !musicWanted || !soundOn) return;
     if (document.hidden) p.pause();
     else if (!blockedUntilGesture()) p.play();
   });
@@ -129,6 +133,9 @@ function rampMusic(p: AudioPlayer, to: number, done?: () => void) {
 
 export function playMusic() {
   musicWanted = true;
+  // Sound off, or the saved choice not loaded yet: turning it on (or the
+  // load finding it on) starts the theme then, if this screen still wants it.
+  if (!soundOn || !soundLoaded) return;
   // A hidden tab starts it when it comes back (see visibilitychange above).
   if (Platform.OS === 'web' && document.hidden) return;
   if (blockedUntilGesture()) return;
@@ -151,6 +158,10 @@ export function playMusic() {
 // route change a moment later).
 export function stopMusic() {
   musicWanted = false;
+  fadeOutMusic();
+}
+
+function fadeOutMusic() {
   try {
     const p = players.get(SOUNDS.theme);
     if (!p || !p.playing || fadingTo === 0) return;
@@ -162,3 +173,56 @@ export function stopMusic() {
     console.warn('sound: music stop failed', e);
   }
 }
+
+// The sound switch (SoundToggle.tsx): off silences everything, the clips and
+// the theme. It's saved like the theme's light / dark choice, in
+// AsyncStorage, which keeps it through restarts and app updates (only an
+// uninstall, or clearing the app's data, forgets it). Nothing plays until the
+// saved choice has loaded, so a player who turned sound off never hears the
+// theme start at launch; the load is a few milliseconds.
+const SOUND_KEY = 'squigglepig.sound';
+let soundOn = true;
+let soundLoaded = false;
+const soundWatchers = new Set<() => void>();
+
+AsyncStorage.getItem(SOUND_KEY)
+  .then((v) => {
+    if (!soundLoaded) soundOn = v !== 'off'; // unless flipped while loading
+  })
+  .catch(() => {})
+  .finally(() => {
+    soundLoaded = true;
+    soundWatchers.forEach((w) => w());
+    if (soundOn && musicWanted) playMusic();
+  });
+
+// Turning sound off fades the theme out (on again, it starts from the top if
+// this screen has it) and cuts a clip that's still playing.
+export function setSoundOn(on: boolean) {
+  soundLoaded = true;
+  if (on === soundOn) return;
+  soundOn = on;
+  AsyncStorage.setItem(SOUND_KEY, on ? 'on' : 'off').catch(() => {});
+  soundWatchers.forEach((w) => w());
+  if (on) {
+    if (musicWanted) playMusic();
+    return;
+  }
+  fadeOutMusic();
+  try {
+    players.forEach((p, mod) => {
+      if (mod !== SOUNDS.theme && p.playing) p.pause();
+    });
+  } catch (e) {
+    console.warn('sound: mute failed', e);
+  }
+}
+
+const watchSound = (w: () => void) => {
+  soundWatchers.add(w);
+  return () => {
+    soundWatchers.delete(w);
+  };
+};
+// Whether sound is on; null until the saved choice has loaded.
+export const useSoundOn = () => useSyncExternalStore(watchSound, () => (soundLoaded ? soundOn : null));

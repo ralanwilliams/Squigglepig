@@ -6,7 +6,7 @@ import { FONT_CAP, useUi } from '../theme/responsive';
 
 // A transient message pinned to the bottom of the screen, above the safe area.
 // `showToast` from anywhere; ToastOverlay (mounted once, in the root layout
-// beside ThemeToggleOverlay) shows it. A new message replaces the old one at
+// beside CornerControlsOverlay) shows it. A new message replaces the old one at
 // once — unlike Android's system toasts, which queue and each hang around for
 // two seconds, so a rapid sequence lags well behind whatever caused it.
 // Touches pass straight through it.
