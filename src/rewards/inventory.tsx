@@ -97,6 +97,11 @@ type InventoryCtx = {
   // and putting one back on or taking it off.
   hiddenFor: (skinId: string) => string[];
   showPart: (skinId: string, part: string, on: boolean) => void;
+  // Dress the pig in all of the showing theme's look, as a theme coming on
+  // does (theme.tsx): every part of it on, and nothing in their place — no
+  // outfits, no other theme's parts. Its speech bubble stays. What's changed
+  // on Your pig after that is kept until the next.
+  resetLook: () => void;
   // What the pig's speech bubble says (cleaned: see cleanBubbleText). Kept
   // even while no bubble is chosen, so switching bubbles keeps the words.
   bubbleText: string;
@@ -202,6 +207,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     [commit]
   );
 
+  const resetLook = useCallback(() => {
+    const s = latest.current;
+    if (s.worn.length || s.parts.length || s.hidden.length) commit({ ...s, worn: [], parts: [], hidden: [] });
+  }, [commit]);
+
   const setBubbleText = useCallback(
     (text: string) => {
       const s = latest.current;
@@ -234,11 +244,12 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setPart,
       hiddenFor: (skinId) => state.hidden.filter((k) => k.startsWith(`${skinId}:`)).map((k) => k.slice(skinId.length + 1)),
       showPart,
+      resetLook,
       bubbleText: state.bubbleText,
       setBubbleText,
       reset,
     }),
-    [state, grant, choose, wear, setPart, showPart, setBubbleText, reset]
+    [state, grant, choose, wear, setPart, showPart, resetLook, setBubbleText, reset]
   );
 
   return <Ctx.Provider value={value}>{loaded ? children : null}</Ctx.Provider>;

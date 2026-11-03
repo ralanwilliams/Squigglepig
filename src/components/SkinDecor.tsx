@@ -2,8 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 import { font } from '../theme/tokens';
-import { useReducedMotion, useSkin, useTheme } from '../theme/theme';
+import { useMorph, useReducedMotion, useSkin, useTheme } from '../theme/theme';
 import { PROPS, type Prop, type TextSlot } from '../theme/skins/props';
+import { morphPlacement, morphProp, nightProp, shownAt } from '../theme/skins/morph';
+import { onThePig } from '../theme/skins/layout';
 import type { ArtName, Placement } from '../theme/skins';
 
 // The season's props on one piece of pig artwork: Logo and WorkStage lay this
@@ -16,13 +18,21 @@ import type { ArtName, Placement } from '../theme/skins';
 //
 // Line weights are fractions of the image width, so a prop's outline matches
 // the art's at any size; on the dark palette each prop gets the same light
-// sticker rim scripts/dark-art.py gives the artwork.
+// sticker rim scripts/dark-art.py gives the artwork. A prop with a night
+// form (Lukas's) is drawn part way to it while the light changes
+// (skins/morph.ts), swelling a little and rocking as it turns (unless it
+// passes through a form of its own on the way, Chris's cape blowing, which is
+// motion enough); one that's there only by day or by night grows and fades
+// in, or shrinks and fades away.
 const LINE = 9 / 954; // the art's black outline
 const RIM = 5 / 954; // dark-art.py's RADIUS on the 954px stills
 const INK = '#000000';
 const RIM_COLOR = '#E6EDEE'; // dark-art.py's OUTLINE
 const BOB_MS = 1400;
 const TWINKLE_MS = 450;
+const MORPH_SWELL = 0.14; // how much bigger a prop grows halfway through its morph
+const MORPH_ROCK = 7; // and how far it rocks either way, in degrees
+const FADE_SHRINK = 0.5; // how much smaller a prop that's fading in or out is while it's all but gone
 const CHAR_W = 0.7; // Roboto Bold's average letter width plus the piping, in ems (for fitting a name)
 const PIPE_STROKE = 0.11; // piped letters' stroke, in ems
 const PIPE_DROP = 0.07; // how far the icing's shade sits below it, in ems
@@ -54,7 +64,8 @@ export function SkinDecor({
   extra?: Placement[];
 }) {
   const skin = useSkin();
-  const placements = [...(skin?.decor[art] ?? []).filter((p) => !omit?.(p)), ...(extra ?? [])].filter(
+  // In layers, whatever's held where the hooves are drawn (layout.ts onThePig).
+  const placements = onThePig([...(skin?.decor[art] ?? []).filter((p) => !omit?.(p)), ...(extra ?? [])]).filter(
     (p) => !!(PROPS[p.prop] as Prop).behind === (layer === 'behind')
   );
   if (!placements.length || !width || !height) return null;
@@ -64,16 +75,24 @@ export function SkinDecor({
   return (
     <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
       {placements.map((p, i) => (
-        <Piece key={i} p={p} i={i} left={(p.x - window.x) * iw} top={(p.y - window.y) * ih} imageW={iw} />
+        <Piece key={i} p={p} i={i} window={window} imageW={iw} imageH={ih} />
       ))}
     </View>
   );
 }
 
-function Piece({ p, i, left, top, imageW }: { p: Placement; i: number; left: number; top: number; imageW: number }) {
+function Piece({ p: day, i, window, imageW, imageH }: { p: Placement; i: number; window: Window; imageW: number; imageH: number }) {
   const dark = useTheme().name === 'dark';
   const reduced = useReducedMotion();
-  const prop: Prop = PROPS[p.prop];
+  // Part way from the day form to the night one, for a prop that has one.
+  const dusk = useMorph(!!day.night || !!day.by);
+  const p = morphPlacement(day, dusk);
+  const via = day.night?.via;
+  const prop: Prop = day.night ? morphProp(PROPS[day.prop], PROPS[nightProp(day)], dusk, via && PROPS[via]) : PROPS[day.prop];
+  const swell = via ? 0 : Math.sin(Math.PI * dusk); // 0 at either end, 1 halfway
+  const fade = shownAt(day, dusk);
+  const left = (p.x - window.x) * imageW;
+  const top = (p.y - window.y) * imageH;
   const w = p.w * imageW;
   const h = (w * prop.h) / prop.w;
   const unit = prop.w / w; // grid units per dp
@@ -113,6 +132,7 @@ function Piece({ p, i, left, top, imageW }: { p: Placement; i: number; left: num
   const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [0, motion === 'bob' ? -h * 0.25 : 0] });
   const scale = t.interpolate({ inputRange: [0, 1], outputRange: [1, motion === 'twinkle' ? 0.8 : 1] });
   const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [1, motion === 'twinkle' ? 0.7 : 1] });
+  if (fade <= 0) return null;
 
   return (
     <Animated.View
@@ -126,9 +146,23 @@ function Piece({ p, i, left, top, imageW }: { p: Placement; i: number; left: num
         transform: [{ translateY }, { rotate: `${p.rotate ?? 0}deg` }, { scaleX: p.flip ? -1 : 1 }, { scale }],
       }}
     >
-      <Svg width={bw} height={bh} viewBox={`${-pad} ${-pad} ${prop.w + 2 * pad} ${prop.h + 2 * pad}`}>
-        <PropArt prop={prop} line={line} rim={dark && prop.rim !== false && p.rim !== false ? rim : undefined} text={p.text} />
-      </Svg>
+      {/* The morph's swell, rock and fade change every frame, so they're on a view
+          of their own: the float above may run on the native driver, which
+          doesn't pick up a change to the plain values beside it. */}
+      <View
+        style={
+          swell || fade < 1
+            ? {
+                opacity: fade,
+                transform: [{ rotate: `${MORPH_ROCK * Math.sin(2 * Math.PI * dusk)}deg` }, { scale: (1 + MORPH_SWELL * swell) * (1 - FADE_SHRINK * (1 - fade)) }],
+              }
+            : null
+        }
+      >
+        <Svg width={bw} height={bh} viewBox={`${-pad} ${-pad} ${prop.w + 2 * pad} ${prop.h + 2 * pad}`}>
+          <PropArt prop={prop} line={line} rim={dark && prop.rim !== false && p.rim !== false ? rim : undefined} text={p.text} />
+        </Svg>
+      </View>
     </Animated.View>
   );
 }

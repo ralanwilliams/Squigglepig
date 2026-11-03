@@ -1,10 +1,11 @@
 import type { Theme } from '../tokens';
-import type { IMAGES } from '../../assets/assets';
+import type { IMAGES, SOUNDS } from '../../assets/assets';
 import type { PropName } from './props';
 
 // A skin: a palette laid over the classic one, plus vector props drawn on the
 // pig artwork. Most are seasonal; the rest are themes a player wins and
-// chooses (index.ts UNLOCKABLE). The artwork itself, the sounds, the drawing paper and the
+// chooses (index.ts UNLOCKABLE). The artwork itself, the sounds (bar a
+// theme's sting as the light changes, `sounds`), the drawing paper and the
 // judge's marks are never skinned — they are Squigglepig.
 
 // The roles a skin may recolor. Any it leaves out keep the classic value, so
@@ -22,6 +23,10 @@ export type ArtName = keyof typeof IMAGES;
 // Reduce motion). text fills the prop's text slot (the name on a cake).
 // rim: false leaves it out of the dark-mode sticker rim (things the pig
 // holds sit in front of it, inside its outline, where the art has none).
+// night: on the dark palette it's another prop (or the same one), and may
+// sit elsewhere; it morphs from one into the other as the light changes
+// (morph.ts), through `via` halfway if it names one. by: it's only there by
+// day, or by night, and fades away or in as the light changes.
 export type Placement = {
   prop: PropName;
   x: number;
@@ -33,6 +38,8 @@ export type Placement = {
   twinkle?: boolean;
   text?: string;
   rim?: false;
+  night?: { prop?: PropName; via?: PropName } & Partial<Pick<Placement, 'x' | 'y' | 'w' | 'rotate'>>;
+  by?: 'day' | 'night';
 };
 
 // [month, day], 1-based months, local time.
@@ -53,4 +60,7 @@ export type Skin = {
   // list repeated across its slots: usually what the pig holds. Without one
   // the trough keeps its mud.
   trough?: PropName[];
+  // A sting to play as the screen turns dark, or light, while this skin
+  // shows (theme.tsx): what the morph to its night or day props sounds like.
+  sounds?: Record<'light' | 'dark', keyof typeof SOUNDS>;
 };

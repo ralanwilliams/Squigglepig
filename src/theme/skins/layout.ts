@@ -1,4 +1,4 @@
-import { PROPS, type PropName } from './props';
+import { PROPS, type Prop, type PropName } from './props';
 import type { ArtName, Placement, Skin } from './types';
 
 // Where props go on each piece of artwork, measured once and shared by every
@@ -102,6 +102,77 @@ export function held(prop: PropName, art: ArtName): Placement[] {
   const slot = SLOTS[art].hold;
   const hoof = HOOVES[art];
   return slot && hoof ? [{ prop, ...slot, rim: false }, hoof] : [];
+}
+
+// A long gun (Bobby's blaster, Lukas's repeater) carried in both hooves: its
+// grip in the pig's left hoof (the viewer's left) at the hold slot, with the
+// hoof redrawn over it (held). On the home art both hooves are free, so it
+// lies level across the belly on the other hoof, the barrel just past the
+// pig's side; on the winner and waiting art the other hoof is busy (the
+// trumpet, the pencil), so it's carried low, pointing down across the
+// belly. The join, lobby and phone art have both hooves on the sign or
+// phone, so the pig carries none there. For a gun drawn 200 units long with
+// its grip a quarter of the way along (props.ts rifle, repeater).
+export const LONG_GUN: Partial<Record<ArtName, Partial<Placement>>> = {
+  home: { w: 0.61 },
+  winner: { w: 0.5, rotate: 24 },
+  waiting: { w: 0.3, rotate: 24 },
+};
+
+export function carried(prop: PropName, art: ArtName): Placement[] {
+  const place = LONG_GUN[art];
+  const [gun, ...hoof] = place ? held(prop, art) : [];
+  return gun ? [{ ...gun, ...place }, ...hoof] : [];
+}
+
+// The pig's right hoof (the viewer's right), where it's free: only on the
+// home art (on the others it holds the sign, the phone, the trumpet or the
+// pencil). Traced from the art like HOOVES, to draw over whatever it holds.
+const RIGHT_HOOVES: Partial<Record<ArtName, Placement>> = {
+  home: { prop: 'hoofStillRight', x: 0.423, y: 0.685, w: 0.0681 },
+};
+
+// Where something held in the right hoof goes (its grip on the hoof), and
+// the hoof to draw over it; null on art where that hoof isn't free.
+export const rightHoof = (art: ArtName): Placement | null => RIGHT_HOOVES[art] ?? null;
+
+// The props on a piece of art, from any theme or a player's pig, as they're
+// drawn: in layers, what's worn on the body first (props.ts `under`: Ash's
+// jersey), then the rest, then arms drawn again (Ash's), then the hooves
+// redrawn over what they hold, each layer in its own order; and whatever's
+// held where the hooves are (followHooves).
+export function onThePig(list: Placement[]): Placement[] {
+  const layer = (p: Placement) => {
+    const prop = PROPS[p.prop] as Prop;
+    return prop.under ? 0 : prop.hooves ? 2 : p.prop.startsWith('hoof') ? 3 : 1;
+  };
+  return followHooves(list)
+    .map((p, i) => ({ p, i, at: layer(p) }))
+    .sort((a, b) => a.at - b.at || a.i - b.i)
+    .map(({ p }) => p);
+}
+
+// The props on a piece of art with the pig's hooves where they're drawn: a
+// prop that moves them (props.ts `hooves`: Ash's jersey takes his arms out
+// to his sides) takes along whatever's held in them, from any theme — what's
+// at a hoof (held, carried, rightHoof) and the hoof redrawn over its grip,
+// and where it goes by night too. Each goes with the hoof nearest it.
+export function followHooves(list: Placement[]): Placement[] {
+  const moves = list.flatMap((p) => (PROPS[p.prop] as Prop).hooves ?? []);
+  if (!moves.length) return list;
+  const along = (x: number, y: number): [number, number] => {
+    const near = (m: (typeof moves)[number]) => Math.hypot(m.from[0] - x, m.from[1] - y);
+    const m = moves.reduce((a, b) => (near(b) < near(a) ? b : a));
+    return [x + m.to[0] - m.from[0], y + m.to[1] - m.from[1]];
+  };
+  return list.map((p) => {
+    if ((PROPS[p.prop] as Prop).hooves || !(p.rim === false || p.prop.startsWith('hoof'))) return p;
+    const [x, y] = along(p.x, p.y);
+    const n = p.night;
+    if (!n || (n.x === undefined && n.y === undefined)) return { ...p, x, y };
+    const [nx, ny] = along(n.x ?? p.x, n.y ?? p.y);
+    return { ...p, x, y, night: { ...n, x: nx, y: ny } };
+  });
 }
 
 // A sky prop: by name (it bobs), or with options (`twinkle` for fireworks).

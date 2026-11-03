@@ -1,3 +1,5 @@
+import { ASH_WEAR } from './ashWear';
+
 // Vector props that seasonal skins draw on top of the pig artwork: hats, bats,
 // pumpkins, balloons, a birthday cake. Plain path data, no images — a prop
 // costs a few hundred bytes instead of a second copy of every PNG and GIF, and
@@ -33,6 +35,13 @@ export type TextSlot = { x: number; y: number; size: number; maxW: number; fill:
 // `head` marks something worn on the head (a hat, a crown) and `eyes` over
 // the eyes (a visor): a player's own hat or sunglasses (src/avatar) replace
 // the theme's on the winner pig.
+// `hooves` says a prop draws the pig's hooves somewhere else on its piece of
+// art (Ash's jersey moves his arms out, ashWear.ts): each from where it is in
+// the art to where it's drawn, as fractions of the image. Whatever's held in
+// them moves with them (layout.ts followHooves).
+// `under` marks something worn on the body (Ash's jersey): it's drawn first,
+// under whatever the pig holds and anything else of any theme's on it
+// (layout.ts onThePig).
 export type Prop = {
   w: number;
   h: number;
@@ -43,6 +52,8 @@ export type Prop = {
   rim?: false;
   head?: true;
   eyes?: true;
+  hooves?: { from: number[]; to: number[] }[];
+  under?: true;
   shapes: Shape[];
 };
 
@@ -63,6 +74,50 @@ function star(cx: number, cy: number, R: number, r: number, n = 5) {
     d += `${i ? 'L' : 'M'}${r1(cx + rad * Math.cos(a))} ${r1(cy + rad * Math.sin(a))}`;
   }
   return d + 'Z';
+}
+
+// A closed outline through `pts`, every side a cubic curve: straight
+// (`round` 0) or bending smoothly through each point (1). Two outlines with
+// as many points have the same commands, so one morphs into the other
+// (morph.ts): a sun into a moon.
+function loop(pts: [number, number][], round = 0) {
+  const n = pts.length;
+  const at = (i: number) => pts[(i + n) % n];
+  let d = `M ${r1(pts[0][0])} ${r1(pts[0][1])}`;
+  for (let i = 0; i < n; i++) {
+    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+    const c1 = round ? [p1[0] + ((p2[0] - p0[0]) / 6) * round, p1[1] + ((p2[1] - p0[1]) / 6) * round] : [p1[0] + (p2[0] - p1[0]) / 3, p1[1] + (p2[1] - p1[1]) / 3];
+    const c2 = round ? [p2[0] - ((p3[0] - p1[0]) / 6) * round, p2[1] - ((p3[1] - p1[1]) / 6) * round] : [p1[0] + ((p2[0] - p1[0]) * 2) / 3, p1[1] + ((p2[1] - p1[1]) * 2) / 3];
+    d += ` C ${[...c1, ...c2, ...p2].map(r1).join(' ')}`;
+  }
+  return d + ' Z';
+}
+
+// The points of a star with n points (outer radius R, inner r), clockwise
+// from the one straight up; and n points round an ellipse, from its top.
+const starPoints = (cx: number, cy: number, R: number, r: number, n: number): [number, number][] =>
+  Array.from({ length: 2 * n }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / n;
+    const rad = i % 2 ? r : R;
+    return [cx + rad * Math.cos(a), cy + rad * Math.sin(a)];
+  });
+const ovalPoints = (cx: number, cy: number, rx: number, ry: number, n: number): [number, number][] =>
+  Array.from({ length: n }, (_, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
+  });
+
+// Eight triangular rays round a point: their bases `inner` from it, their
+// tips `outer`, each `spread` radians wide at the base, the first turned
+// `turn` from straight up. One path, so a sun's rays can draw in to specks.
+function rays(cx: number, cy: number, inner: number, outer: number, spread: number, turn = 0) {
+  let d = '';
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI / 2 + turn + (i * Math.PI) / 4;
+    const pt = (rad: number, da: number) => `${r1(cx + rad * Math.cos(a + da))} ${r1(cy + rad * Math.sin(a + da))}`;
+    d += `M ${pt(inner, -spread / 2)} L ${pt(outer, 0)} L ${pt(inner, spread / 2)} Z `;
+  }
+  return d.trim();
 }
 
 // A jagged burst round an ellipse: n spikes out to rx / ry, the notches
@@ -979,6 +1034,394 @@ export const PROPS = {
     ],
   },
 
+  // Lukas (an unlockable theme): the Old West, a sheriff by day who turns
+  // outlaw after dark. Each day prop has a night one drawn to match it shape
+  // for shape (morph.ts), and morphs into it as the light changes.
+  // The sheriff's white hat: a tall crown creased down the middle, the brim
+  // curled up at the sides, a leather band with a gold star on it.
+  sheriffHat: {
+    head: true,
+    w: 100,
+    h: 70,
+    anchor: [50, 56],
+    shapes: [
+      { d: 'M 2 40 Q 6 60 50 60 Q 94 60 98 40 Q 88 53 50 53 Q 12 53 2 40 Z', fill: '#E9DFC8', line: true }, // brim
+      { d: 'M 22 52 Q 17 16 30 8 Q 40 2 50 11 Q 60 2 70 8 Q 83 16 78 52 Q 50 58 22 52 Z', fill: '#F7F0DF', line: true }, // crown
+      { d: 'M 30 46 Q 27 22 35 12 L 38.5 14 Q 32.5 24 35 46 Z', fill: '#FFFFFF' }, // highlight
+      { d: 'M 21.4 41 Q 50 47 78.6 41 L 78 52 Q 50 58 22 52 Z', fill: '#8B5A2B', line: true }, // band
+      { d: star(50, 49.5, 6.5, 2.8), fill: '#F2C230', line: true },
+    ],
+  },
+  // The outlaw's black hat: the crown squashed low, the brim pulled wide
+  // and dipping over the eyes, a blood-red band and a silver
+  // concho where the star was.
+  outlawHat: {
+    head: true,
+    w: 100,
+    h: 70,
+    anchor: [50, 56],
+    shapes: [
+      { d: 'M 0 44 Q 4 64 50 64 Q 96 64 100 44 Q 88 57 50 56 Q 12 57 0 44 Z', fill: '#1F1A1A', line: true },
+      { d: 'M 24 55 Q 20 26 30 18 Q 40 13 50 20 Q 60 13 70 18 Q 80 26 76 55 Q 50 60 24 55 Z', fill: '#262020', line: true },
+      { d: 'M 31 49 Q 29 30 34 21 L 37.5 23 Q 33.5 31 36 49 Z', fill: '#4A3F3F' },
+      { d: 'M 23 46 Q 50 51 77 46 L 76 55 Q 50 60 24 55 Z', fill: '#7A1616', line: true },
+      { d: star(50, 53, 4.6, 4.3), fill: '#C9CED6', line: true },
+    ],
+  },
+  // Eyebrows, over the pig's eyes (anchored on the point between them, as the
+  // visor is): kind ones raised in a friendly arch by day, and by night
+  // knitted down into a scowl. Drawn on the face, so no sticker rim.
+  kindBrows: {
+    eyes: true,
+    rim: false,
+    w: 100,
+    h: 30,
+    anchor: [50, 26],
+    shapes: [{ d: 'M 9 16 Q 23 -2 37 14 Q 23 10 9 16 Z M 91 16 Q 77 -2 63 14 Q 77 10 91 16 Z', fill: '#1B1B1B' }],
+  },
+  angryBrows: {
+    eyes: true,
+    rim: false,
+    w: 100,
+    h: 30,
+    anchor: [50, 26],
+    shapes: [{ d: 'M 6 4 Q 26 2 45 18 Q 24 16 6 12 Z M 94 4 Q 74 2 55 18 Q 76 16 94 12 Z', fill: '#1B1B1B' }],
+  },
+  // The sheriff's badge, pinned over his heart: a six-pointed star with a
+  // ball on each point and a rivet in the middle. On the pig's chest, inside
+  // its outline, so no sticker rim. By night the outlaw has none: it's there
+  // only by day (lukas.ts).
+  sheriffBadge: {
+    rim: false,
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: star(50, 50, 40, 21, 6), fill: '#F2C230', line: true },
+      {
+        d: Array.from({ length: 6 }, (_, i) => circle(r1(50 + 41 * Math.cos(-Math.PI / 2 + (i * Math.PI) / 3)), r1(50 + 41 * Math.sin(-Math.PI / 2 + (i * Math.PI) / 3)), 7)).join(''),
+        fill: '#F2C230',
+        line: true,
+      },
+      { d: star(50, 50, 27, 15, 6), fill: '#FFE07A' },
+      { d: circle(50, 50, 8), fill: '#E0A800', line: true },
+    ],
+  },
+  // The outlaw's sack of loot, hanging from his left hoof by its tied neck
+  // (the anchor), a dollar sign on it.
+  lootSack: {
+    w: 100,
+    h: 100,
+    anchor: [50, 15],
+    shapes: [
+      {
+        // The gathered tuft, the neck, then round the sack, clockwise.
+        d: loop([[40, 2], [50, 7], [60, 2], [56, 16], [74, 28], [90, 56], [84, 88], [50, 98], [16, 88], [10, 56], [26, 28], [44, 16]], 0.9),
+        fill: '#A87B4F',
+        line: true,
+      },
+      { d: loop(ovalPoints(31, 60, 9, 22, 12), 1), fill: '#C49A6C' },
+      { d: ellipse(50, 15, 11, 4.5), fill: '#6B4A2B', line: true }, // the knot
+      { d: 'M 61 46 C 54 38 38 40 40 51 C 42 61 60 57 60 69 C 60 81 42 81 36 71 M 50 36 L 50 84', fill: 'none', line: true },
+    ],
+  },
+  // The sheriff's lever-action repeater, brass-framed, pointing right: a
+  // wooden stock, the lever looped under the brass receiver, a long barrel
+  // over its magazine tube and wooden forestock. Carried like Bobby's
+  // blaster (layout.ts carried), gripped at the stock's wrist (the anchor).
+  // By night it shrinks into the outlaw's six-shooter, part for part:
+  // stock into grip, lever into trigger guard, forestock into cylinder,
+  // receiver into frame, the barrels, magazine and ejector rod, hammers,
+  // sights, engraving into the cylinder's flutes, triggers.
+  repeater: {
+    w: 200,
+    h: 60,
+    anchor: [50, 34],
+    shapes: [
+      { d: 'M 2 16 L 44 25 L 56 27 L 56 38 L 46 41 L 4 50 Z', fill: '#8A5A2E', line: true }, // stock
+      { d: 'M 60 40 Q 60 54 74 54 Q 86 54 86 40', fill: 'none', line: true }, // lever
+      { d: 'M 96 23 L 198 23 L 198 30 L 96 30 Z', fill: '#3A3F46', line: true }, // barrel
+      { d: 'M 150 31 L 194 31 L 194 36 L 150 36 Z', fill: '#4A5059', line: true }, // magazine tube
+      { d: 'M 96 27 L 150 27 L 150 38 L 96 38 Z', fill: '#9B6A38', line: true }, // forestock
+      { d: 'M 56 23 L 96 23 L 96 40 L 56 40 Z', fill: '#D9A93A', line: true }, // receiver
+      { d: 'M 58 23 L 53 15 L 59 14 L 64 22 Z', fill: '#2E3238', line: true }, // hammer
+      { d: 'M 190 23 L 191 18 L 195 18 L 195 23 Z', fill: '#2E3238', line: true }, // front sight
+      { d: 'M 62 27 L 90 27 L 90 29 L 62 29 Z M 62 33 L 90 33 L 90 35 L 62 35 Z', fill: '#F2D27A' }, // engraving
+      { d: 'M 66 40 L 68 47 L 71 40 Z', fill: '#2E3238', line: true }, // trigger
+    ],
+  },
+  // The outlaw's six-shooter, held by its dark grip (the anchor) in his
+  // right hoof (layout.ts rightHoof). Drawn upside down, pointing right with
+  // the grip rising from it, so that turned to hang from the hoof pointing
+  // at the ground (lukas.ts) its grip faces the viewer's right.
+  sixShooter: {
+    w: 100,
+    h: 64,
+    anchor: [38, 12],
+    shapes: [
+      { d: 'M 38 30 L 48 28 L 47 18 L 44 4 L 32 2 L 28 12 Z', fill: '#2A1E18', line: true }, // grip
+      { d: 'M 47 26 Q 47 14 56 14 Q 63 14 63 26', fill: 'none', line: true }, // trigger guard
+      { d: 'M 62 41 L 98 41 L 98 33 L 62 33 Z', fill: '#2B2F35', line: true }, // barrel
+      { d: 'M 64 33 L 90 33 L 90 29 L 64 29 Z', fill: '#3A3F46', line: true }, // ejector rod
+      { d: 'M 48 44 L 65 44 L 65 27 L 48 27 Z', fill: '#4A5059', line: true }, // cylinder
+      { d: 'M 36 42 L 48 42 L 48 26 L 38 26 Z', fill: '#3A3F46', line: true }, // frame
+      { d: 'M 38 42 L 32 50 L 38 51 L 44 43 Z', fill: '#22262B', line: true }, // hammer
+      { d: 'M 93 41 L 94 46 L 97 46 L 97 41 Z', fill: '#22262B', line: true }, // front sight
+      { d: 'M 50 39 L 63 39 L 63 37 L 50 37 Z M 50 34 L 63 34 L 63 32 L 50 32 Z', fill: '#6B727C' }, // flutes
+      { d: 'M 52 26 L 53 19 L 56 26 Z', fill: '#22262B', line: true }, // trigger
+    ],
+  },
+  // The desert sun, its rays out; by night they draw in and it wanes to a
+  // crescent moon.
+  sun: {
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: rays(50, 50, 30, 47, 0.42), fill: '#FFB703', line: true },
+      { d: loop(ovalPoints(50, 50, 27, 27, 8), 1.12), fill: '#FFD23F', line: true },
+      { d: ellipse(41, 41, 7, 5), fill: '#FFF1A8' }, // shine
+    ],
+  },
+  moon: {
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: rays(31, 52, 1, 3, 0.42, Math.PI / 8), fill: '#F6E7B0', line: true }, // drawn in, out of sight behind it
+      { d: loop([[56, 21], [46, 36], [43, 50], [46, 64], [56, 79], [30, 74], [20, 50], [30, 26]], 1), fill: '#F6E7B0', line: true },
+      { d: ellipse(30, 62, 4, 3), fill: '#D9C78A' }, // a crater
+    ],
+  },
+  // A bluebird flying, its wings up; by night a vulture, wings spread wide,
+  // its bald red head and a red eye.
+  bluebird: {
+    w: 100,
+    h: 60,
+    shapes: [
+      { d: 'M 52 30 Q 60 8 80 3 Q 70 20 62 33 Z', fill: '#2C5FA8', line: true }, // far wing
+      { d: 'M 30 34 L 8 26 L 12 44 Z', fill: '#2C5FA8', line: true }, // tail
+      { d: ellipse(48, 36, 21, 11), fill: '#3A7BD5', line: true }, // body
+      { d: ellipse(52, 41, 12, 5.5), fill: '#F28C38' }, // breast
+      { d: 'M 46 33 Q 32 4 10 2 Q 22 22 36 41 Z', fill: '#5B9BEA', line: true }, // near wing
+      { d: circle(70, 29, 9), fill: '#3A7BD5', line: true }, // head
+      { d: 'M 78 26 L 89 30 L 78 34 Z', fill: '#F5B700', line: true }, // beak
+      { d: circle(72, 27, 1.8), fill: '#1B1B1B' }, // eye
+    ],
+  },
+  vulture: {
+    w: 100,
+    h: 60,
+    shapes: [
+      { d: 'M 52 30 Q 68 12 96 14 Q 78 26 62 35 Z', fill: '#241D19', line: true },
+      { d: 'M 30 35 L 6 34 L 14 46 Z', fill: '#241D19', line: true },
+      { d: ellipse(48, 37, 22, 12), fill: '#2E2622', line: true },
+      { d: ellipse(63, 31, 7, 5), fill: '#E6DCCB' }, // its ruff
+      { d: 'M 46 34 Q 26 14 2 22 Q 18 32 36 43 Z', fill: '#3B312B', line: true },
+      { d: circle(73, 26, 7), fill: '#D46A6A', line: true },
+      { d: 'M 79 23 L 90 29 L 79 30 Z', fill: '#E8DDB5', line: true },
+      { d: circle(75, 24, 1.8), fill: '#FF3B30' },
+    ],
+  },
+  // A horseshoe for the trough, iron grey, its nail holes showing.
+  horseshoe: {
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: 'M 20 92 L 12 54 Q 10 8 50 6 Q 90 8 88 54 L 80 92 L 64 92 L 70 54 Q 72 26 50 26 Q 28 26 30 54 L 36 92 Z', fill: '#8E9399', line: true },
+      { d: 'M 18 52 Q 17 20 42 13 L 43 17 Q 22 24 22 52 Z', fill: '#B9BEC4' }, // shine
+      { d: rect(18, 64, 5, 5) + rect(77, 64, 5, 5) + rect(16, 42, 5, 5) + rect(79, 42, 5, 5), fill: '#3A3D42' }, // nail holes
+    ],
+  },
+
+  // Chris (an unlockable theme): a superhero by day who turns supervillain
+  // after dark. Each day prop has a night one drawn to match it shape for
+  // shape (morph.ts); the cape blows out in the wind on the way.
+  // A domino mask over the eyes (anchored on the point between them), its
+  // holes over the pig's own eyes: a hero's blue one by day, its ends drawn
+  // out level as if he's moving at speed, a gold streak along it; by night a
+  // villain's black one swept up into points, the holes narrowed to slits.
+  // On the face, so no sticker rim. The outline runs clockwise and the holes
+  // the other way round, so they're cut out of it.
+  heroMask: {
+    eyes: true,
+    rim: false,
+    w: 100,
+    h: 40,
+    anchor: [50, 20],
+    shapes: [
+      {
+        d: 'M 0 22 Q 16 6 50 10 Q 84 6 100 22 Q 86 26 78 34 Q 60 36 50 28 Q 40 36 22 34 Q 14 26 0 22 Z ' + ellipse(32, 20, 7.5, 6) + ellipse(68, 20, 7.5, 6),
+        fill: '#2B6FE8',
+        line: true,
+      },
+      { d: 'M 6 20 Q 22 9 44 11 Q 22 12 9 22 Z', fill: '#FFD23F' }, // the streak
+    ],
+  },
+  villainMask: {
+    eyes: true,
+    rim: false,
+    w: 100,
+    h: 40,
+    anchor: [50, 20],
+    shapes: [
+      {
+        d: 'M 0 4 Q 20 10 50 14 Q 80 10 100 4 Q 94 28 78 32 Q 62 34 50 27 Q 38 34 22 32 Q 6 28 0 4 Z ' + ellipse(33, 21, 7, 4.5) + ellipse(67, 21, 7, 4.5),
+        fill: '#1A1022',
+        line: true,
+      },
+      { d: 'M 8 9 Q 22 12 36 14 Q 24 15 10 13 Z', fill: '#4A2A66' },
+    ],
+  },
+  // The emblem on his chest: a gold-edged shield with a pig's snout on red
+  // by day; by night its edge sharpens into a black six-pointed burst, the
+  // field turns poison purple and the nostrils glow red. On the chest, inside
+  // the pig's outline, so no sticker rim.
+  heroEmblem: {
+    rim: false,
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: loop([[50, 4], [72, 8], [94, 10], [94, 40], [86, 66], [70, 86], [50, 97], [30, 86], [14, 66], [6, 40], [6, 10], [28, 8]], 0.35), fill: '#FFD23F', line: true }, // its edge
+      { d: loop([[50, 14], [68, 17], [84, 18], [84, 42], [78, 62], [66, 78], [50, 87], [34, 78], [22, 62], [16, 42], [16, 18], [32, 17]], 0.35), fill: '#D62839', line: true },
+      { d: ellipse(50, 50, 20, 14), fill: '#FEA0B2', line: true }, // the snout
+      { d: ellipse(42, 50, 4, 6.5) + ellipse(58, 50, 4, 6.5), fill: '#B2244E' },
+    ],
+  },
+  villainEmblem: {
+    rim: false,
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: loop(starPoints(50, 50, 49, 32, 6)), fill: '#1A1022', line: true },
+      { d: loop(starPoints(50, 50, 33, 24, 6)), fill: '#6A1B9A', line: true },
+      { d: ellipse(50, 52, 18, 12), fill: '#3B1250', line: true },
+      { d: ellipse(43, 52, 3, 6.5) + ellipse(57, 52, 3, 6.5), fill: '#FF2D2D' },
+    ],
+  },
+  // The cape, behind him from his shoulders (the anchor, the middle of its
+  // collar) to his ankles: a hero's red one with a gold lining by day, by
+  // night a villain's in purple and black, wider, its hem torn into points.
+  // On the way from one to the other it blows out in the wind to his left
+  // (capeBlown, the viewer's right), streaming out flat with its lining
+  // showing. All three are drawn on the same grid, so they line up.
+  heroCape: {
+    behind: true,
+    w: 210,
+    h: 100,
+    anchor: [70, 8],
+    shapes: [
+      { d: loop([[44, 8], [70, 13], [96, 8], [110, 28], [120, 56], [128, 86], [100, 80], [70, 86], [40, 80], [12, 86], [20, 56], [30, 28]], 0.7), fill: '#D62839', line: true },
+      { d: loop([[96, 10], [104, 30], [112, 58], [118, 84], [108, 80], [100, 40]], 0.7), fill: '#A31C2B' }, // a fold
+    ],
+  },
+  capeBlown: {
+    behind: true,
+    w: 210,
+    h: 100,
+    anchor: [70, 8],
+    shapes: [
+      { d: loop([[44, 8], [70, 13], [96, 8], [118, 4], [146, 12], [176, 30], [158, 44], [140, 36], [122, 52], [102, 48], [80, 36], [54, 24]], 0.8), fill: '#A8204A', line: true },
+      { d: loop([[96, 10], [119, 10], [146, 18], [172, 32], [146, 38], [105, 30]], 0.8), fill: '#FFC531' }, // its lining
+    ],
+  },
+  villainCape: {
+    behind: true,
+    w: 210,
+    h: 100,
+    anchor: [70, 8],
+    shapes: [
+      { d: loop([[40, 6], [70, 12], [100, 6], [118, 28], [130, 58], [136, 92], [110, 74], [70, 94], [30, 74], [4, 92], [10, 58], [22, 28]], 0.25), fill: '#3B1250', line: true },
+      { d: loop([[100, 8], [112, 30], [124, 60], [130, 88], [118, 76], [106, 40]], 0.25), fill: '#1A0A24' },
+    ],
+  },
+  // A puffy white cloud; by night a lumpy storm cloud.
+  cloud: {
+    w: 100,
+    h: 60,
+    shapes: [
+      { d: loop([[10, 46], [8, 32], [20, 22], [32, 24], [40, 10], [58, 6], [70, 16], [84, 14], [94, 28], [92, 44], [70, 52], [36, 52]], 1), fill: '#FFFFFF', line: true },
+      { d: ellipse(52, 44, 30, 5), fill: '#DCEAF5' }, // its shade
+    ],
+  },
+  stormCloud: {
+    w: 100,
+    h: 60,
+    shapes: [
+      { d: loop([[6, 44], [6, 28], [18, 18], [30, 22], [40, 6], [60, 4], [72, 14], [88, 10], [98, 26], [96, 44], [72, 54], [34, 54]], 1), fill: '#3B3550', line: true },
+      { d: ellipse(52, 46, 32, 5), fill: '#26213A' },
+    ],
+  },
+  // A gold star; by night a bolt of acid-green lightning.
+  heroStar: {
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: star(50, 52, 46, 20), fill: '#FFD23F', line: true },
+      { d: star(50, 52, 26, 11), fill: '#FFF1A0' },
+    ],
+  },
+  bolt: {
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: 'M 52 2 L 36 30 L 24 56 L 46 56 L 40 78 L 34 98 L 56 66 L 76 38 L 56 38 L 72 2 Z', fill: '#B6FF3B', line: true },
+      { d: 'M 56 8 L 44 30 L 34 50 L 50 50 L 46 64 L 42 78 L 54 60 L 66 44 L 50 44 L 62 8 Z', fill: '#EFFFC2' },
+    ],
+  },
+
+  // Ash (an unlockable theme): a basketball player in red, black and white,
+  // sitting the game out on crutches with his ankle in a cast.
+  // His sweatband and his jersey and shorts are traced from the art to fit
+  // him on each piece of it (ashWear.ts, made by scripts/ash-wear.py).
+  ...ASH_WEAR,
+  // An underarm crutch: a padded top, two aluminium rails meeting at the leg,
+  // a grip across them (the anchor, where the hoof holds it) and a rubber
+  // tip. Held on the pig's art, inside its outline, so no rim.
+  crutch: {
+    rim: false,
+    w: 36,
+    h: 200,
+    anchor: [18, 64],
+    shapes: [
+      { d: 'M 5 12 L 11 12 L 20 122 L 15 122 Z M 31 12 L 25 12 L 16 122 L 21 122 Z', fill: '#C9CED6', line: true }, // rails
+      { d: rect(14.5, 118, 7, 74), fill: '#B8BEC6', line: true }, // leg
+      { d: 'M 12 190 L 24 190 L 25 200 L 11 200 Z', fill: '#1E1E1E', line: true }, // tip
+      { d: 'M 2 4 Q 2 0 8 0 L 28 0 Q 34 0 34 4 L 34 10 Q 34 13 30 13 L 6 13 Q 2 13 2 10 Z', fill: '#2B2B2B', line: true }, // pad
+      { d: rect(4, 60, 28, 8), fill: '#1E1E1E', line: true }, // grip
+    ],
+  },
+  // A white cast round his ankle, the bandage's wraps showing, signed with a
+  // little red heart.
+  ankleCast: {
+    w: 100,
+    h: 70,
+    shapes: [
+      { d: 'M 10 6 Q 50 0 90 6 Q 96 35 90 64 Q 50 70 10 64 Q 4 35 10 6 Z', fill: '#F5F5F2', line: true },
+      { d: 'M 12 20 Q 50 10 88 24 L 88 30 Q 50 16 12 26 Z M 12 40 Q 50 30 88 44 L 88 50 Q 50 36 12 46 Z', fill: '#D9D9D4' }, // wraps
+      { d: heart(70, 54, 6), fill: '#CE1141' },
+    ],
+  },
+  // A basketball, and a hoop: a white backboard with its red square, an
+  // orange rim and a net.
+  basketball: {
+    w: 100,
+    h: 100,
+    shapes: [
+      { d: circle(50, 50, 46), fill: '#E8762B', line: true },
+      { d: ellipse(34, 30, 10, 6), fill: '#F6A469' }, // shine
+      { d: 'M 50 4 L 50 96 M 4 50 L 96 50 M 20 16 Q 42 50 20 84 M 80 16 Q 58 50 80 84', fill: 'none', line: true }, // seams
+    ],
+  },
+  hoop: {
+    w: 100,
+    h: 110,
+    shapes: [
+      { d: rect(4, 2, 92, 62), fill: '#FFFFFF', line: true }, // backboard
+      { d: rect(33, 24, 34, 28), fill: '#CE1141' },
+      { d: rect(38, 29, 24, 18), fill: '#FFFFFF' },
+      { d: 'M 28 64 L 36 104 L 64 104 L 72 64 M 34 64 L 44 104 M 43 64 L 50 104 M 57 64 L 56 104 M 66 64 L 58 104 M 30 76 L 70 76 M 33 90 L 67 90', fill: 'none', line: true }, // net
+      { d: ellipse(50, 63, 24, 5), fill: '#E8762B', line: true }, // rim
+    ],
+  },
+
   // ---- Outfits (src/avatar/outfits.ts): worn by a player's own pig when
   // they win, placed on the winner art there.
   crown: {
@@ -1214,6 +1657,9 @@ export const PROPS = {
   hoofSign: { w: 100, h: 128.8, rim: false, shapes: [{ d: 'M9.1 0.0L24.2 0.0L24.2 30.3L22.7 30.3L22.7 31.8L36.4 31.8L36.4 33.3L47.0 33.3L47.0 34.8L50.0 34.8L50.0 33.3L60.6 31.8L60.6 30.3L68.2 30.3L68.2 28.8L86.4 28.8L86.4 27.3L100.0 28.8L100.0 113.6L59.1 113.6L59.1 112.1L56.1 112.1L56.1 116.7L54.5 116.7L53.0 119.7L48.5 119.7L48.5 121.2L27.3 121.2L27.3 119.7L0.0 118.2L0.0 100.0L39.4 103.0L39.4 98.5L40.9 98.5L40.9 48.5L27.3 48.5L27.3 50.0L24.2 50.0L24.2 51.5L6.1 51.5L6.1 31.8L7.6 31.8Z', fill: '#000000' }] },
   hoofPhone: { w: 100, h: 115.7, rim: false, shapes: [{ d: 'M98.6 0.0L100.0 0.0L100.0 115.7L98.6 115.7L98.6 108.6L87.1 108.6L87.1 110.0L61.4 108.6L61.4 107.1L54.3 107.1L54.3 105.7L48.6 105.7L48.6 104.3L44.3 104.3L44.3 102.9L41.4 102.9L41.4 104.3L31.4 104.3L31.4 105.7L18.6 105.7L18.6 107.1L0.0 107.1L0.0 92.9L1.4 92.9L1.4 91.4L35.7 90.0L35.7 42.9L34.3 42.9L34.3 38.6L0.0 40.0L0.0 24.3L22.9 22.9L22.9 21.4L35.7 21.4L35.7 20.0L48.6 20.0L50.0 30.0L52.9 30.0L52.9 28.6L98.6 27.1Z', fill: '#000000' }] },
   hoofWaiting: { w: 100, h: 108.3, rim: false, shapes: [{ d: 'M54.2 0.0L70.8 0.0L70.8 25.0L66.7 25.0L66.7 41.7L70.8 41.7L70.8 58.3L75.0 58.3L75.0 100.0L70.8 100.0L70.8 108.3L50.0 108.3L50.0 104.2L33.3 100.0L29.2 91.7L20.8 91.7L16.7 100.0L0.0 104.2L0.0 29.2L54.2 29.2Z', fill: '#000000' }] },
+  // The pig's right hoof (the viewer's right) on the home art (layout.ts
+  // rightHoof), traced the same way.
+  hoofStillRight: { w: 100, h: 106.2, rim: false, shapes: [{ d: 'M67.7 106.2L64.6 106.2L58.5 98.5L55.4 98.5L32.3 73.8L27.7 75.4L23.1 81.5L20.0 81.5L13.8 87.7L10.8 87.7L9.2 90.8L0.0 93.8L3.1 53.8L4.6 53.8L4.6 44.6L6.2 44.6L6.2 35.4L7.7 35.4L7.7 27.7L0.0 26.2L1.5 1.5L16.9 0.0L16.9 6.2L16.9 10.8L20.0 12.3L36.9 12.3L36.9 13.8L55.4 13.8L55.4 15.4L73.8 15.4L75.4 16.9L78.5 0.0L100.0 0.0L93.8 30.8L83.1 29.2L80.0 61.5L78.5 61.5L72.3 95.4L70.8 95.4Z', fill: '#000000' }] },
   hoofWinner: { w: 100, h: 89.5, rim: false, shapes: [{ d: 'M13.2 0.0L28.9 0.0L28.9 13.2L26.3 13.2L26.3 15.8L73.7 15.8L73.7 13.2L76.3 13.2L76.3 0.0L92.1 0.0L92.1 2.6L89.5 2.6L89.5 18.4L86.8 18.4L86.8 26.3L89.5 26.3L89.5 34.2L92.1 34.2L92.1 55.3L94.7 55.3L94.7 68.4L92.1 68.4L92.1 81.6L89.5 81.6L92.1 89.5L76.3 86.8L76.3 84.2L60.5 78.9L60.5 76.3L52.6 73.7L52.6 71.1L44.7 73.7L44.7 76.3L39.5 76.3L34.2 84.2L21.1 86.8L21.1 78.9L18.4 78.9L18.4 36.8L21.1 36.8L21.1 31.6L18.4 31.6L18.4 28.9L10.5 28.9Z', fill: '#000000' }] },
 } satisfies Record<string, Prop>;
 

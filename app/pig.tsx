@@ -11,7 +11,7 @@ import { propThumb } from '../src/rewards/RewardThumb';
 import { BUBBLE_MAX, rewardsOf, slotOf, type Reward } from '../src/rewards/catalog';
 import { cleanBubbleText, useInventory } from '../src/rewards/inventory';
 import { font, type Theme } from '../src/theme/tokens';
-import { useSkin, useThemedStyles } from '../src/theme/theme';
+import { useSkin, useTheme, useThemedStyles } from '../src/theme/theme';
 import type { Skin } from '../src/theme/skins';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
 
@@ -38,6 +38,7 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 export default function Pig() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const dark = useTheme().name === 'dark';
   const { owns, worn, wear, chosen, choose, setPart, showPart, bubbleText, setBubbleText } = useInventory();
   const showing = useSkin();
   const themes = useThemeSkins();
@@ -69,7 +70,9 @@ export default function Pig() {
 
   // On: the pig wears this theme's part now. Off: taken off, or another
   // theme's (or an outfit in that slot) is on instead.
+  // A part that turns into another after dark (Lukas's) shows as it looks now.
   const themeTile = (skin: Skin, part: ThemePart) => {
+    const looks = (dark && part.night) || part;
     const on = partSource(mine, showing, part.key) === skin.id;
     const toggle = () => {
       setPart(part.key, on || skin === showing ? null : skin.id);
@@ -82,8 +85,8 @@ export default function Pig() {
     return (
       <Card
         key={`${skin.id}:${part.key}`}
-        picture={propThumb(part.prop, ui.sp(32))}
-        name={part.label}
+        picture={propThumb(looks.prop, ui.sp(32))}
+        name={looks.label}
         status={on ? 'On your pig' : 'Tap to put on'}
         owned
         chosen={on}
@@ -103,10 +106,15 @@ export default function Pig() {
     </View>
   );
 
-  // Outfits ahead of theme parts in the same place; sort is stable.
+  // Outfits ahead of theme parts in the same place; sort is stable. A part
+  // that's there only by day (Lukas's badge) has no card at night.
   const accessories = [
     ...rewardsOf('outfit').map((r) => ({ rank: placeRank(r.slot), card: tile(r) })),
-    ...themes.flatMap((s) => partsOf(s).map((part) => ({ rank: placeRank(part.key), card: themeTile(s, part) }))),
+    ...themes.flatMap((s) =>
+      partsOf(s)
+        .filter((part) => !(dark && part.dayOnly))
+        .map((part) => ({ rank: placeRank(part.key), card: themeTile(s, part) }))
+    ),
   ]
     .sort((a, b) => a.rank - b.rank)
     .map((a) => a.card);

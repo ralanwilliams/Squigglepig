@@ -1,11 +1,14 @@
 import { themes, type Theme } from '../tokens';
+import { ash } from './ash';
 import { birthday, type Birthday } from './birthday';
 import { bobby } from './bobby';
+import { chris } from './chris';
 import { christmas } from './christmas';
 import { easter } from './easter';
 import { fourthOfJuly } from './fourthOfJuly';
 import { groundhogDay } from './groundhogDay';
 import { halloween } from './halloween';
+import { lukas } from './lukas';
 import { newYear } from './newYear';
 import { paul } from './paul';
 import { railroad } from './railroad';
@@ -37,14 +40,17 @@ export const SKINS: Skin[] = [
 
 // Themes a player wins in solo play and then chooses (src/rewards/catalog.ts),
 // by the reward's id. They have no season: the chosen one shows whenever no
-// birthday or holiday is on (or always, with Seasonal themes off), and over
-// the one that was on when it was chosen (theme.tsx pinChoice). To add
+// birthday or holiday is on (or always, with Seasonal themes off: choosing
+// one switches them off until the next, theme.tsx themeChosen). To add
 // one, write it beside railroad.ts, list it here, and take `soon` off its
 // reward in the catalog.
 export const UNLOCKABLE: Record<string, Skin> = {
   'theme.railroad': railroad,
   'theme.paul': paul,
   'theme.bobby': bobby,
+  'theme.lukas': lukas,
+  'theme.chris': chris,
+  'theme.ash': ash,
 };
 
 // Every skin, holidays first (the previews and their contrast check use this).
