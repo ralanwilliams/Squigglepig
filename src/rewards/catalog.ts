@@ -94,6 +94,9 @@ const THEMES: Entry<ThemeReward>[] = [
   { id: 'theme.railroad', label: 'Railroad', tier: 'rare' }, // src/theme/skins/railroad.ts
   { id: 'theme.paul', label: 'Paul', tier: 'rare' }, // src/theme/skins/paul.ts
   { id: 'theme.bobby', label: 'Bobby', tier: 'rare' }, // src/theme/skins/bobby.ts
+  { id: 'theme.lukas', label: 'Lukas', tier: 'rare' }, // src/theme/skins/lukas.ts
+  { id: 'theme.chris', label: 'Chris', tier: 'rare' }, // src/theme/skins/chris.ts
+  { id: 'theme.ash', label: 'Ash', tier: 'rare' }, // src/theme/skins/ash.ts
 ];
 
 // Colors drawn on the canvas's white paper, which is never themed, so each is

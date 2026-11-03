@@ -16,8 +16,11 @@ import { birthday } from '../theme/skins/birthday';
 // same for every theme ('head', 'eyes', 'sky', 'hold', or the prop's name),
 // so it travels in an avatar (avatar.ts) as is. 'head' and 'eyes' are also
 // outfit slots (src/rewards/catalog.ts): an outfit there and a theme's part
-// there take each other's place.
-export type ThemePart = { key: string; label: string; prop: PropName };
+// there take each other's place. A part that turns into another after dark
+// (Lukas's, morph.ts) has its `night` name and prop for the card then; one
+// that's there only by day is `dayOnly`, and has no card at night, unless
+// something else there only by night takes its place (the rifle, the sack).
+export type ThemePart = { key: string; label: string; prop: PropName; night?: { label: string; prop: PropName }; dayOnly?: true };
 
 export function partOf(p: Placement): string {
   const prop = PROPS[p.prop] as Prop;
@@ -26,6 +29,9 @@ export function partOf(p: Placement): string {
   // the winner art's name.
   if (p.prop.startsWith('ears')) return 'earsWinner';
   if (prop.eyes) return 'eyes';
+  // Ash's jersey is traced for each piece of art, with the arms that hold
+  // his crutches drawn again over it (ashWear.ts): all one part.
+  if (p.prop.startsWith('jersey')) return 'jersey';
   if (p.rim === false || p.prop.startsWith('hoof')) return 'hold';
   if (p.bob || p.twinkle) return 'sky';
   return p.prop;
@@ -82,6 +88,29 @@ const LABELS: Partial<Record<PropName, string>> = {
   visor: 'Shield shades',
   hoverCar: 'Flying cars',
   rifle: 'Blaster',
+  sheriffHat: "Sheriff's hat",
+  outlawHat: "Outlaw's hat",
+  kindBrows: 'Kind brows',
+  angryBrows: 'Scowl',
+  sheriffBadge: 'Sheriff badge',
+  repeater: 'Repeater rifle',
+  sixShooter: 'Six-shooter',
+  lootSack: 'Sack of loot',
+  heroMask: 'Domino mask',
+  villainMask: "Villain's mask",
+  heroEmblem: 'Hero shield',
+  villainEmblem: 'Villain emblem',
+  heroCape: 'Cape',
+  villainCape: "Villain's cape",
+  cloud: 'Clouds and stars',
+  stormCloud: 'Storm clouds and lightning',
+  sweatbandWinner: 'Sweatband',
+  jerseyWinner: 'Jersey',
+  crutch: 'Crutches',
+  ankleCast: 'Ankle cast',
+  hoop: 'Hoop and basketballs',
+  sun: 'Sun and bluebirds',
+  moon: 'Moon and vultures',
 };
 
 const named = (prop: PropName) => LABELS[prop] ?? prop.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
@@ -92,7 +121,15 @@ export function partsOf(skin: Skin): ThemePart[] {
   for (const p of skin.decor.winner ?? []) {
     const key = partOf(p);
     // The hoof only goes with what it holds; the card shows the held prop.
-    if (!parts.has(key) && !p.prop.startsWith('hoof')) parts.set(key, { key, label: named(p.prop), prop: p.prop });
+    if (p.prop.startsWith('hoof')) continue;
+    const day = parts.get(key);
+    if (day?.dayOnly && p.by === 'night') {
+      parts.set(key, { key, label: day.label, prop: day.prop, night: { label: named(p.prop), prop: p.prop } });
+      continue;
+    }
+    if (day) continue;
+    const night = p.night?.prop && { label: named(p.night.prop), prop: p.night.prop };
+    parts.set(key, { key, label: named(p.prop), prop: p.prop, ...(night ? { night } : {}), ...(p.by === 'day' ? { dayOnly: true as const } : {}) });
   }
   return [...parts.values()];
 }
@@ -119,9 +156,11 @@ export function parsePart(id: string): { skin: Skin; key: string } | null {
 // then what floats about it. An outfit's slot is one of these too
 // (src/rewards/catalog.ts). A theme's one-off props go where they sit:
 // Easter's ears with the hats, Valentine's quiver with what's carried, the
-// groundhog at the pig's feet; any other with what's at its feet.
+// groundhog and Ash's cast at the pig's feet, Lukas's badge, Chris's
+// emblem and cape and Ash's jersey with what's at the neck; any other with
+// what's at its feet.
 const PLACES = ['head', 'eyes', 'neck', 'hold', 'feet', 'sky'];
-const SITS: Record<string, string> = { earsWinner: 'head', quiver: 'hold', stumpGroundhog: 'feet' };
+const SITS: Record<string, string> = { earsWinner: 'head', quiver: 'hold', stumpGroundhog: 'feet', sheriffBadge: 'neck', heroEmblem: 'neck', heroCape: 'neck', jersey: 'neck', ankleCast: 'feet' };
 export function placeRank(key: string): number {
   const i = PLACES.indexOf(SITS[key] ?? key);
   return i < 0 ? PLACES.indexOf('feet') : i;

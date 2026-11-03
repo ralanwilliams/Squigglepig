@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AccessibilityInfo, Animated, AppState, Easing, Platform, StyleSheet, View, useColorScheme, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
@@ -7,6 +7,8 @@ import { themes, type Theme } from './tokens';
 import { UNLOCKABLE, dayKey, paletteFor, seasonEnd, skinFor, type Birthday, type Skin } from './skins';
 import { BIRTHDAYS_KEY, fetchBirthdays, parseBirthdays } from '../lib/birthdays';
 import { useInventory } from '../rewards/inventory';
+import { SOUNDS } from '../assets/assets';
+import { playSound } from '../lib/sound';
 
 // Which palette the app shows. 'system' follows the device setting (app.json
 // sets userInterfaceStyle "automatic" so we're told about it); the in-app
@@ -27,10 +29,14 @@ type ThemeName = 'light' | 'dark';
 //
 // The skin showing is, first to last: a birthday or holiday (while Seasonal
 // themes is on), else the theme the player chose from what they've won (the
-// inventory, src/rewards/inventory.tsx), else classic. Choosing a theme puts
-// it on at once, over the birthday or holiday on now (`pinChoice`): it stays
-// until that one ends, so the next one shows, and once that's over the
-// chosen theme is back.
+// inventory, src/rewards/inventory.tsx), else classic. Choosing a theme
+// (`themeChosen`) puts it on over everything at once: it switches Seasonal
+// themes off, until the next birthday or holiday comes (not the one on when
+// it was chosen), when they switch back on by themselves and it shows.
+// Switching them on shows the one in season at once. Whenever a theme comes
+// on like this, chosen or a birthday or holiday, the player's pig is dressed
+// in all of its look (inventory.tsx resetLook), to change as they like on
+// Your pig until the next.
 export type ContrastMode = 'system' | 'normal' | 'high';
 export type MotionMode = 'system' | 'full' | 'reduced';
 
@@ -38,10 +44,58 @@ const STORAGE_KEY = 'squigglepig.theme';
 const CONTRAST_KEY = 'squigglepig.contrast';
 const MOTION_KEY = 'squigglepig.motion';
 const SEASONAL_KEY = 'squigglepig.seasonal';
-const PIN_KEY = 'squigglepig.themePin';
+const PAUSE_KEY = 'squigglepig.seasonalPause';
+// Earlier versions pinned a chosen theme over the birthday or holiday on
+// when it was chosen; a pin saved then is read as a pause (below) and removed.
+const OLD_PIN_KEY = 'squigglepig.themePin';
 const WIPE_MS = 700; // the sweep
 const FLIP_AT_MS = 90; // how far into the sweep the palette flips under the photo
 const EDGE = 0.18; // soft leading edge, as a share of the screen height
+const MORPH_MS = 1000; // a skin's props turning between their day and night forms
+const STING_VOLUME = 0.35; // a skin's sting as the light changes (Skin.sounds)
+
+// How far the skins' props that morph (skins/morph.ts: Lukas's sheriff
+// turning outlaw) are from their day form (0) to their night form (1). One
+// clock for all of them, so every pig on screen turns together. The provider
+// moves it (morphTo) once the screen has changed: when the sweep is over, so
+// the morph plays on the new screen rather than under the photo of the old.
+let morphAt = 0;
+let morphFrame: number | null = null;
+const morphWatchers = new Set<() => void>();
+const morphEase = Easing.inOut(Easing.cubic);
+
+function setMorph(v: number) {
+  morphAt = v;
+  morphWatchers.forEach((w) => w());
+}
+
+// Head for night (1) or day (0): in MORPH_MS, or at once. Turned back part
+// way, it goes back the way it came, in as much of the time.
+function morphTo(night: boolean, animate: boolean) {
+  const to = night ? 1 : 0;
+  if (morphFrame !== null) cancelAnimationFrame(morphFrame);
+  morphFrame = null;
+  if (!animate || morphAt === to) {
+    if (morphAt !== to) setMorph(to);
+    return;
+  }
+  const from = morphAt;
+  const ms = MORPH_MS * Math.abs(to - from);
+  const start = Date.now();
+  const step = () => {
+    const k = Math.min(1, (Date.now() - start) / ms);
+    setMorph(from + (to - from) * morphEase(k));
+    morphFrame = k < 1 ? requestAnimationFrame(step) : null;
+  };
+  morphFrame = requestAnimationFrame(step);
+}
+
+const watchMorph = (w: () => void) => {
+  morphWatchers.add(w);
+  return () => {
+    morphWatchers.delete(w);
+  };
+};
 
 type ThemeCtx = {
   theme: Theme;
@@ -63,12 +117,15 @@ type ThemeCtx = {
   reducedMotion: boolean; // likewise
   setMotion: (m: MotionMode) => void;
   seasonal: boolean;
+  // Switch Seasonal themes on (the birthday or holiday in season shows at
+  // once, behind the sweep, and dresses the pig) or off.
   setSeasonal: (on: boolean) => void;
   skin: Skin | null; // the skin showing (seasonal or chosen), if any
   season: Skin | null; // the birthday or holiday in season today, showing or not
-  // A theme was just chosen: show it over the birthday or holiday on today
-  // until that one ends. With none on, it shows until the next one starts.
-  pinChoice: () => void;
+  // A theme was just chosen (inventory.tsx choose): it shows over
+  // everything, Seasonal themes off until the next birthday or holiday, and
+  // the pig is dressed in its look.
+  themeChosen: () => void;
   // A screen whose art changes with the light itself (useFadesWithTheme)
   // registers while it's up (+1) and leaves (-1).
   fadesItself: (delta: number) => void;
@@ -78,14 +135,18 @@ type ThemeCtx = {
 // covers (run once the photo is showing).
 type Wipe = { uri: string; up: boolean; apply: () => void };
 type Size = { width: number; height: number };
-// The birthday or holiday a chosen theme shows over (its skin id), and the
-// last day of it (seasonEnd), so a pin made this Halloween is over by next.
-type Pin = { id: string; until: string };
+// Seasonal themes switched off by choosing a theme, until the next birthday
+// or holiday: the one in season when it was chosen (its skin id), if any,
+// and the last day of it (seasonEnd), so this Halloween's doesn't wait out
+// next Halloween too. Any other that comes switches them back on.
+type Pause = { id: string | null; until: string | null };
 
-function parsePin(raw: string | null): Pin | null {
+function parsePause(raw: string | null): Pause | null {
   try {
     const p = raw ? JSON.parse(raw) : null;
-    return p && typeof p.id === 'string' && typeof p.until === 'string' ? { id: p.id, until: p.until } : null;
+    if (!p || typeof p !== 'object') return null;
+    const str = (v: unknown) => (typeof v === 'string' ? v : null);
+    return { id: str(p.id), until: str(p.until) };
   } catch {
     return null;
   }
@@ -183,22 +244,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [seasonal, setSeasonalState] = useState(true);
   const [savedBirthdays, setSavedBirthdays] = useState<Birthday[] | null>(null);
   const { season, today } = useSeasonSkin(savedBirthdays);
-  const [pin, setPin] = useState<Pin | null>(null);
-  const chosen = UNLOCKABLE[useInventory().chosen('theme') ?? ''] ?? null;
+  const [pause, setPause] = useState<Pause | null>(null);
+  const inventory = useInventory();
+  const chosen = UNLOCKABLE[inventory.chosen('theme') ?? ''] ?? null;
   const [loaded, setLoaded] = useState(false);
 
   // Restore the pinned settings before the first frame so a
   // dark-mode player never sees a teal flash at launch (the splash screen
   // covers the wait).
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, CONTRAST_KEY, MOTION_KEY, SEASONAL_KEY, BIRTHDAYS_KEY, PIN_KEY])
-      .then(([[, v], [, c], [, m], [, z], [, b], [, p]]) => {
+    AsyncStorage.multiGet([STORAGE_KEY, CONTRAST_KEY, MOTION_KEY, SEASONAL_KEY, BIRTHDAYS_KEY, PAUSE_KEY, OLD_PIN_KEY])
+      .then(([[, v], [, c], [, m], [, z], [, b], [, p], [, old]]) => {
         if (v === 'light' || v === 'dark') setModeState(v);
         if (c === 'normal' || c === 'high') setContrastState(c);
         if (m === 'full' || m === 'reduced') setMotionState(m);
         if (z === 'off') setSeasonalState(false);
         setSavedBirthdays(parseBirthdays(b));
-        setPin(parsePin(p));
+        const pinned = parsePause(old);
+        if (pinned?.id && pinned.until) {
+          // A theme chosen over a birthday or holiday by an earlier version:
+          // it shows over it, as it did, and the next one switches them back on.
+          setSeasonalState(false);
+          setPause(pinned);
+          AsyncStorage.multiSet([[SEASONAL_KEY, 'off'], [PAUSE_KEY, JSON.stringify(pinned)]]).catch(() => {});
+        } else setPause(parsePause(p));
+        if (old !== null) AsyncStorage.removeItem(OLD_PIN_KEY).catch(() => {});
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -207,9 +277,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const name: ThemeName = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const highContrast = contrast === 'system' ? osHighContrast : contrast === 'high';
   const reducedMotion = motion === 'system' ? osReduceMotion : motion === 'reduced';
-  // The season gives way to a theme chosen while it was on.
-  const pinned = !!season && pin?.id === season.id && dayKey(today) <= pin.until;
-  const skin = (seasonal && !pinned ? season : null) ?? chosen;
+  const skin = (seasonal ? season : null) ?? chosen;
   const theme = paletteFor(skin, name, highContrast);
 
   const setMode = useCallback((m: ThemeMode) => {
@@ -227,16 +295,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(MOTION_KEY, m).catch(() => {});
   }, []);
 
-  const setSeasonal = useCallback((on: boolean) => {
+  // Seasonal themes on or off, and the pause a chosen theme put on them (null
+  // clears it), kept together.
+  const storeSeasonal = useCallback((on: boolean, paused: Pause | null) => {
     setSeasonalState(on);
+    setPause(paused);
     AsyncStorage.setItem(SEASONAL_KEY, on ? 'on' : 'off').catch(() => {});
+    (paused ? AsyncStorage.setItem(PAUSE_KEY, JSON.stringify(paused)) : AsyncStorage.removeItem(PAUSE_KEY)).catch(() => {});
   }, []);
 
-  const pinChoice = useCallback(() => {
-    const next = season ? { id: season.id, until: seasonEnd(season, today) } : null;
-    setPin(next);
-    (next ? AsyncStorage.setItem(PIN_KEY, JSON.stringify(next)) : AsyncStorage.removeItem(PIN_KEY)).catch(() => {});
-  }, [season, today]);
+  const { resetLook } = inventory;
+  const themeChosen = useCallback(() => {
+    storeSeasonal(false, season ? { id: season.id, until: seasonEnd(season, today) } : { id: null, until: null });
+    resetLook();
+  }, [storeSeasonal, season, today, resetLook]);
+
+  // Paused by a chosen theme: the first birthday or holiday that isn't the
+  // one on when it was chosen switches Seasonal themes back on, and dresses
+  // the pig for it.
+  useEffect(() => {
+    if (!loaded || seasonal || !pause || !season) return;
+    if (pause.id === season.id && pause.until && dayKey(today) <= pause.until) return;
+    storeSeasonal(true, null);
+    resetLook();
+  }, [loaded, seasonal, pause, season, today, storeSeasonal, resetLook]);
 
   // The transition: the OLD screen is photographed
   // (react-native-view-shot), the palette flips underneath the photo, and the
@@ -279,6 +361,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [reducedMotion]
   );
 
+  // Switched on, the birthday or holiday in season (if any) shows over
+  // everything at once, behind the sweep, and the pig is dressed for it.
+  // Switched by hand, either way, it's no longer paused.
+  const setSeasonal = useCallback(
+    (on: boolean) => {
+      const apply = () => {
+        storeSeasonal(on, null);
+        if (on && season) resetLook();
+      };
+      if (on && !seasonal && season && season !== chosen) sweep(apply);
+      else if (!on && seasonal && season && season !== chosen) sweep(apply, true);
+      else apply();
+    },
+    [storeSeasonal, seasonal, season, chosen, sweep, resetLook]
+  );
+
   const toggle = useCallback(() => {
     if (pending) return; // one at a time
     const to: ThemeName = name === 'dark' ? 'light' : 'dark';
@@ -301,6 +399,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setPending(null);
   }, []);
 
+  // The skins' props that morph follow the palette once the screen has
+  // changed: at once with no sweep (Reduce motion, a screen that fades
+  // itself, web), else when the sweep is over. At launch they're simply in
+  // place, and with Reduce motion they swap without the morph. A layout
+  // effect, so a pig drawn dark at launch never shows its day form first.
+  const morphed = useRef(false);
+  useLayoutEffect(() => {
+    if (!loaded || wipe) return;
+    morphTo(name === 'dark', morphed.current && !reducedMotion);
+    morphed.current = true;
+  }, [loaded, wipe, name, reducedMotion]);
+
+  // The skin's sting as the light changes (Lukas's dun, dun, dunnn going
+  // dark), the moment the palette flips: it plays over the sweep and into
+  // the morph after it. Not at launch, and not for a change of skin.
+  const heard = useRef<ThemeName | null>(null);
+  useEffect(() => {
+    if (!loaded) return;
+    const was = heard.current;
+    heard.current = name;
+    const sting = skin?.sounds?.[name];
+    if (was && was !== name && sting) playSound(SOUNDS[sting], STING_VOLUME);
+  }, [loaded, name, skin]);
+
   const value = useMemo(
     () => ({
       theme,
@@ -319,13 +441,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setSeasonal,
       skin,
       season,
-      pinChoice,
+      themeChosen,
       fadesItself,
     }),
     [
       theme, mode, pending, name, setMode, toggle, sweep,
       contrast, highContrast, setContrast, motion, reducedMotion, setMotion,
-      seasonal, setSeasonal, skin, season, pinChoice, fadesItself,
+      seasonal, setSeasonal, skin, season, themeChosen, fadesItself,
     ]
   );
   const wipeValue = useMemo(() => ({ shotRef, size, setSize, wipe, onReady, onDone }), [size, wipe, onReady, onDone]);
@@ -457,6 +579,13 @@ export function useReducedMotion(): boolean {
   const ctx = useContext(Ctx);
   const os = useOsReduceMotion();
   return ctx ? ctx.reducedMotion : os;
+}
+
+// How far the skins' props that morph are into their night form: 0 by day,
+// 1 by night, in between while the light changes (morphTo). With `on` false
+// it's always 0 and never re-renders, for a prop that doesn't morph.
+export function useMorph(on = true): number {
+  return useSyncExternalStore(watchMorph, () => (on ? morphAt : 0));
 }
 
 // The skin showing, seasonal or chosen, if any (null outside the provider).

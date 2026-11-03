@@ -85,7 +85,7 @@ export default function Rewards() {
       <Pressable
         accessibilityRole="switch"
         accessibilityState={{ checked: seasonal }}
-        accessibilityHint="Birthdays and holidays show over your theme"
+        accessibilityHint="Birthdays and holidays show over your theme. Choosing a theme switches this off until the next one"
         onPress={() => setSeasonal(!seasonal)}
         style={({ pressed }) => [
           styles.setting,

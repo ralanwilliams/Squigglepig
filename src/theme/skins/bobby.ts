@@ -1,4 +1,4 @@
-import { EYES, dress, held } from './layout';
+import { EYES, LONG_GUN, carried, dress } from './layout';
 import type { ArtName, Placement, Skin } from './types';
 
 // The shield sunglasses (props.ts visor) over the pig's eyes on each piece of
@@ -8,25 +8,10 @@ function withVisor(decor: Skin['decor']): Skin['decor'] {
   return decor;
 }
 
-// The two-handed blaster (props.ts rifle): its grip in the pig's left hoof
-// (the viewer's left) at the hold slot, with the hoof redrawn over it
-// (layout.ts held). On the home art both hooves are free, so it lies level
-// across the belly on the other hoof, the barrel just past the pig's side;
-// on the winner and waiting art the other hoof is busy (the trumpet, the
-// pencil), so it's carried low, pointing down across the belly. The join,
-// lobby and phone art have both hooves on the sign or phone, so the pig
-// holds no blaster there.
-const RIFLE: Partial<Record<ArtName, Partial<Placement>>> = {
-  home: { w: 0.61 },
-  winner: { w: 0.5, rotate: 24 },
-  waiting: { w: 0.3, rotate: 24 },
-};
-
+// The two-handed blaster (props.ts rifle), carried in both hooves where
+// they're free (layout.ts carried).
 function withRifle(decor: Skin['decor']): Skin['decor'] {
-  for (const [art, place] of Object.entries(RIFLE) as [ArtName, Partial<Placement>][]) {
-    const [gun, ...hoof] = held('rifle', art);
-    if (gun) decor[art] = [...(decor[art] ?? []), { ...gun, ...place }, ...hoof];
-  }
+  for (const art of Object.keys(LONG_GUN) as ArtName[]) decor[art] = [...(decor[art] ?? []), ...carried('rifle', art)];
   return decor;
 }
 
