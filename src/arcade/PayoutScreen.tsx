@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
 import { Stage } from '../components/Stage';
 import { Heading } from '../components/Heading';
+import { Hint } from '../components/Hint';
 import { PigButton } from '../components/PigButton';
 import { RewardTile } from '../rewards/RewardTile';
-import { KINDS, type Reward } from '../rewards/catalog';
+import { KINDS, homeOf, type Reward } from '../rewards/catalog';
 import { useInventory } from '../rewards/inventory';
 import { useChoose } from '../rewards/useChoose';
 import { useUi } from '../theme/responsive';
@@ -15,7 +17,10 @@ import { offers } from './payout';
 
 // The end of a banked run: choose a prize (payout.ts offers), then it's
 // yours. Every pot offers three of its tier to choose from. A won reward of a kind worn one at a time (a theme) can be put to use there
-// and then. With nothing left to give, it says so.
+// and then. A button opens the screen the prize is kept on (catalog.ts
+// homeOf), and a hint says where rewards are found later. An outfit or a
+// speech bubble is put on at Your pig, where it's seen on the pig, so there
+// Dress your pig stands in for Use it. With nothing left to give, it says so.
 export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain: () => void; onDone: () => void }) {
   const ui = useUi();
   const { owned, grant, uses } = useInventory();
@@ -38,7 +43,8 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
   const done = <PigButton name="Done" onPress={onDone} />;
 
   if (taken) {
-    const wearable = KINDS[taken.kind].pick === 'one' && !taken.soon;
+    const home = homeOf(taken.kind);
+    const wearable = KINDS[taken.kind].pick === 'one' && !taken.soon && home.path !== '/pig';
     const inUse = uses(taken.id);
     const use = () => putToUse(taken.kind, taken.id);
     return (
@@ -50,8 +56,12 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
         <>
           <Heading>{taken.label} is in your rewards.</Heading>
           {wearable && !inUse ? <PigButton name="Use it" onPress={use} /> : null}
+          <PigButton name={home.go} onPress={() => router.push(home.path)} />
           {again}
           {done}
+          <Hint>
+            Your rewards are always in the <Hint.Strong>☰ menu</Hint.Strong> on the home screen.
+          </Hint>
         </>
       </Screen>
     );

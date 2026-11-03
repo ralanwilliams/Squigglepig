@@ -7,7 +7,7 @@ import { Glyph, type GlyphName } from './Glyph';
 import { Switch } from './Switch';
 import { showToast } from './Toast';
 import { AppMark } from './AppMark';
-import { GROUPS, type Group } from '../rewards/catalog';
+import { GROUPS, type RewardsPath } from '../rewards/catalog';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
@@ -32,7 +32,7 @@ const NATIVE = Platform.OS !== 'web';
 // corners clear, so nothing moves to make room). It slides a drawer in from
 // the left holding the About information: the app icon, name and version,
 // then the Support / Accessibility / Rewards groups (Support ends with the
-// Privacy Policy, Terms of Service and open-source licenses) and the
+// Privacy Policy, Terms of Service and Credits & licenses) and the
 // copyright line, which links to the developer's site. The drawer is painted
 // with the screen's own palette (background, text, link), so it follows
 // light / dark mode like everything else. Nothing scrolls: in two-pane
@@ -125,7 +125,7 @@ function MenuDrawer({
       onClose();
       showToast(`No email app found. Write to ${CONTACT_EMAIL}`, 4000);
     });
-  const go = (path: '/licenses' | '/pig' | `/rewards?group=${Group}`) => () => {
+  const go = (path: '/licenses' | RewardsPath) => () => {
     onClose();
     router.push(path);
   };
@@ -149,7 +149,7 @@ function MenuDrawer({
     // bundled packages' licenses (and the Quick, Draw! credit) must ship with it.
     { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },
     { icon: 'doc', label: 'Terms of Service', onPress: () => open(TERMS_URL), trailing: 'external' },
-    { icon: 'code', label: 'Open-source licenses', onPress: go('/licenses'), trailing: 'chevron' },
+    { icon: 'code', label: 'Credits & licenses', onPress: go('/licenses'), trailing: 'chevron' },
   ];
   const accessibility: Row[] = [
     { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },

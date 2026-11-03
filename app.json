@@ -2,10 +2,10 @@
   "expo": {
     "name": "Squigglepig",
     "slug": "squigglepig",
-    "version": "2.7.0",
+    "version": "2.7.1",
     "orientation": "default",
     "scheme": "squigglepig",
-    "icon": "./src/assets/images/logo-512X512.png",
+    "icon": "./src/assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#4ECDC4",
     "ios": {
@@ -19,8 +19,8 @@
       "package": "com.squigglepig.app",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#4ECDC4",
-        "foregroundImage": "./src/assets/images/logo-512X512.png"
+        "backgroundColor": "#4EC4C4",
+        "foregroundImage": "./src/assets/images/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
@@ -54,10 +54,16 @@
       [
         "expo-splash-screen",
         {
-          "image": "./src/assets/images/logo-512X512.png",
           "resizeMode": "contain",
           "backgroundColor": "#4ECDC4",
-          "imageWidth": 200
+          "android": {
+            "image": "./src/assets/images/splash-android.png",
+            "imageWidth": 192
+          },
+          "ios": {
+            "image": "./src/assets/images/squigglepig_clear_dark.png",
+            "imageWidth": 320
+          }
         }
       ],
       "expo-asset",
