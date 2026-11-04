@@ -19,8 +19,17 @@ import { birthday } from '../theme/skins/birthday';
 // there take each other's place. A part that turns into another after dark
 // (Lukas's, morph.ts) has its `night` name and prop for the card then; one
 // that's there only by day is `dayOnly`, and has no card at night, unless
-// something else there only by night takes its place (the rifle, the sack).
-export type ThemePart = { key: string; label: string; prop: PropName; night?: { label: string; prop: PropName }; dayOnly?: true };
+// something else there only by night takes its place (the rifle, the sack;
+// Ash's basketball, his crutches). One there only by night (Ash's cast) is
+// `nightOnly`, and has no card by day.
+export type ThemePart = {
+  key: string;
+  label: string;
+  prop: PropName;
+  night?: { label: string; prop: PropName };
+  dayOnly?: true;
+  nightOnly?: true;
+};
 
 export function partOf(p: Placement): string {
   const prop = PROPS[p.prop] as Prop;
@@ -105,8 +114,9 @@ const LABELS: Partial<Record<PropName, string>> = {
   cloud: 'Clouds and stars',
   stormCloud: 'Storm clouds and lightning',
   sweatbandWinner: 'Sweatband',
-  jerseyWinner: 'Jersey',
+  jerseyThrown: 'Jersey',
   crutch: 'Crutches',
+  basketball: 'Basketball',
   ankleCast: 'Ankle cast',
   hoop: 'Hoop and basketballs',
   sun: 'Sun and bluebirds',
@@ -129,7 +139,13 @@ export function partsOf(skin: Skin): ThemePart[] {
     }
     if (day) continue;
     const night = p.night?.prop && { label: named(p.night.prop), prop: p.night.prop };
-    parts.set(key, { key, label: named(p.prop), prop: p.prop, ...(night ? { night } : {}), ...(p.by === 'day' ? { dayOnly: true as const } : {}) });
+    parts.set(key, {
+      key,
+      label: named(p.prop),
+      prop: p.prop,
+      ...(night ? { night } : {}),
+      ...(p.by === 'day' ? { dayOnly: true as const } : p.by === 'night' ? { nightOnly: true as const } : {}),
+    });
   }
   return [...parts.values()];
 }

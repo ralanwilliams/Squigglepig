@@ -4,7 +4,7 @@ import { inkFor } from '../lib/drawing';
 import type { BrushReward } from '../rewards/catalog';
 import type { Ui } from '../theme/responsive';
 
-// The ink on the drawing canvas (PigCanvas), in its top-left corner (above
+// The ink on the drawing canvas (DrawingBoard), in its top-left corner (above
 // the sticker button, when there is one), across from the 1× / 2× switch and
 // dressed the same: a dark pill floating on the
 // paper. Shut, it's one dot in the ink in use; tapped, it opens into rows of

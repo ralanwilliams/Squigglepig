@@ -4,10 +4,9 @@ His jersey, a tank top, covers his body from the crease under his head to
 its hem over his belly, cut to the outline of the art: bare at the
 shoulders, where its armholes are cut deep, and with holes where something
 in front of him has to show (the sign, the phone, the pencil, and any arm
-not holding a crutch). On the winner art it's cut just as on the home art,
-and the trumpet, its banner and the arm holding it are traced in the art's
-own colours and drawn again in front of it. Below the hem he's just the
-pig. The arms that hold a crutch are traced and drawn again over
+not holding a crutch). Below the hem he's just the pig. On the winner art
+(the trumpet) he's thrown it off in celebration: it's drawn loose instead,
+a tank top on its own (jerseyThrown), for ash.ts to toss to the ground. The arms that hold a crutch are traced and drawn again over
 the jersey and the crutch, so the crutch is under them, and moved out to his
 sides, so they hang from his bare shoulders in the armholes rather than from
 the front of his jersey; they say where they've moved his hooves to, so
@@ -49,9 +48,6 @@ REACH = 30  # an arm's black sides are this far apart at most (in pixels of the 
 #              the art (grip), before it moves; or (mirror) the arm before it,
 #              mirrored about that line down his middle, so the two match, the
 #              grip then the art's own hoof on that side
-#   front    — what's in front of the jersey, traced and drawn again over it:
-#              ('colour', box) the trumpet and its banner, ('arm', box) the arm
-#              holding them
 #   arms     — the boxes round the arms that don't, to show through
 #   holes    — what's in front of him: ('sign', box) a white card, ('rect',
 #              box) a phone, ('colour', box) the trumpet and banner, the pencil
@@ -79,10 +75,6 @@ ARTS = {
     'cell': dict(STILL, file='squigglepig_cell.png', arms=[(0.04, 0.49, 0.25, 0.6), (0.36, 0.49, 0.54, 0.6)],
                  holes=[('rect', (0.233, 0.451, 0.374, 0.74))]),
     # The same pig as the stills, with the trumpet up: his jersey as at home.
-    'winner': dict(STILL, file='squigglepig_winner.gif', body_x=0.6,
-                   crutch=[dict(box=(0.1, 0.52, 0.215, 0.725), dx=-0.075, grip=(0.162, 0.672))],
-                   front=[('colour', (0.3, 0.2, 0.75, 0.75)), ('arm', (0.34, 0.37, 0.49, 0.6))],
-                   logo=(0.3, 0.585, 0.036), number=(0.3, 0.695, 0.075)),
     'waiting': dict(file='squigglepig.gif', body_x=0.72, hem=0.845, armholes=[(0.27, 0.605, 0.085, 0.15), (0.69, 0.6, 0.075, 0.12)],
                     neck=scoop(0.465, 0.612, 1.7),
                     crutch=[dict(box=(0.33, 0.64, 0.42, 0.8), dx=-0.06, grip=(0.39, 0.75))], arms=[(0.5, 0.52, 0.62, 0.7)], holes=[('colour', (0.48, 0.38, 0.75, 0.7))],
@@ -375,6 +367,48 @@ def team_pig(cx, cy, r):
     ]
 
 
+def mirror_x(d):
+    """A path of absolute M/L/Q/Z commands, flipped left to right across a
+    100-unit-wide prop."""
+    out, nums = [], d.replace(',', ' ').split()
+    i = 0
+    for tok in nums:
+        if tok.isalpha():
+            out.append(tok)
+            i = 0
+            continue
+        v = float(tok)
+        out.append(f'{num(100 - v)}' if i % 2 == 0 else f'{num(v)}')
+        i += 1
+    return ' '.join(out)
+
+
+def thrown():
+    """His jersey on its own, thrown off: a tank top laid flat, 100 units
+    across, its straps up, cut deep at the armholes and scooped at the neck,
+    trimmed in black with a white stripe like the one he wears, the team's
+    pig on its chest and his number under it."""
+    body = ('M 27 2 L 39 2 Q 50 16 61 2 L 73 2 Q 75 22 78 30 Q 84 40 95 42 '
+            'L 97 100 Q 50 106 3 100 L 5 42 Q 16 40 22 30 Q 25 22 27 2 Z')
+    neck = 'M 38 2 Q 50 19 62 2 L 59.5 2 Q 50 14 40.5 2 Z'
+    neck_white = 'M 39.6 2 Q 50 16.6 60.4 2 L 59.9 2 Q 50 15.4 40.1 2 Z'
+    arm = 'M 27 2 Q 25 22 22 30 Q 16 40 5 42 L 5 46 Q 19 44 26 32 Q 30 22 31 2 Z'
+    arm_white = 'M 28.4 2 Q 26.8 22 23.8 31 Q 17.8 41.4 5 43.4 L 5 44.6 Q 18.4 42.6 24.8 31.6 Q 28.2 22 29.6 2 Z'
+    hem = 'M 3 93 Q 50 99 97 93 L 97 100 Q 50 106 3 100 Z'
+    hem_white = 'M 3 95.4 Q 50 101.4 97 95.4 L 97 97 Q 50 103 3 97 Z'
+    size = 24
+    return {
+        'w': 100, 'h': 104,
+        'text': {'x': 50, 'y': num(72 + size * 0.35), 'size': size, 'maxW': num(size * 1.4), 'fill': WHITE, 'shade': BLACK},
+        'shapes': [
+            {'d': body, 'fill': RED, 'line': True},
+            {'d': ' '.join([neck, arm, mirror_x(arm), hem]), 'fill': BLACK},
+            {'d': ' '.join([neck_white, arm_white, mirror_x(arm_white), hem_white]), 'fill': WHITE},
+            *team_pig(50, 36, 7),
+        ],
+    }
+
+
 def sample(im, m):
     c = np.median(im[m][:, :3], axis=0)
     return '#%02X%02X%02X' % tuple(int(v) for v in c)
@@ -428,18 +462,6 @@ def kit(art, cfg):
     prop['shapes'] = [s for s in shapes if s['d']]
     name = art[0].upper() + art[1:]
     out = {f'jersey{name}': (prop, placement(frame, size, shape))}
-
-    # What's in front of the jersey, where it overlaps it, drawn again over it.
-    if cfg.get('front'):
-        m = np.zeros(shape, bool)
-        for kind, b in cfg['front']:
-            m |= dilate(arm(im, b, REACH), 2) if kind == 'arm' else hole(im, kind, b)
-        m &= solid & dilate(wear, 6)
-        fframe, fsize = frame_of(m)
-        fk = fframe[2]
-        front = {'rim': False, 'under': True, 'w': 100, 'h': round(fsize[1] * fk, 1), 'anchor': [50, round(fsize[1] * fk / 2, 1)],
-                 'shapes': [{'d': path(layer, fframe), 'fill': fill} for layer, fill in posterize(im, m)]}
-        out[f'jerseyFront{name}'] = (front, placement(fframe, fsize, shape))
 
     # The arms that hold a crutch, drawn again over it, out at his sides: the
     # pink of the arm, its shading and its highlight, and its black linework
@@ -548,11 +570,13 @@ def main():
             props[prop_name] = prop
             for art, place in places.items():
                 fits.setdefault(art, []).insert(0, (prop_name, place))
+    props['jerseyThrown'] = thrown()  # placed and tossed by ash.ts
     lines = [
         '// Generated by scripts/ash-wear.py from the pig artwork — do not edit.',
         "// What the Ash theme's pig wears (ash.ts), traced to fit him on each piece",
         '// of art: his sweatband, his jersey, and the arms that hold his',
-        '// crutches drawn again over them. Rerun the script after changing the art.',
+        '// crutches drawn again over them; and the jersey thrown off, for the',
+        '// winner art. Rerun the script after changing the art.',
         "import type { Prop } from './props';",
         "import type { ArtName, Placement } from './types';",
         '',

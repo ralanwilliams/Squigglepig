@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Stage } from '../src/components/Stage';
 import { Glyph } from '../src/components/Glyph';
 import { Switch } from '../src/components/Switch';
+import { Logo } from '../src/components/Logo';
+import { PigButton } from '../src/components/PigButton';
+import { DrawingBoard, useDrawingStore, type DrawingBoardHandle } from '../src/components/DrawingBoard';
+import { IMAGES } from '../src/assets/assets';
 import { RewardTile } from '../src/rewards/RewardTile';
 import { KindTabs } from '../src/rewards/KindTabs';
 import { GROUPS, KINDS, REWARDS, isNone, noneOf, rewardsOf, type Group, type Kind } from '../src/rewards/catalog';
@@ -18,17 +22,27 @@ import { FONT_CAP, useUi, type Ui } from '../src/theme/responsive';
 // is to win (src/rewards/catalog.ts) and which of it this player owns
 // (src/rewards/inventory.tsx), one group of kinds at a time (catalog GROUPS:
 // Art supplies, Themes; ?group= from the menu row), untitled: the menu row
-// says which. One tab per kind of reward in the rail, that kind's rewards as
-// a grid of cards in the art pane. A kind with nothing in it yet gets no tab.
-// Nothing scrolls: a kind with more cards than fit is scaled down to fit
-// (Stage's fitFocus).
+// says which. The art pane shows the group's rewards at work (catalog
+// GROUPS `show`); the rail has one tab per kind of reward, and under it that
+// kind's rewards as a grid of the compact cards Your pig's rail has (the ring
+// and lock still say where the player stands, and a screen reader still
+// hears it). A kind with nothing in it yet gets no tab. Nothing scrolls: a
+// rail with more than fits is scaled down to fit (Stage's FitBox).
+//
+// Art supplies has the drawing canvas from the game (DrawingBoard), to try
+// out the brushes and sticker packs won, with Undo and Clear under the cards.
+// The drawing goes nowhere: it's gone when the screen closes.
+//
+// Themes has the home screen's pig, whole and dressed as it is there (the
+// theme showing and the player's own look). Using a theme puts it on the pig
+// at once.
 //
 // Of a kind the player picks one of (a theme), tapping an owned card puts it
 // to use; the kind's default (Classic) leads the grid once there's anything
 // to choose instead of it. Birthdays and holidays show over a chosen theme
 // while Seasonal themes is on, but one chosen during a birthday or holiday
 // shows over it until it ends (src/theme/theme.tsx). The Themes tab has the
-// switch under the tabs, the same setting as the menu's.
+// Seasonal themes switch under its cards, the same setting as the menu's.
 //
 // Development builds add Unlock all / Reset under the tabs, to see every card
 // both ways.
@@ -60,11 +74,12 @@ export default function Rewards() {
     if (!used(id)) putToUse(kind, id);
   };
 
+  const show = GROUPS[group].show;
+  // The drawing's kept here, so it lasts through the phone turning.
+  const board = useRef<DrawingBoardHandle>(null);
+  const drawing = useDrawingStore();
   const grid = (
-    <View
-      accessibilityLabel={KINDS[kind].label}
-      style={[styles.grid, { gap: ui.sp(10) }]}
-    >
+    <View accessibilityLabel={KINDS[kind].label} style={[styles.grid, { gap: ui.sp(6) }]}>
       {cards.map((r) => {
         const usable = !!none && !r.soon && (isNone(r) || owns(r.id));
         return (
@@ -74,6 +89,7 @@ export default function Rewards() {
             owned={isNone(r) || owns(r.id)}
             chosen={usable && used(isNone(r) ? null : r.id)}
             onPress={usable ? () => use(isNone(r) ? null : r.id) : undefined}
+            compact
           />
         );
       })}
@@ -120,14 +136,28 @@ export default function Rewards() {
     </View>
   ) : null;
 
+  // Under the canvas's cards: the drawing screen's Clear and Undo, side by side.
+  const drawingButtons =
+    show === 'canvas' ? (
+      <View style={[styles.buttons, { gap: ui.sp(10) }]}>
+        <View style={styles.flex}>
+          <PigButton name="Clear" onPress={() => board.current?.clear()} silent />
+        </View>
+        <View style={styles.flex}>
+          <PigButton name="Undo" onPress={() => board.current?.undo()} silent />
+        </View>
+      </View>
+    ) : null;
+
   return (
     <Stage
-      focus={grid}
-      fitFocus
+      focus={show === 'canvas' ? <DrawingBoard ref={board} store={drawing} /> : <Logo source={IMAGES.home} />}
       actions={
         <>
           {tabs}
+          {grid}
           {seasonalRow}
+          {drawingButtons}
           {dev}
         </>
       }
@@ -147,6 +177,8 @@ function DevLink({ label, onPress, ui, styles }: { label: string; onPress: () =>
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  buttons: { flexDirection: 'row' },
+  flex: { flex: 1 },
   setting: { flexDirection: 'row', alignItems: 'center' },
   settingLabel: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },
   devRow: { flexDirection: 'row', justifyContent: 'center' },

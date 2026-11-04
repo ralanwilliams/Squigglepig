@@ -26,7 +26,11 @@ export type ArtName = keyof typeof IMAGES;
 // night: on the dark palette it's another prop (or the same one), and may
 // sit elsewhere; it morphs from one into the other as the light changes
 // (morph.ts), through `via` halfway if it names one. by: it's only there by
-// day, or by night, and fades away or in as the light changes.
+// day, or by night, and fades away or in as the light changes. toss: it's
+// been thrown, and comes to rest here, lying on the ground (Ash's jersey,
+// thrown off on the winner art): it flies up from the pig's chest, tumbling,
+// and flutters down like cloth when it's first drawn (SkinDecor.tsx), or
+// just lies there under Reduce motion.
 export type Placement = {
   prop: PropName;
   x: number;
@@ -40,6 +44,7 @@ export type Placement = {
   rim?: false;
   night?: { prop?: PropName; via?: PropName } & Partial<Pick<Placement, 'x' | 'y' | 'w' | 'rotate'>>;
   by?: 'day' | 'night';
+  toss?: true;
 };
 
 // [month, day], 1-based months, local time.

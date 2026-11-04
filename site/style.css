@@ -74,6 +74,13 @@ p { margin: 8px 0; color: var(--muted); }
 }
 .stores { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
 .note { font-size: 0.85rem; }
+/* Google's own Get it on Google Play badge (google-play-badge.png, unaltered):
+   its transparent margin is the clear space the badge guidelines ask for, so
+   the image is sized to show the badge itself 52px tall (168 of its 250px). */
+.badge { display: inline-block; margin: 8px 0 0; }
+.badge img { display: block; height: 77px; width: auto; }
+/* The trademark notice the badge guidelines ask for, wherever it shows. */
+.legal { font-size: 0.7rem; margin-top: 16px; }
 [hidden] { display: none !important; }
 
 /* Long-form pages (help.html, terms.html): no card. The text sits straight

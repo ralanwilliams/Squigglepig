@@ -7,10 +7,14 @@ Lukas (lukas.ts): his sheriff turns outlaw to a "dun, dun, dunnn"
 Chris (chris.ts): his superhero turns supervillain to a menace that creeps up
 from the depths and lands on a stab (supervillainTheme.mp3), and back to a
 soaring fanfare (superheroTheme.mp3).
+Ash (ash.ts): his basketball player goes down hurt to an arena's
+"ooooh!!!" (crowdOoh.mp3), and is back on his feet to its cheer
+(crowdCheer.mp3).
 
 All are synthesized here from scratch, sine and sawtooth tones and noise,
 with no samples, recordings or loops from anywhere else, and the melodies are
-our own. So the sounds are wholly Squigglepig's (site/terms.html: the sounds
+our own; the crowds are made the same way, each voice a buzz shaped into a
+vowel and each clap a burst of noise. So the sounds are wholly Squigglepig's (site/terms.html: the sounds
 belong to me), with no licence to credit or keep to in the stores. Run from
 the repo root after changing anything here:
 
@@ -28,9 +32,11 @@ import numpy as np
 OUT = Path(__file__).resolve().parent.parent / 'src' / 'assets' / 'sounds'
 SR = 44100
 KBPS = 80  # mono; a few seconds comes to about 30 kB
+CROWD_KBPS = 128  # the crowds' many voices need more to stay clear
 PEAK = 0.89  # -1 dBFS, the headroom the MP3 encoder needs
 # The noise is the same every run, so a file only changes when its sting does.
-# The stings draw on it in turn, so add new ones at the end of the list below.
+# The stings draw on it in turn, so add new ones at the end of the list below;
+# the crowds each start their own (with_noise).
 RNG = np.random.default_rng(7)
 
 
@@ -229,9 +235,186 @@ def supervillain():
     return finish(mix(rise + 2.1, parts), fade=0.6)
 
 
-def write(name, x):
+# ---- Crowds (Ash) -----------------------------------------------------------
+
+# Where a vowel's formants are, in Hz, and how loud each is: the peaks in the
+# spectrum a mouth shapes a buzz into.
+VOWELS = {
+    'ah': ((750, 1.0), (1200, 0.7), (2550, 0.25)),
+    'eh': ((550, 1.0), (1800, 0.6), (2550, 0.25)),
+    'oh': ((480, 1.0), (850, 0.6), (2500, 0.12)),
+    'oo': ((330, 1.0), (800, 0.35), (2300, 0.08)),
+    # The bright ones: high second formants, the ring of a happy shout.
+    'ae': ((660, 1.0), (1720, 0.8), (2410, 0.35)),
+    'ee': ((300, 0.8), (2300, 0.85), (3000, 0.45)),
+}
+
+
+def formants(f, vowel, bw=90.0):
+    """How loud a vowel makes each frequency in `f`: a resonance at each
+    formant, wider the higher it is."""
+    gain = np.zeros_like(f, dtype=float)
+    for centre, amp in VOWELS[vowel]:
+        width = bw + centre * 0.06
+        gain += amp / (1 + ((f - centre) / width) ** 2)
+    return gain
+
+
+def voice(dur, f0, contour, vowels, morph=None, vel=1.0, breath=0.1, swell=None, tilt=0.9):
+    """One person: a buzz at `f0` Hz bent by `contour` (a multiplier over the
+    note, from 0 to 1 of the way through), with a little natural wobble,
+    shaped by a mouth moving from the first of `vowels` to the second as
+    `morph` goes from 0 to 1 ('eh' opening to 'ah' is a "yeah"), as loud
+    over the note as `swell` says, with a little breath in it. A lower
+    `tilt` keeps more of the upper harmonics: a shout's edge."""
+    t = times(dur)
+    u = t / dur
+    pitch = f0 * contour(u) * (1 + 0.012 * np.sin(2 * np.pi * RNG.uniform(4, 6.5) * t + RNG.uniform(0, 6)))
+    pitch *= 1 + 0.006 * lowpass(RNG.standard_normal(len(t)), 30)  # jitter
+    phase = 2 * np.pi * np.cumsum(pitch) / SR
+    first, last = vowels[0], vowels[-1]
+    m = np.clip(morph(u), 0, 1) if morph else np.zeros_like(u)
+    out = np.zeros_like(t)
+    for k in range(1, 40):
+        fk = k * pitch
+        if fk.min() > 5000:
+            break
+        mouth = (1 - m) * formants(fk, first) + m * formants(fk, last)
+        out += np.sin(k * phase) / k ** tilt * mouth * (fk < SR / 2.2)
+    # A little breath in the voice, through the mouth it ends in.
+    air = shaped(RNG.standard_normal(len(t)), last, hiss=0.03)
+    level = np.sqrt(np.mean(out ** 2)) / max(1e-9, np.sqrt(np.mean(air ** 2)))
+    loud = swell(u) if swell else 1.0
+    return vel * (out + breath * level * air) * loud * envelope(t, 0.05, min(0.35, dur / 2), dur)
+
+
+def shaped(noise, vowel, hiss=0.15):
+    """Noise through a vowel's shape, with `hiss` of the higher air in it."""
+    spec = np.fft.rfft(noise)
+    f = np.fft.rfftfreq(len(noise), 1 / SR)
+    spec *= formants(f, vowel, bw=160) + hiss * np.clip((f - 2000) / 3000, 0, 1) * (f < 7000)
+    return np.fft.irfft(spec, len(noise))
+
+
+def breathy(dur, vowel, vel=1.0, attack=0.03, release=0.18):
+    """Unvoiced air through a vowel's shape: the hush under a crowd."""
+    t = times(dur)
+    return vel * shaped(RNG.standard_normal(len(t)), vowel) * envelope(t, attack, release, dur)
+
+
+def clap(vel=1.0):
+    """One pair of hands: a sharp crack of mid-high noise."""
+    t = times(0.05)
+    noise = RNG.standard_normal(len(t))
+    band = lowpass(noise, RNG.uniform(2200, 3400)) - lowpass(noise, 900)
+    return vel * band * np.exp(-RNG.uniform(90, 130) * t)
+
+
+def whistle(dur, vel=1.0):
+    """A fan's two-finger whistle: a pure high note swooping up and down."""
+    t = times(dur)
+    f = 2400 + 700 * np.sin(np.pi * t / dur) ** 2
+    tone = np.sin(2 * np.pi * np.cumsum(f) / SR)
+    return vel * tone * envelope(t, 0.04, 0.12, dur)
+
+
+def hall(x, seconds=1.5, mix=0.2):
+    """An arena: room enough to sound big, kept short and light so the
+    voices stay clear rather than washing together."""
+    return reverb(x, seconds, mix)
+
+
+def people(n, men=0.55):
+    """`n` voices, men's and women's (`men` of them men's), each its own pitch."""
+    low = RNG.random(n) < men
+    return np.where(low, RNG.uniform(105, 165, n), RNG.uniform(200, 300, n))
+
+
+def presence(x, gain=1.6, lo=1800, hi=5000):
+    """Lift the band where a voice rings (`lo` to `hi` Hz) by `gain`: brighter."""
+    spec = np.fft.rfft(x)
+    f = np.fft.rfftfreq(len(x), 1 / SR)
+    lift = np.clip((f - lo) / (hi - lo), 0, 1)
+    spec *= 1 + (gain - 1) * np.sin(np.pi / 2 * lift) * (f < 9000)
+    return np.fft.irfft(spec, len(x))
+
+
+def cheer():
+    """Back on his feet: an arena erupts, bright and happy. Mostly women's
+    and kids' pitches; voices on "yeah!" (an 'eh' opening to the bright
+    'ae', leaping up into the shout, holding, falling at the end), "yay!"
+    (an 'eh' brightening to 'ee') and a few high "woo!"s gliding up; every
+    shout with the edge of its upper harmonics kept, and the band where
+    voices ring lifted. Crisp clapping under it and three whistles over the
+    top, then it settles."""
+    length = 3.0
+    parts = []
+    for f0 in people(48, men=0.3) * 1.08:
+        start = RNG.uniform(0, 0.3)
+        dur = RNG.uniform(1.4, length - start - 0.15)
+        kind = RNG.random()
+        if kind < 0.5:
+            rise = RNG.uniform(1.25, 1.5)
+            contour = lambda u, r=rise: 1 + (r - 1) * np.clip(u / 0.1, 0, 1) - 0.3 * (r - 1) * np.clip((u - 0.7) / 0.3, 0, 1)
+            parts.append((start, voice(dur, f0, contour, ('eh', 'ae'), lambda u: u / 0.15, RNG.uniform(0.6, 1.0), tilt=0.6)))
+        elif kind < 0.8:
+            rise = RNG.uniform(1.2, 1.4)
+            contour = lambda u, r=rise: 1 + (r - 1) * np.clip(u / 0.15, 0, 1) - 0.2 * (r - 1) * np.clip((u - 0.75) / 0.25, 0, 1)
+            parts.append((start, voice(dur, f0, contour, ('eh', 'ee'), lambda u: (u - 0.05) / 0.25, RNG.uniform(0.5, 0.9), tilt=0.6)))
+        else:
+            glide = RNG.uniform(1.4, 1.7)
+            contour = lambda u, g=glide: 1 + (g - 1) * np.clip(u / 0.3, 0, 1) ** 0.6
+            parts.append((start, voice(dur, f0 * 1.15, contour, ('oo',), None, RNG.uniform(0.45, 0.75), tilt=0.7)))
+    # A hush of breath under the voices, faint, for the size of the crowd.
+    parts.append((0, breathy(length, 'ae', 0.08, attack=0.3, release=1.0)))
+    # Clapping: dense at first, thinning out as it settles.
+    for _ in range(190):
+        at = RNG.uniform(0.12, length - 0.1)
+        parts.append((at, clap(RNG.uniform(0.35, 0.75) * max(0.15, 1 - at / length))))
+    parts += [(0.35, whistle(0.7, 0.1)), (0.95, whistle(0.5, 0.07)), (1.5, whistle(0.6, 0.08))]
+    return finish(presence(hall(mix(length, parts), seconds=1.2, mix=0.16)), fade=0.8)
+
+
+def ooh():
+    """He's gone down hurt: the arena's "ooooh!!!", all at once. A deep,
+    round 'oo' that opens towards 'oh' as it swells, sliding up into it
+    and holding, then sinking away as it fades: the sound a crowd makes at
+    a nasty fall. Mostly men's voices, for its depth."""
+    length = 2.4
+    parts = []
+    for f0 in people(46, men=0.7):
+        start = RNG.uniform(0, 0.12)
+        dur = RNG.uniform(1.6, 2.1)
+        lift = RNG.uniform(1.18, 1.32)
+        sink = RNG.uniform(0.78, 0.88)
+        # Up into the "OOOH", a hold, and down as it dies away.
+        contour = lambda u, a=lift, b=sink: np.interp(u, [0, 0.25, 0.5, 1], [1.0, a, a * 0.97, b])
+        loud = lambda u: np.interp(u, [0, 0.12, 0.35, 1], [0.35, 1.0, 0.8, 0.25])
+        parts.append((start, voice(dur, f0, contour, ('oo', 'oh'), lambda u: (u - 0.08) / 0.3, RNG.uniform(0.6, 1.0), swell=loud, tilt=0.85)))
+    parts.append((0, breathy(length, 'oh', 0.08, attack=0.1, release=1.2)))
+    return finish(hall(mix(length, parts)), fade=0.7)
+
+
+# Where the random draws for each crowd start, so changing one never changes
+# the other. The ooh's is where it was first made from (after the stings and
+# an earlier cheer), kept so it stays exactly as it is.
+CHEER_NOISE = 11
+OOH_NOISE = {'bit_generator': 'PCG64', 'state': {'state': 107422374632947494580013978206694976578,
+                                                 'inc': 261136684632268670825940853076396136793}, 'has_uint32': 0, 'uinteger': 0}
+
+
+def with_noise(start, make):
+    """Make a sound with the noise drawn from `start` (a seed, or a saved state)."""
+    global RNG
+    RNG = np.random.default_rng(start if isinstance(start, int) else 0)
+    if not isinstance(start, int):
+        RNG.bit_generator.state = start
+    return make()
+
+
+def write(name, x, kbps=KBPS):
     enc = lameenc.Encoder()
-    enc.set_bit_rate(KBPS)
+    enc.set_bit_rate(kbps)
     enc.set_in_sample_rate(SR)
     enc.set_channels(1)
     enc.set_quality(2)
@@ -247,3 +430,6 @@ if __name__ == '__main__':
     write('outlawTheme.mp3', outlaw())
     write('superheroTheme.mp3', superhero())  # Chris
     write('supervillainTheme.mp3', supervillain())
+    # A crowd is many voices at once, which a low bit rate smears: these get more.
+    write('crowdCheer.mp3', with_noise(CHEER_NOISE, cheer), CROWD_KBPS)  # Ash
+    write('crowdOoh.mp3', with_noise(OOH_NOISE, ooh), CROWD_KBPS)

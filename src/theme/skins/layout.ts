@@ -1,5 +1,6 @@
 import { PROPS, type Prop, type PropName } from './props';
 import type { ArtName, Placement, Skin } from './types';
+import { FRONT_ARM_AT } from './frontArms';
 
 // Where props go on each piece of artwork, measured once and shared by every
 // skin that dresses the pig the usual way: something on its head, three
@@ -106,7 +107,9 @@ export function held(prop: PropName, art: ArtName): Placement[] {
 
 // A long gun (Bobby's blaster, Lukas's repeater) carried in both hooves: its
 // grip in the pig's left hoof (the viewer's left) at the hold slot, with the
-// hoof redrawn over it (held). On the home art both hooves are free, so it
+// whole forearm on that side drawn again over it, hoof and all, in the art's
+// own colours (FRONT_ARMS), so the gun reads as behind it: the hoof alone is
+// a flat black shape that sinks into a dark gun. On the home art both hooves are free, so it
 // lies level across the belly on the other hoof, the barrel just past the
 // pig's side; on the winner and waiting art the other hoof is busy (the
 // trumpet, the pencil), so it's carried low, pointing down across the
@@ -119,10 +122,20 @@ export const LONG_GUN: Partial<Record<ArtName, Partial<Placement>>> = {
   waiting: { w: 0.3, rotate: 24 },
 };
 
+// The forearm on the viewer's left on each piece of art a long gun is
+// carried on. Named as a hoof (props.ts hoofArm…), so it's drawn with the
+// hooves, over what they hold, and moves with them (onThePig, followHooves).
+const FRONT_ARMS: Partial<Record<ArtName, Placement>> = {
+  home: { prop: 'hoofArmStill', ...FRONT_ARM_AT.Still },
+  winner: { prop: 'hoofArmWinner', ...FRONT_ARM_AT.Winner },
+  waiting: { prop: 'hoofArmWaiting', ...FRONT_ARM_AT.Waiting },
+};
+
 export function carried(prop: PropName, art: ArtName): Placement[] {
   const place = LONG_GUN[art];
+  const arm = FRONT_ARMS[art];
   const [gun, ...hoof] = place ? held(prop, art) : [];
-  return gun ? [{ ...gun, ...place }, ...hoof] : [];
+  return gun ? [{ ...gun, ...place }, ...(arm ? [arm] : hoof)] : [];
 }
 
 // The pig's right hoof (the viewer's right), where it's free: only on the

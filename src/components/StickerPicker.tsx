@@ -7,7 +7,7 @@ import { STICKER_ART } from '../stickers/art';
 import { PROPS, type Prop } from '../theme/skins/props';
 import type { Ui } from '../theme/responsive';
 
-// Stickers on the drawing canvas (PigCanvas), for a player who has won a
+// Stickers on the drawing canvas (DrawingBoard), for a player who has won a
 // sticker pack (src/rewards): a button under the ink picker, dressed like it
 // (a dark pill on the paper), that opens a tray of their stickers, one pack to
 // a row. A tapped sticker lands in the middle of the view, selected; while it

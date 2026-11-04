@@ -7,7 +7,7 @@ import { SPACE, STROKE } from '../../../lib/drawing';
 import { useUi } from '../../../theme/responsive';
 import { canvas as paper, layout } from '../../../theme/tokens';
 
-// The game's drawing surface: PigCanvas (src/components/PigCanvas.tsx) cut
+// The game's drawing surface: DrawingBoard (src/components/DrawingBoard.tsx) cut
 // down to one finger and black ink, no zoom, no brushes, no stickers, and
 // none of WorkStage's timer or buttons; the round has its own. Strokes are in
 // drawing units and built the same way, so score.ts reads them like the pack's.
@@ -45,7 +45,7 @@ export function DrawPad({ strokes, onStroke }: { strokes: string[]; onStroke: (d
   const onStrokeRef = useRef(onStroke);
   onStrokeRef.current = onStroke;
 
-  // The stroke under the finger, as PigCanvas builds it: each point is the
+  // The stroke under the finger, as DrawingBoard builds it: each point is the
   // control of a quadratic ending halfway to the next, for a smooth line.
   const live = useRef<{ d: string; last: Pt; moved: boolean } | null>(null);
   const [, force] = useReducer((n) => n + 1, 0);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { FitBox } from './FitBox';
+import { Backdrop } from './Backdrop';
 import { cornerReserve } from './CornerControls';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
@@ -82,6 +83,7 @@ export function Stage({
 
   return (
     <View style={[styles.safe, frame]}>
+      <Backdrop />
       {band}
       <KeyboardAvoidingView
         style={styles.flex}

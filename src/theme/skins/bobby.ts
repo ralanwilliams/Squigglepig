@@ -9,9 +9,16 @@ function withVisor(decor: Skin['decor']): Skin['decor'] {
 }
 
 // The two-handed blaster (props.ts rifle), carried in both hooves where
-// they're free (layout.ts carried).
+// they're free (layout.ts carried), a little lower than the grip so it sits
+// down in the hooves, under the forearm drawn over it: this much, of the
+// image's height.
+const LOWER = 0.02;
+
 function withRifle(decor: Skin['decor']): Skin['decor'] {
-  for (const art of Object.keys(LONG_GUN) as ArtName[]) decor[art] = [...(decor[art] ?? []), ...carried('rifle', art)];
+  for (const art of Object.keys(LONG_GUN) as ArtName[]) {
+    const [gun, ...arm] = carried('rifle', art);
+    if (gun) decor[art] = [...(decor[art] ?? []), { ...gun, y: gun.y + LOWER }, ...arm];
+  }
   return decor;
 }
 
