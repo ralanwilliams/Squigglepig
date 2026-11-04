@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Squigglepig — Privacy Policy</title>
+  <meta name="description" content="What Squigglepig collects, why, and how to have it deleted.">
+  <link rel="icon" href="logo.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="doc">
+  <!-- https://squigglepig.app/privacy. A copy of the privacy policy on Google
+       Sites (src/lib/links.ts PRIVACY_URL), which the app, the store listings
+       and the other site pages still link to; they move here once the App
+       Store listing is live. Until then, keep the two the same. Bump "Last
+       updated" whenever the text changes. -->
+  <main class="doc">
+    <header>
+      <img class="logo" src="logo.png" alt="Squigglepig">
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: 3 November 2026</p>
+    </header>
+
+    <p>Squigglepig is a drawing and guessing party game, played in the app or on the web at play.squigglepig.app. It has
+      no accounts and never asks for your real name, email address or any other personal details.</p>
+
+    <h2>Your guest ID</h2>
+    <p>The first time you create or join a game, the app signs in to the game server as a guest. Nothing is asked: the
+      server gives your device a random ID, and the app keeps it so the game knows you're the same player when you come
+      back. It isn't linked to your name, your email, your phone number or anything else about you. A guest ID that
+      hasn't been used for 180 days, and has nothing attached to it, is deleted.</p>
+
+    <h2>What you share with other players</h2>
+    <p>To play together, the app sends these to the other players in your room:</p>
+    <ul>
+      <li>the username you type in (it doesn't have to be your real name)</li>
+      <li>the four-letter room code</li>
+      <li>the prompts and captions you write, the drawings you make, and your guesses</li>
+      <li>how you've dressed your pig (its outfit and speech bubble), if you've changed it</li>
+      <li>whether you have the app open right now, so the others can see who is away</li>
+    </ul>
+    <p>This game traffic is relayed in real time through Supabase, a hosting service, over an encrypted connection.</p>
+
+    <h2>What the game server keeps, and for how long</h2>
+    <p>So that you stay in your room when you close the app, the game server keeps a few things while a room is open:</p>
+    <ul>
+      <li><b>Who is in the room:</b> your guest ID, your username and when you joined. Removed when you tap
+        <b>Leave game</b> (if you leave during a game, when that game ends), or when the room closes.</li>
+      <li><b>The game in progress:</b> its prompts, drawings, guesses and scores, so the game can carry on if everyone
+        closes the app at once. Deleted when the game ends or the room closes.</li>
+      <li><b>When anyone last did something in the room.</b> A room nobody has done anything in for 10 minutes is
+        closed, and everything above is deleted with it.</li>
+    </ul>
+    <p>Games aren't kept after they end, and closed rooms can't be reopened.</p>
+
+    <h2>Notifications</h2>
+    <p>If you allow notifications, Squigglepig tells you about the room you're in while the app isn't open: when
+      someone enters or leaves the lobby, and, if you're away, that the game has started or that it's your turn. To
+      send them, the app gives the game server a push token for your device from Expo, the service that delivers them
+      (through Apple or Google). The token is used for nothing else.</p>
+    <p>Turn notifications off in the app's menu (☰ › Notifications) and the token is deleted from the server straight
+      away. A token that hasn't been refreshed for 90 days is deleted too. You can also turn notifications off in your
+      phone's settings. The web version doesn't send notifications.</p>
+
+    <h2>Solo games</h2>
+    <p>Solo games are played on your own device. To play Trivia, the app downloads questions from the Open Trivia
+      Database (opentdb.com), a free public question service. Nothing about you is sent with that request.</p>
+    <p>Rewards you win in solo games stay on your device. They aren't linked to you or stored anywhere else, so they're
+      lost if you uninstall the app or clear its data. Nothing in Squigglepig is for sale: rewards are only won by
+      playing.</p>
+
+    <h2>What stays on your device</h2>
+    <p>The app keeps a few things on your phone (or in your browser, for the web version) so it works the way you left
+      it:</p>
+    <ul>
+      <li>your guest ID</li>
+      <li>your username and room code, so it can take you back into your room</li>
+      <li>your settings: light or dark mode, high contrast, reduce motion, seasonal themes, sound, whether notifications
+        are on, and whether you've seen the walkthrough</li>
+      <li>the rewards you've won, the theme you chose and how you've dressed your pig</li>
+      <li>trivia questions saved for your next solo games, and which ones you've already been asked, so you don't get
+        repeats</li>
+      <li>the list of birthdays the app celebrates with a birthday theme</li>
+    </ul>
+    <p>Apart from what this policy describes above, none of it is sent anywhere. Uninstalling the app, or clearing the
+      site's data in your browser, deletes it.</p>
+
+    <h2>Your IP address</h2>
+    <p>Like any internet connection, your device's IP address is visible to the services the app connects to: Supabase
+      (multiplayer games and the birthday list), Expo (push notifications), the Open Trivia Database (trivia questions)
+      and Cloudflare (which hosts the web version). Squigglepig doesn't record or use your IP address, and sends these
+      services nothing else about you.</p>
+
+    <h2>What the app does not do</h2>
+    <ul>
+      <li>No advertising, no analytics, no tracking, and no third-party code that collects data.</li>
+      <li>No location, contacts, camera, microphone or photo access.</li>
+      <li>No marketing notifications: only ones about the room you're in.</li>
+      <li>No purchases.</li>
+    </ul>
+
+    <h2>Reporting</h2>
+    <p>To report something inappropriate that another player shared, email
+      <a href="mailto:alan@ralanwilliams.com?subject=Squigglepig%20report">alan@ralanwilliams.com</a> with the room code
+      and their username. Reports are reviewed.</p>
+
+    <h2>Children</h2>
+    <p>Squigglepig is intended for players aged 13 and over.</p>
+
+    <h2>Deleting your data</h2>
+    <p>Most of it deletes itself: tap <b>Leave game</b> to take yourself out of a room, and games and rooms are deleted
+      when they end or close. Turning notifications off deletes your push token. What the app keeps on your device is
+      removed when you uninstall it or clear its data. To have your guest ID and anything tied to it deleted now, email
+      <a href="mailto:alan@ralanwilliams.com?subject=Squigglepig%20data%20deletion">alan@ralanwilliams.com</a>.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If this policy changes, the new version will be posted here with a new date.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy: <a href="mailto:alan@ralanwilliams.com">alan@ralanwilliams.com</a></p>
+
+    <footer>
+      <a href="help">Help &amp; FAQ</a> ·
+      <a href="terms">Terms of Service</a><br>
+      © 2026 R. Alan Williams. All rights reserved.
+    </footer>
+  </main>
+</body>
+</html>

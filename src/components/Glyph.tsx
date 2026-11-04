@@ -38,6 +38,7 @@ const GLYPHS = {
   ),
   season: <Path d="M4 6h16v14H4zM4 10h16M8 3.5v4M16 3.5v4M12 12.6l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z" />, // a calendar with a star
   lock: <Path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3" />, // a reward not yet won
+  bell: <Path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15zM10 20.5a2 2 0 0 0 4 0" />, // room notifications
   // One per kind of reward (src/rewards/catalog.ts KINDS).
   palette: (
     <>

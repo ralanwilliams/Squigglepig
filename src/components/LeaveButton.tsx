@@ -6,9 +6,11 @@ import { font, type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 
-// A small, always-available "leave the game" link. Leaving unsubscribes from the
-// room, so the player drops out of presence and is removed from the rotation at
-// the next round (their pooled prompts simply go unused). See GameContext.
+// A small, always-available "leave the game" link — the only way out of a room
+// (closing the app just makes the player "away"). Leaving tells the server and
+// unsubscribes; mid-game the player is taken out of the rotation, or, if that
+// would leave fewer than 3, their turns run out the clock until the round
+// ends (their pooled prompts simply go unused). See GameContext.
 // Visually a quiet text link, but padded + hit-slopped to a full 44dp target.
 export function LeaveButton({ label = 'Leave game' }: { label?: string }) {
   const ui = useUi();

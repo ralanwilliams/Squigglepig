@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "675074519011",
+    "project_id": "squigglepig-312ac",
+    "storage_bucket": "squigglepig-312ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:675074519011:android:bc8c4478ab7691a207fad6",
+        "android_client_info": {
+          "package_name": "com.squigglepig.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBlao_CXj9-P_jeQCR1rSb7QJR-luDyuGs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

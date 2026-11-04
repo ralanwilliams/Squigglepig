@@ -13,7 +13,10 @@ faithful saves both earn points.
 
 1. One person taps **Create Game** to get a 4-letter room code; everyone else taps
    **Join Game** and enters it. When the group is in the lobby, the host picks the
-   points-to-win and taps **Start**.
+   points-to-win and taps **Start**. Everyone stays in the room until they tap
+   **Leave game**: closing the app only marks them away (and sends them
+   notifications about the room). A room closes after 10 minutes with nobody
+   doing anything in it, and nobody new can join once a game has started.
 2. **Fill the pot** — everyone drops short, drawable prompts into a shared pool
    until it holds enough to seed every chain of every round. The game auto-starts
    the moment it fills.
@@ -23,7 +26,9 @@ faithful saves both earn points.
    thing to draw, and so on until everyone has touched every chain.
 4. **Reveal** — each chain is walked one step at a time, judged by the player who
    owns its prompt. Every drawing or guess that still matches the original prompt
-   earns its maker **+1**. First player to the target score wins.
+   earns its maker **+1**, and every blank drawing (an empty canvas, or the
+   timer running out) costs the player who owed it **−1**. First player to the
+   target score wins.
 
 Needs at least **3 players** (with 2, the last caption would always fall to the
 prompt's own author, so there's nothing to guess).
@@ -34,7 +39,8 @@ prompt's own author, so there's nothing to guess).
 - **react-native-web** — The same screens rendered in the browser
 - **React Native 0.86** — Cross-platform mobile UI
 - **TypeScript** — Type safety
-- **Supabase Realtime** — Real-time database, Broadcast and Presence for multiplayer sync (free tier)
+- **Supabase** — Realtime Broadcast and Presence for multiplayer sync, anonymous guest sign-in, and Postgres (with pg_cron and pg_net) for rooms that outlast a closed app (free tier)
+- **expo-notifications** — Push notifications about your room, sent through Expo's push service
 - **expo-router** — Navigation and deep linking
 - **react-native-svg** — Vector drawing canvas (strokes encoded as compact JSON)
 - **react-native-gesture-handler** — Touch input and pan gestures
@@ -52,14 +58,22 @@ prompt's own author, so there's nothing to guess).
 3. In the dashboard copy two values (the **Connect** button at the top shows both):
    - **Project URL** — Settings → Data API (e.g. `https://abcd1234.supabase.co`)
    - **Publishable key** — Settings → API Keys (starts with `sb_publishable_...`; click **Create new API keys** if you only see the legacy anon key)
-4. Realtime is enabled by default; the game itself needs no tables.
-5. Open **SQL Editor → New query**, paste in `supabase/keepalive.sql` and click
+4. Turn on guest sign-in: **Authentication → Sign In / Providers → Allow
+   anonymous sign-ins**. Every player is an anonymous Supabase user (no sign-up
+   screen), which is what room membership and push tokens hang off.
+5. Open **SQL Editor → New query**, paste in `supabase/rooms.sql` and click
+   **Run**. It creates the rooms (who is in each one, whether a game is on, and
+   the host's snapshot of it), makes each room's Realtime channel private to its
+   members, schedules a job that closes rooms after 10 idle minutes (pg_cron),
+   and sends push notifications through Expo (pg_net). Safe to run again.
+6. Open **SQL Editor → New query**, paste in `supabase/keepalive.sql` and click
    **Run**. It creates a one-row table for the keep-alive workflow
    (`.github/workflows/supabase-keepalive.yml`): free projects pause after 7 days
    without database reads, and the game's Realtime traffic doesn't count. The
    workflow also needs `SUPABASE_URL` and `SUPABASE_KEY` repository secrets
    (Settings → Secrets and variables → Actions), the same values as `.env`.
-6. Do the same with `supabase/birthdays.sql`. It creates the `birthdays` table
+7. Do the same with `supabase/birthdays.sql` (run it again if you ran an older
+   copy: signed-in guests need to be able to read it too). It creates the `birthdays` table
    the app reads to know whose birthday it is: on each one the app shows the
    birthday theme with that name iced on the cake. Add, change or remove
    birthdays in **Table Editor → birthdays** (a name of 1–24 characters, a
@@ -83,6 +97,21 @@ Then either:
 
 To test multiplayer, open the app on two devices/emulators: one taps **Create Game**
 (shares the 4-letter code), the other taps **Join Game** and enters it.
+
+### Push notifications
+Expo Go can't receive push notifications, so test them in a development build
+(`eas build --profile development`) on a real phone; simulators and emulators
+have no push token. The server sends them through Expo's push service, which
+needs each platform's credentials once:
+- **Android:** create a Firebase project, add an Android app with the package
+  `com.squigglepig.app`, download its `google-services.json` to the project root
+  and add `"googleServicesFile": "./google-services.json"` under `android` in
+  `app.json`. Then upload an FCM V1 service-account key with
+  `eas credentials -p android` (Push Notifications → FCM V1).
+- **iOS:** once the Apple developer account exists, `eas build -p ios` offers to
+  create the push key (APNs) for you.
+
+Without them the game works the same; there are just no notifications.
 
 > If you change `.env`, restart with `npx expo start -c` to clear the cache.
 
