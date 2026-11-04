@@ -21,7 +21,7 @@ export const PLAY_STORE_APP_URL = 'market://details?id=com.squigglepig.app'; // 
 // it's null, iOS hides "Rate this app".
 export const APP_STORE_URL: string | null = null;
 export const HELP_URL = `${LINK_ORIGIN}/help`;
-export const PRIVACY_URL = 'https://sites.google.com/view/squigglepig-privacy-policy/home';
+export const PRIVACY_URL = 'https://squigglepig.app/privacy';
 export const TERMS_URL = `${LINK_ORIGIN}/terms`;
 export const DEVELOPER_URL = 'https://ralanwilliams.com';
 
