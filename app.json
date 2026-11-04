@@ -22,6 +22,7 @@
         "backgroundColor": "#4EC4C4",
         "foregroundImage": "./src/assets/images/adaptive-icon.png"
       },
+      "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
         {
@@ -76,6 +77,13 @@
       ],
       "expo-font",
       "expo-image",
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/images/notification-icon.png",
+          "color": "#4ECDC4"
+        }
+      ],
       "expo-status-bar"
     ],
     "extra": {

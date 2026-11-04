@@ -19,7 +19,7 @@ export default function RoundOne() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const { prev, readyView } = useGame();
-  const text = prev && prev.kind !== 'drawing' ? prev.text : '';
+  const text = prev && 'text' in prev ? prev.text : '';
 
   // Fixed once per screen: Stage rebuilds its panes (remounting the Countdown)
   // when the layout flips between one and two panes, and the clock must not
@@ -29,7 +29,7 @@ export default function RoundOne() {
   const expire = () => {
     if (expired.current) return;
     expired.current = true;
-    readyView();
+    readyView(false); // the clock, not the player: doesn't count as activity
   };
 
   const focus = <Logo source={IMAGES.home} />;
@@ -55,7 +55,7 @@ export default function RoundOne() {
           {text || '…'}
         </Text>
       </View>
-      <PigButton name="Got it — let's draw!" onPress={readyView} />
+      <PigButton name="Got it — let's draw!" onPress={() => readyView()} />
       <LeaveButton />
     </>
   );

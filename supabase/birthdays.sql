@@ -14,12 +14,13 @@ create table if not exists public.birthdays (
   day smallint not null check (day between 1 and 31)
 );
 
--- Readable with the publishable key (the anon role); nobody can write to it
--- from the app. Edit it in the dashboard, which bypasses these rules.
+-- Readable with the publishable key, before and after the app signs in as a
+-- guest (the anon and authenticated roles, see rooms.sql); nobody can write
+-- to it from the app. Edit it in the dashboard, which bypasses these rules.
 alter table public.birthdays enable row level security;
-grant select on public.birthdays to anon;
+grant select on public.birthdays to anon, authenticated;
 drop policy if exists "birthdays are readable" on public.birthdays;
-create policy "birthdays are readable" on public.birthdays for select to anon using (true);
+create policy "birthdays are readable" on public.birthdays for select to anon, authenticated using (true);
 
 -- The first one.
 insert into public.birthdays (name, month, day)

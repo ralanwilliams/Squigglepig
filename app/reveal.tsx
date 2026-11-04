@@ -7,20 +7,30 @@ import { DrawingImage } from '../src/components/DrawingImage';
 import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { RuleBadge } from '../src/components/RuleBadge';
-import { useGame } from '../src/state/GameContext';
+import { isBlankCell, isEmptyTurn, useGame } from '../src/state/GameContext';
 import { TIMERS } from '../src/lib/timers';
 import { font, layout, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
+import { SPACE } from '../src/lib/drawing';
+
+// A blank drawing shows as an empty canvas, the size and frame of a real one,
+// so the ✗ lands where it would on a drawing.
+const EMPTY_CANVAS = JSON.stringify({ w: SPACE.w, h: SPACE.h, strokes: [] });
 
 // End-of-round scoring. The chain is judged by its ORIGINAL PROMPT AUTHOR, who
 // votes the current cell (drawing/guess) against the original prompt. The cell
 // under judgement fills the left; the prompt, verdict buttons and running scores
 // sit on the right. Everyone's screen mirrors the same cell + ✓/✗ animation.
+//
+// An empty turn — a blank drawing, or a guess nobody wrote — has nothing to
+// judge: it shows as it came in and the judge's phone marks it ✗ by itself, a
+// blank drawing costing its artist a point (GameContext). Players who left
+// mid-game keep their row in the scores, marked "left".
 export default function Reveal() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { chains, revealIndex, revealStep, rulings, judge, isJudge, scores, players, vote } =
+  const { chains, revealIndex, revealStep, rulings, judge, isJudge, scores, players, departed, vote } =
     useGame();
 
   const chain = chains[revealIndex];
@@ -42,9 +52,12 @@ export default function Reveal() {
   const frontierRuled = rulings[step] !== undefined;
   const ruled = rulings[step];
   const isDrawing = frontier?.kind === 'drawing';
+  const empty = isEmptyTurn(frontier);
+  const blankDrawing = isBlankCell(frontier);
   const author = frontier?.author || 'someone';
+  const caption = frontier?.kind === 'caption' ? (frontier.text ?? '') : '';
 
-  const board = [...players].sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0));
+  const board = [...players, ...departed].sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0));
   // Score rows the rail can show at full size under the prompt + vote buttons.
   const visible = Math.max(4, Math.floor((ui.paneH - ui.sp(260)) / ui.sp(21)));
   const shownBoard = board.slice(0, visible);
@@ -58,12 +71,12 @@ export default function Reveal() {
   const focus = (
     <View style={[styles.cellArea, { gap: ui.sp(4) }]}>
       <Text style={[styles.author, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
-        {author + (isDrawing ? ' drew' : ' guessed')}
+        {author + (blankDrawing ? '’s canvas was blank' : isDrawing ? ' drew' : empty ? ' didn’t guess' : ' guessed')}
       </Text>
       <View style={styles.overlayHost}>
         {isDrawing ? (
           <DrawingImage
-            data={frontier.data}
+            data={blankDrawing ? EMPTY_CANVAS : frontier.data}
             frameStyle={[ruled === true && styles.good, ruled === false && styles.bad]}
           />
         ) : (
@@ -81,14 +94,22 @@ export default function Reveal() {
               numberOfLines={4}
               adjustsFontSizeToFit
             >
-              {frontier?.kind === 'caption' ? frontier.text : ''}
+              {caption.trim() || '(no answer)'}
             </Text>
           </View>
         )}
         {ruled !== undefined && <RuleBadge correct={ruled} size={badge} />}
       </View>
-      <Text style={[styles.awarded, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
-        {ruled === true && frontier?.author ? `✓ +1 ${frontier.author}` : ' '}
+      <Text
+        style={[styles.awarded, { fontSize: ui.f(13) }, blankDrawing && styles.penalty]}
+        maxFontSizeMultiplier={FONT_CAP}
+        numberOfLines={1}
+      >
+        {ruled === true && frontier?.author
+          ? `✓ +1 ${frontier.author}`
+          : blankDrawing && ruled === false && frontier?.author
+            ? `−1 ${frontier.author} (blank canvas)`
+            : ' '}
       </Text>
     </View>
   );
@@ -118,7 +139,7 @@ export default function Reveal() {
       </View>
 
       {isJudge ? (
-        !frontierRuled && frontier ? (
+        !frontierRuled && frontier && !empty ? (
           <View style={[styles.votes, { gap: ui.sp(10) }]}>
             <View style={styles.flex}>
               <PigButton name="✓ Yes" onPress={() => vote(true)} />
@@ -141,7 +162,7 @@ export default function Reveal() {
         {shownBoard.map((name) => (
           <View key={name} style={[styles.scoreRow, { paddingHorizontal: ui.sp(4), gap: ui.sp(8) }]}>
             <Text style={[styles.scoreName, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
-              {name === judge ? `${name} ⚖️` : name}
+              {name === judge ? `${name} ⚖️` : departed.includes(name) ? `${name} (left)` : name}
             </Text>
             <Text style={[styles.scoreVal, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
               {scores[name] ?? 0}
@@ -184,6 +205,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   bubbleText: { color: t.surfaceText, fontFamily: font.medium, textAlign: 'center' },
   awarded: { color: t.success, fontFamily: font.bold, textAlign: 'center' },
+  // The −1 is in the plain text color: the theme's red is too light to read
+  // on the teal. The minus sign says it.
+  penalty: { color: t.text },
   progress: { alignItems: 'center' },
   darkCard: { backgroundColor: t.overlay, borderWidth: t.edge, borderColor: t.overlayBorder },
 

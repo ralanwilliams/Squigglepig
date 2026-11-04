@@ -1,9 +1,9 @@
 -- One-row table for the keep-alive ping (.github/workflows/supabase-keepalive.yml).
 --
--- The game itself stores nothing: it only uses Realtime (Presence and
--- Broadcast). Supabase pauses a free project after 7 days without database
--- reads, and Realtime traffic doesn't count, so the workflow reads this row
--- through the REST API every few days.
+-- Supabase pauses a free project after 7 days without database reads. Games
+-- read the database now (rooms.sql), but a quiet week with nobody playing
+-- would still pause it, so the workflow reads this row through the REST API
+-- every few days.
 --
 -- Run once in the Supabase dashboard: SQL Editor → New query → paste → Run.
 -- Safe to run again.

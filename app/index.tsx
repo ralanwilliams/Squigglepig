@@ -8,17 +8,20 @@ import { PigButton } from '../src/components/PigButton';
 import { MenuButton } from '../src/components/MenuDrawer';
 import { SnoutSecret } from '../src/components/SnoutSecret';
 import { Walkthrough } from '../src/components/Walkthrough';
+import { showToast } from '../src/components/Toast';
 import { IMAGES } from '../src/assets/assets';
-import { useGame } from '../src/state/GameContext';
+import { entryMessage, useGame } from '../src/state/GameContext';
 import { PLAYABLE } from '../src/arcade/games';
-import { loadSession } from '../src/lib/session';
+import { clearSession, loadSession } from '../src/lib/session';
 import { markTutorialDone, tutorialDone } from '../src/lib/tutorial';
 
 // Home screen (was pages/Home.js). On launch it checks for a saved session and
-// auto-rejoins that room, so a returning player skips the username/room entry.
-// Otherwise, until the player has finished or skipped it once, the first-run
-// walkthrough opens over it (src/lib/tutorial.ts). Play Solo (app/arcade)
-// shows whenever there's a solo game this build offers (src/arcade/games).
+// goes back into that room — the player is still in it until they tap Leave
+// game or it closes — so a returning player skips the username/room entry. If
+// the room has gone, it says so and stays here. Otherwise, until the player
+// has finished or skipped it once, the first-run walkthrough opens over it
+// (src/lib/tutorial.ts). Play Solo (app/arcade) shows whenever there's a solo
+// game this build offers (src/arcade/games).
 export default function Home() {
   const { enterRoom } = useGame();
   const [checking, setChecking] = useState(true);
@@ -28,7 +31,14 @@ export default function Home() {
     let active = true;
     loadSession().then(async (s) => {
       if (!active) return;
-      if (s) return enterRoom(s.room, s.username); // rejoins + syncs into the live round
+      if (s) {
+        const status = await enterRoom(s.room, s.username, true); // rejoins + syncs into the live round
+        if (!active || status === 'ok') return;
+        // Gone (closed, or left from another screen): forget it. Offline: keep
+        // it, so the next launch tries again.
+        if (status !== 'offline') clearSession();
+        showToast(entryMessage(status), 4000);
+      }
       const done = await tutorialDone();
       if (!active) return;
       setWalkthrough(!done);

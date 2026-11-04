@@ -43,13 +43,15 @@ const COPY_LINK =
 
 // Lobby: the pig fills the left of the stage; on the right a single card groups
 // everything the host touches — room code, the points-to-win stepper, Start, and
-// the live roster (host = the earliest joiner, players[0]). Nothing scrolls: the
-// roster shows as many rows as the pane has room for and collapses the rest to
-// "+N more", and Stage's FitBox shrinks the card if it is still too tall.
+// the roster: everyone in the room, oldest first. A player without the app open
+// is dimmed and tagged AWAY (they're still in, until they tap Leave game); the
+// host is the longest-in player who has it open. Nothing scrolls: the roster
+// shows as many rows as the pane has room for and collapses the rest to "+N
+// more", and Stage's FitBox shrinks the card if it is still too tall.
 export default function Lobby() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { room, players, username, isHost, startGame, status, statusDetail } = useGame();
+  const { room, players, away, host, username, isHost, startGame, status, statusDetail } = useGame();
   const [target, setTarget] = useState(5);
 
   const bump = (delta: number) => setTarget((t) => Math.min(20, Math.max(1, t + delta)));
@@ -73,14 +75,14 @@ export default function Lobby() {
   const canStart = players.length >= MIN_PLAYERS;
   const connected = status === 'connected';
 
+  const here = players.length - away.length;
   const banner =
-    status === 'no-keys'
-      ? '⚠ Supabase keys not loaded — check .env, then: npx expo start -c'
-      : status === 'connecting'
-        ? 'Connecting to server…'
-        : status === 'error'
-          ? `⚠ Connection error: ${statusDetail || 'unknown'}`
-          : `Connected · ${players.length} player${players.length === 1 ? '' : 's'}`;
+    status === 'connecting'
+      ? 'Connecting to server…'
+      : status === 'error'
+        ? `⚠ Connection error: ${statusDetail || 'unknown'}`
+        : `Connected · ${players.length} player${players.length === 1 ? '' : 's'}` +
+          (away.length ? ` · ${here} here, ${away.length} away` : '');
 
   // Roster rows the pane can hold at full size beneath the card's fixed chrome.
   const visible = Math.max(4, Math.floor((ui.paneH - ui.sp(300)) / ui.sp(34)));
@@ -171,12 +173,13 @@ export default function Lobby() {
           <Text style={[styles.playersCount, { fontSize: ui.f(11) }]} maxFontSizeMultiplier={FONT_CAP}>{players.length}</Text>
         </View>
         <View style={{ gap: ui.sp(2) }}>
-          {shown.map((p, i) => (
-            <View key={i} style={[styles.playerRow, { gap: ui.sp(10), paddingVertical: ui.sp(3) }]}>
+          {shown.map((p) => (
+            <View key={p} style={[styles.playerRow, { gap: ui.sp(10), paddingVertical: ui.sp(3) }]}>
               <View
                 style={[
                   styles.avatar,
                   { width: avatar, height: avatar, borderRadius: avatar / 2, backgroundColor: colorFor(p).bg },
+                  away.includes(p) && styles.awayAvatar,
                 ]}
               >
                 <Text style={[styles.avatarText, { fontSize: ui.f(12), color: colorFor(p).ink }]} maxFontSizeMultiplier={FONT_CAP}>
@@ -191,14 +194,21 @@ export default function Lobby() {
                 {p}
                 {p === username ? ' (you)' : ''}
               </Text>
-              {i === 0 && (
+              {p === host ? (
                 <Text
                   style={[styles.hostBadge, { fontSize: ui.f(10), paddingHorizontal: ui.sp(7), paddingVertical: ui.sp(2) }]}
                   maxFontSizeMultiplier={FONT_CAP}
                 >
                   HOST
                 </Text>
-              )}
+              ) : away.includes(p) ? (
+                <Text
+                  style={[styles.awayBadge, { fontSize: ui.f(10), paddingHorizontal: ui.sp(7), paddingVertical: ui.sp(2) }]}
+                  maxFontSizeMultiplier={FONT_CAP}
+                >
+                  AWAY
+                </Text>
+              ) : null}
             </View>
           ))}
           {hidden > 0 && (
@@ -287,6 +297,19 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     letterSpacing: 0.5,
     color: t.accentText,
     backgroundColor: t.accent,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  // Away: still in the room, app not open. The avatar fades (the name keeps
+  // its full contrast); the tag is an outline in the muted text color,
+  // quieter than HOST's filled pill.
+  awayAvatar: { opacity: 0.45 },
+  awayBadge: {
+    fontFamily: font.bold,
+    letterSpacing: 0.5,
+    color: t.textMuted,
+    borderWidth: 1,
+    borderColor: t.textMuted,
     borderRadius: 999,
     overflow: 'hidden',
   },

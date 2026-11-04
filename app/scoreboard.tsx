@@ -18,6 +18,9 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 // player straight into a new prompts round and clears all history — or drop back
 // to the lobby.
 //
+// Players who tapped Leave game during the game are still listed, with their
+// score and "left" after their name, but can't take the win.
+//
 // The winner's pig is dressed as they dressed it (src/avatar): their outfit,
 // and their speech bubble saying what they wrote, for everyone in the room to
 // see. A tie lines up every winner's pig, each named underneath (up to
@@ -26,7 +29,7 @@ const LINEUP = 4;
 export default function Scoreboard() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { players, scores, startGame, target, avatars } = useGame();
+  const { players, departed, scores, startGame, target, avatars } = useGame();
 
   useEffect(() => {
     playSound(SOUNDS.winner);
@@ -37,11 +40,12 @@ export default function Scoreboard() {
   // Reaching the target only ends the game (after the round's last chain is
   // scored); the winner is whoever has the most points then — and several
   // players on the same top score share the win.
-  const ranked = [...players]
-    .map((name) => ({ name, score: scores[name] ?? 0 }))
+  const ranked = [...players.map((name) => ({ name, left: false })), ...departed.map((name) => ({ name, left: true }))]
+    .map((r) => ({ ...r, score: scores[r.name] ?? 0 }))
     .sort((a, b) => b.score - a.score);
-  const top = ranked[0]?.score ?? 0;
-  const winners = top > 0 ? ranked.filter((r) => r.score === top).map((r) => r.name) : [];
+  const stayed = ranked.filter((r) => !r.left);
+  const top = stayed[0]?.score ?? 0;
+  const winners = top > 0 ? stayed.filter((r) => r.score === top).map((r) => r.name) : [];
   const title =
     winners.length === 0
       ? 'Final scores'
@@ -98,6 +102,7 @@ export default function Scoreboard() {
               >
                 {winner ? '👑 ' : ''}
                 {r.name}
+                {r.left ? ' (left)' : ''}
               </Text>
               <Text
                 style={[styles.score, { fontSize: ui.f(16) }, winner && styles.winnerText]}

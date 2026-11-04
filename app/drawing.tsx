@@ -14,7 +14,7 @@ export default function Drawing() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const { submitCell, prev } = useGame();
-  const text = prev && prev.kind !== 'drawing' ? prev.text : '';
+  const text = prev && 'text' in prev ? prev.text : '';
 
   // Fills WorkStage's fixed-height top slot (same footprint as the guess input),
   // so a long prompt shrinks to fit rather than pushing the buttons down.

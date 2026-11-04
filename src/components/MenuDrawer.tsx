@@ -8,6 +8,7 @@ import { Switch } from './Switch';
 import { showToast } from './Toast';
 import { AppMark } from './AppMark';
 import { GROUPS, type RewardsPath } from '../rewards/catalog';
+import { pushSupported, setNotificationsOn, useNotificationsOn } from '../lib/push';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
@@ -42,6 +43,9 @@ const NATIVE = Platform.OS !== 'web';
 // Seasonal themes); the first two show what is in effect — the phone's setting
 // until it is flipped here — and Seasonal themes is on until turned off (the
 // Rewards screen's Themes tab has the same switch, beside the theme cards).
+// Notifications (not on the web) is the one switch for every room
+// notification (src/lib/push.ts): on until turned off; if the phone itself
+// was told no, turning it on opens the phone's Settings.
 // Rewards opens what the player has won, a group at a time (app/rewards.tsx:
 // Art supplies, Themes), and Your pig (app/pig.tsx), its outfits and bubbles.
 // With reduced motion the drawer appears and goes without sliding.
@@ -97,6 +101,7 @@ function MenuDrawer({
   const win = useWindowDimensions();
   const { highContrast, setContrast, reducedMotion, setMotion, seasonal, setSeasonal } = useThemeMode();
   const reduced = useReducedMotion();
+  const notifyOn = useNotificationsOn() ?? true;
 
   // Stay mounted through the closing slide; unmount once it has finished.
   const [mounted, setMounted] = useState(visible);
@@ -155,6 +160,13 @@ function MenuDrawer({
     { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },
     { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
     { icon: 'season', label: 'Seasonal themes', on: seasonal, onPress: () => setSeasonal(!seasonal) },
+  ];
+  const toggleNotifications = () =>
+    setNotificationsOn(!notifyOn).then((r) => {
+      if (r === 'settings') showToast('Allow notifications for Squigglepig in your phone’s Settings', 4000);
+    });
+  const notifications: Row[] = [
+    { icon: 'bell', label: 'Room notifications', on: notifyOn, onPress: toggleNotifications },
   ];
   const rewards: Row[] = [
     { icon: 'hat', label: 'Your pig', onPress: go('/pig'), trailing: 'chevron' },
@@ -253,6 +265,7 @@ function MenuDrawer({
                 </View>
                 <View style={[styles.column, { gap: ui.sp(12) }]}>
                   {section('Accessibility', accessibility)}
+                  {pushSupported ? section('Notifications', notifications) : null}
                   {section('Rewards', rewards)}
                 </View>
               </View>
@@ -260,6 +273,7 @@ function MenuDrawer({
               <View style={{ gap: ui.sp(12) }}>
                 {section('Support', support)}
                 {section('Accessibility', accessibility)}
+                {pushSupported ? section('Notifications', notifications) : null}
                 {section('Rewards', rewards)}
               </View>
             )}
