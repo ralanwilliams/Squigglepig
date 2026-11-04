@@ -26,7 +26,7 @@ import { canvas } from '../theme/tokens';
 // part is dropped rather than drawn, and a hopeless drawing is null.
 
 // The drawing space: every drawing is 400 × 300 units whatever the device,
-// orientation or zoom it was drawn at (PigCanvas).
+// orientation or zoom it was drawn at (DrawingBoard).
 export const SPACE = { w: 400, h: 300 };
 
 // Pen width, in drawing units.

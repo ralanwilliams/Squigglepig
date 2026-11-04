@@ -6,7 +6,7 @@ import { PROPS, type Prop } from '../theme/skins/props';
 import { inkColor, type Sticker } from '../lib/drawing';
 
 // A drawing's parts (src/lib/drawing.ts), for any <Svg> whose viewBox is in
-// drawing units: the canvas while it's drawn on (PigCanvas), and the finished
+// drawing units: the canvas while it's drawn on (DrawingBoard), and the finished
 // drawing wherever it's shown (DrawingImage).
 
 // The strokes, each in its own ink (black unless a brush says otherwise).

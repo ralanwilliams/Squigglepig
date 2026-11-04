@@ -107,12 +107,13 @@ export default function Pig() {
   );
 
   // Outfits ahead of theme parts in the same place; sort is stable. A part
-  // that's there only by day (Lukas's badge) has no card at night.
+  // that's there only by day (Lukas's badge) has no card at night, and one
+  // there only by night (Ash's cast) none by day.
   const accessories = [
     ...rewardsOf('outfit').map((r) => ({ rank: placeRank(r.slot), card: tile(r) })),
     ...themes.flatMap((s) =>
       partsOf(s)
-        .filter((part) => !(dark && part.dayOnly))
+        .filter((part) => !(dark ? part.dayOnly : part.nightOnly))
         .map((part) => ({ rank: placeRank(part.key), card: themeTile(s, part) }))
     ),
   ]

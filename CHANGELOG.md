@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1]
+
+### Changed
+- Every screen's background has a soft polka-dot pattern in the theme's own colours (plain in high contrast)
+- squigglepig.app and its invite page use Google's official Get it on Google Play badge
+- Rewards › Art supplies has a drawing canvas beside your brushes and stickers, the same one as in the game, so you can try out what you've won (with Clear and Undo). The drawing isn't kept
+- Rewards › Themes shows your pig from the home screen, head to hoof, beside the themes, so you can see each one on it as you choose
+- Ash plays by day and sits out injured by night: by day he's holding a basketball, and after dark he's on crutches with his cast on the other ankle. The crowd cheers as he comes back in the light, and goes "ooooh!" as he goes down when it turns dark. When Ash's pig wins, he throws his jersey off in celebration, and it floats down to the ground beside him
+- The winner's speech bubble comes and goes, 3 seconds on and 3 off: Speech and Shout fade, Thought and Heart pop up like bubbles, and the royal scroll, now smaller, hangs rolled up and unrolls downward to show its message
+
+### Fixed
+- The words in every speech bubble fit by their real width, so long or wide messages stay inside the bubble, and the heart's words sit inside the heart rather than up in its lobes
+- Bobby's blaster and Lukas's rifle now sit behind the pig's front hoof, not over it, and Bobby's blaster sits a little lower in his hooves
+- The number on Ash's jersey no longer flickers to a thinner font while the app switches between light and dark
+
 ## [2.8.0]
 
 ### Added

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Countdown, deadlineIn } from './Countdown';
 import { FitBox } from './FitBox';
+import { Backdrop } from './Backdrop';
 import { PeekPig, peekPigHeight } from './PeekPig';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
@@ -124,6 +125,7 @@ export function WorkStage({
   if (ui.twoPane) {
     return (
       <View style={[styles.safe, frame]}>
+        <Backdrop />
         <View style={[styles.row, { padding: ui.pad, gap: ui.gap }]}>
           <View style={styles.focus}>{focus}</View>
           <FitBox align="top" minContentH={fixedH} style={{ width: railW }}>
@@ -151,6 +153,7 @@ export function WorkStage({
 
   return (
     <View style={[styles.safe, frame]}>
+      <Backdrop />
       <FitBox minContentH={fixedHP} style={[styles.flex, { margin: ui.pad }]}>
         <View style={{ gap: gapP }}>
           {head}

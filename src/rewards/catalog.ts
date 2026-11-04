@@ -43,11 +43,14 @@ export type Kind = keyof typeof KINDS;
 // The menu's Rewards rows that open a Rewards screen, each with just these
 // kinds' tabs (app/rewards.tsx ?group=), named in the menu by the label.
 // Outfits and speech bubbles are the menu's third row, Your pig (app/pig.tsx).
-// `go` names a button that opens the screen (homeOf, below).
+// `go` names a button that opens the screen (homeOf, below). `show` is what
+// fills the art pane, beside the cards: a drawing canvas to try out the
+// brushes and stickers won ('canvas'), or the home screen's pig, dressed as
+// it is now, to see a theme on the whole pig ('pig').
 export const GROUPS = {
-  art: { label: 'Art supplies', kinds: ['brush', 'sticker'], go: 'See art supplies' },
-  theme: { label: 'Themes', kinds: ['theme'], go: 'See your themes' },
-} as const satisfies Record<string, { label: string; kinds: readonly Kind[]; go: string }>;
+  art: { label: 'Art supplies', kinds: ['brush', 'sticker'], go: 'See art supplies', show: 'canvas' },
+  theme: { label: 'Themes', kinds: ['theme'], go: 'See your themes', show: 'pig' },
+} as const satisfies Record<string, { label: string; kinds: readonly Kind[]; go: string; show: 'canvas' | 'pig' }>;
 
 export type Group = keyof typeof GROUPS;
 

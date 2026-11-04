@@ -55,9 +55,12 @@ export const SOUNDS = {
   winner: require('./sounds/winner.mp3'),
   // The themes' stings as the light changes (src/theme/skins: a skin's
   // `sounds`), made by scripts/stings.py. Lukas's: the outlaw's turn, and the
-  // hero's return; Chris's: the supervillain's, and the superhero's.
+  // hero's return; Chris's: the supervillain's, and the superhero's; Ash's:
+  // the crowd's "ooooh!!!" as he goes down hurt, and its cheer as he's back.
   outlaw: require('./sounds/outlawTheme.mp3'),
   hero: require('./sounds/heroTheme.mp3'),
   supervillain: require('./sounds/supervillainTheme.mp3'),
   superhero: require('./sounds/superheroTheme.mp3'),
+  ooh: require('./sounds/crowdOoh.mp3'),
+  cheer: require('./sounds/crowdCheer.mp3'),
 };

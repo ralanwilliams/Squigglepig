@@ -12,6 +12,7 @@ import { pushSupported, setNotificationsOn, useNotificationsOn } from '../lib/pu
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
+import { Backdrop } from './Backdrop';
 import {
   APP_STORE_URL,
   CONTACT_EMAIL,
@@ -226,6 +227,7 @@ function MenuDrawer({
             },
           ]}
         >
+          <Backdrop style={{ borderTopRightRadius: ui.sp(16), borderBottomRightRadius: ui.sp(16) }} />
           <View style={styles.head}>
             <View style={[styles.identity, { gap: ui.sp(14) }]}>
               <AppMark size={icon} rounded />

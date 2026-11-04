@@ -1,4 +1,5 @@
 import { ASH_WEAR } from './ashWear';
+import { FRONT_ARM_PROPS } from './frontArms';
 
 // Vector props that seasonal skins draw on top of the pig artwork: hats, bats,
 // pumpkins, balloons, a birthday cake. Plain path data, no images — a prop
@@ -21,7 +22,9 @@ import { ASH_WEAR } from './ashWear';
 // piped, like icing: plump rounded strokes in `fill`, a darker edge below and
 // a glossy one above.
 
-export type Shape = { d: string; fill: string; line?: boolean };
+// `roll` marks a shape as part of a scroll's roll, at its top or bottom (a
+// prop that `unroll`s): the rest is the paper between them.
+export type Shape = { d: string; fill: string; line?: boolean; roll?: 'top' | 'bottom' };
 // `lines: 2` lets the words wrap onto a second line (a speech bubble's), and
 // then `y` is the middle of the block rather than a baseline.
 export type TextSlot = { x: number; y: number; size: number; maxW: number; fill: string; shade?: string; shine?: string; lines?: 2 };
@@ -42,6 +45,12 @@ export type TextSlot = { x: number; y: number; size: number; maxW: number; fill:
 // `under` marks something worn on the body (Ash's jersey): it's drawn first,
 // under whatever the pig holds and anything else of any theme's on it
 // (layout.ts onThePig).
+// `appear` is how it comes and goes, on for a few seconds and off for a few,
+// over and over (SkinDecor.tsx: the speech bubbles): 'fade' fades in and
+// out; 'bubble' pops up from small with a bounce, like a bubble, and shrinks
+// away; 'unroll' is a scroll that's always there, rolled up with nothing to
+// read, whose bottom roll drops to unroll it and show the words, then rolls
+// back up, its rolls' middles at `unroll.top` and `unroll.bottom` down it.
 export type Prop = {
   w: number;
   h: number;
@@ -54,6 +63,8 @@ export type Prop = {
   eyes?: true;
   hooves?: { from: number[]; to: number[] }[];
   under?: true;
+  appear?: 'fade' | 'bubble' | 'unroll';
+  unroll?: { top: number; bottom: number };
   shapes: Shape[];
 };
 
@@ -146,6 +157,13 @@ function beads(cx: number, cy: number, rx: number, ry: number, n: number, r: num
 const heart = (cx: number, cy: number, s: number) =>
   `M${cx} ${r1(cy + s)}C${r1(cx - s * 1.6)} ${r1(cy + s * 0.1)} ${r1(cx - s * 1.1)} ${r1(cy - s * 1.2)} ${cx} ${r1(cy - s * 0.45)}` +
   `C${r1(cx + s * 1.1)} ${r1(cy - s * 1.2)} ${r1(cx + s * 1.6)} ${r1(cy + s * 0.1)} ${cx} ${r1(cy + s)}Z`;
+
+// One of the royal scroll's rolls (bubbleScroll), across it at height y: the
+// paper wound round it, and the rod's knobs poking out at either end.
+const scrollRoll = (y: number, roll: 'top' | 'bottom'): Shape[] => [
+  { d: `M56 ${y - 6}H144Q150 ${y - 6} 150 ${y}Q150 ${y + 6} 144 ${y + 6}H56Q50 ${y + 6} 50 ${y}Q50 ${y - 6} 56 ${y - 6}Z`, fill: '#E8D3A6', line: true, roll },
+  { d: ellipse(47, y, 4, 7) + ellipse(153, y, 4, 7), fill: '#8B5A2B', line: true, roll },
+];
 
 const ORANGE = '#F07F1E';
 const GLOW = '#FFD23F'; // candlelight through a carved face, a bat's eyes
@@ -1372,6 +1390,9 @@ export const PROPS = {
   // His sweatband and his jersey and shorts are traced from the art to fit
   // him on each piece of it (ashWear.ts, made by scripts/ash-wear.py).
   ...ASH_WEAR,
+  // The pig's forearm on the viewer's left, drawn again over a long gun
+  // (layout.ts carried; frontArms.ts, made by scripts/front-arms.py).
+  ...FRONT_ARM_PROPS,
   // An underarm crutch: a padded top, two aluminium rails meeting at the leg,
   // a grip across them (the anchor, where the hoof holds it) and a rubber
   // tip. Held on the pig's art, inside its outline, so no rim.
@@ -1516,13 +1537,15 @@ export const PROPS = {
   bubbleSpeech: {
     w: 200,
     h: 110,
-    text: { x: 104, y: 47, size: 26, maxW: 160, fill: '#1A1A1A', lines: 2 },
+    appear: 'fade',
+    text: { x: 102, y: 47, size: 24, maxW: 146, fill: '#1A1A1A', lines: 2 },
     shapes: [{ d: 'M30 8H174Q194 8 194 30V64Q194 86 172 86H64L18 106L40 86H30Q8 86 8 64V30Q8 8 30 8Z', fill: '#FFFFFF', line: true }],
   },
   bubbleThought: {
     w: 200,
     h: 110,
-    text: { x: 104, y: 48, size: 24, maxW: 132, fill: '#1A1A1A', lines: 2 },
+    appear: 'bubble',
+    text: { x: 106, y: 50, size: 22, maxW: 118, fill: '#1A1A1A', lines: 2 },
     shapes: [
       { d: circle(16, 103, 5), fill: '#FFFFFF', line: true },
       { d: circle(32, 92, 8), fill: '#FFFFFF', line: true },
@@ -1532,25 +1555,33 @@ export const PROPS = {
   bubbleShout: {
     w: 200,
     h: 110,
-    text: { x: 100, y: 55, size: 24, maxW: 124, fill: '#1A1A1A', lines: 2 },
+    appear: 'fade',
+    text: { x: 100, y: 55, size: 21, maxW: 108, fill: '#1A1A1A', lines: 2 },
     shapes: [{ d: burst(100, 55, 96, 52, 14, 0.8), fill: '#FFF176', line: true }],
   },
+  // The words sit in the heart's body, below the dip between its lobes, as
+  // wide as it is there.
   bubbleHeart: {
     w: 200,
     h: 110,
-    text: { x: 100, y: 52, size: 22, maxW: 104, fill: '#8E1047', lines: 2 },
-    shapes: [{ d: heart(100, 60, 48), fill: '#FFD1DE', line: true }],
+    appear: 'bubble',
+    text: { x: 100, y: 62, size: 20, maxW: 76, fill: '#8E1047', lines: 2 },
+    shapes: [{ d: heart(100, 55, 54), fill: '#FFD1DE', line: true }],
   },
+  // A royal scroll, smaller than the other bubbles, hanging from a roll
+  // across its top: it starts rolled up, and its bottom roll drops to
+  // unroll it and show the words (SkinDecor.tsx), each roll a wooden rod
+  // wound with paper, its knobs showing at either end.
   bubbleScroll: {
     w: 200,
     h: 110,
-    text: { x: 100, y: 55, size: 24, maxW: 128, fill: '#4A2E16', lines: 2 },
+    appear: 'unroll',
+    unroll: { top: 18, bottom: 92 },
+    text: { x: 100, y: 55, size: 17, maxW: 70, fill: '#4A2E16', lines: 2 },
     shapes: [
-      { d: rect(26, 22, 148, 66), fill: '#F5E6C4', line: true },
-      { d: ellipse(26, 55, 12, 38), fill: '#E8D3A6', line: true }, // rolled ends
-      { d: ellipse(174, 55, 12, 38), fill: '#E8D3A6', line: true },
-      { d: ellipse(26, 55, 4, 22), fill: '#C9AE78' },
-      { d: ellipse(174, 55, 4, 22), fill: '#C9AE78' },
+      { d: rect(58, 18, 84, 74), fill: '#F5E6C4', line: true },
+      ...scrollRoll(18, 'top'),
+      ...scrollRoll(92, 'bottom'),
     ],
   },
 

@@ -5,6 +5,7 @@ import { AppMark } from '../src/components/AppMark';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
+import { Backdrop } from '../src/components/Backdrop';
 import LICENSES from '../src/assets/licenses.json';
 
 type Pkg = { name: string; version: string; license: string };
@@ -39,6 +40,7 @@ export default function Licenses() {
         { paddingTop: ui.insets.top, paddingLeft: ui.insets.left, paddingRight: ui.insets.right },
       ]}
     >
+      <Backdrop />
       <View style={{ minHeight: ui.headerBand }} />
 
       <FlatList
