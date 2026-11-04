@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0]
+
+### Added
+- You stay in your room until you tap Leave game. Closing the app or locking your phone no longer takes you out: the lobby shows you as AWAY, and opening Squigglepig takes you straight back into the game
+- If everyone closes the app during a game, the game waits for them, and the first player back picks it up where it was
+- Room notifications: while the app isn't open, you're told when someone enters or leaves your lobby ("Sam has entered - 4 players in the room."), and, if you're away, when the game starts or it's your turn (once, until you're back). Squigglepig asks to send them the first time you reach a lobby, and ☰ › Notifications turns them off. The web version doesn't send them
+- Three new rare themes to win in solo play: Lukas, a sheriff by day who turns outlaw after dark; Chris, a superhero by day and a supervillain by night, cape and all; and Ash, in his jersey with a cast and crutches. Lukas's and Chris's pigs change from one look to the other, each with its own sting, when the app switches between light and dark
+- A sound switch beside the dark-mode toggle in the top-right corner: off silences the music and the sound effects, and is remembered
+- A privacy policy page on the website, squigglepig.app/privacy
+
+### Changed
+- A room closes after 10 minutes with nobody doing anything in it
+- Nobody can join a game that has already started; they can join in time for the next one
+- Rooms are private: only the players in a room can see or send anything in it. Two players in a room can't have the same name, and names can be up to 24 characters
+- Leaving during a game: if at least 3 players carry on, you're taken out of the rotation straight away and your score stays on the board, marked (left), though you can't take the win. If fewer would be left, your turns come in blank until the round ends, and the game ends there
+- Every blank drawing costs a point, whether an empty canvas was handed in or the timer ran out. At the reveal, a blank drawing or an empty guess is marked ✗ by itself. The next player in a chain is handed the last drawing or words in it that had something in them, and if every drawing so far was blank, they write something for the next player to draw
+- Choosing a theme shows it over everything, switching Seasonal themes off until the next birthday or holiday, and dresses your pig in all of the theme's look. Change it on Your pig as you like
+- The website's home page is a neon sign: the pig, the name and the tagline glow and flicker, above the buttons to get the app
+- The Terms of Service and Help & FAQ explain how rooms, leaving and notifications work now
+
 ## [2.7.1]
 
 ### Added
