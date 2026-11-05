@@ -1,8 +1,11 @@
 # Cloudflare Pages response headers (https://developers.cloudflare.com/pages/configuration/headers/).
-# When iOS is added, .well-known/apple-app-site-association has no extension and
-# needs an explicit JSON content type here too.
+# The two files that let room links open the app: assetlinks.json (Android App
+# Links) and apple-app-site-association (iOS Universal Links). Apple's file has
+# no extension, so it needs its JSON content type set here.
 
 /.well-known/assetlinks.json
+  Content-Type: application/json
+/.well-known/apple-app-site-association
   Content-Type: application/json
 
 # Room codes ride in the /join query string; don't pass them on to the store or

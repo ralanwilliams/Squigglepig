@@ -152,10 +152,16 @@
       text-shadow: 0 0 6px var(--pink), 0 0 14px var(--pink);
     }
 
-    /* Google's own Get it on Google Play badge (google-play-badge.png, from
-       play.google.com/intl/en_us/badges, unaltered). Its transparent margin is
-       the clear space the badge guidelines ask for, so the image is sized to
-       show the badge itself 62px tall (168 of its 250px are badge). */
+    /* The two store badges, the same height, side by side where they fit and
+       stacked on a phone. */
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      column-gap: 8px;
+    }
+
     .badge {
       display: inline-block;
       transition: transform .2s ease;
@@ -163,10 +169,23 @@
 
     .badge:hover { transform: scale(1.06); }
 
+    /* Google's own Get it on Google Play badge (google-play-badge.png, from
+       play.google.com/intl/en_us/badges, unaltered). Its transparent margin is
+       the clear space the badge guidelines ask for, so the image is sized to
+       show the badge itself 62px tall (168 of its 250px are badge). */
     .badge img {
       display: block;
       height: 92px;
       width: auto;
+    }
+
+    /* Apple's own Download on the App Store badge (app-store-badge.svg, from
+       developer.apple.com/app-store/marketing/guidelines, unaltered). It has
+       no margin of its own, so it's shown 62px tall like Google's, with a
+       margin for the quarter-height clear space Apple asks for. */
+    .badge img.apple {
+      height: 62px;
+      margin: 15px 0;
     }
 
     /* The trademark notice the badge guidelines ask for, wherever it shows. */
@@ -174,13 +193,6 @@
       margin-top: 28px;
       font-size: .7rem;
       color: rgba(255,255,255,.55);
-    }
-
-    .soon {
-      display: block;
-      margin-top: 12px;
-      font-size: .78rem;
-      color: rgba(255,255,255,.7);
     }
 
     /* 6. Or play on the web: a sun-yellow neon pill. */
@@ -234,17 +246,22 @@
 
     <section class="app">
       <h2>Get the app</h2>
-      <a class="badge" href="https://play.google.com/store/apps/details?id=com.squigglepig.app">
-        <img src="google-play-badge.png" width="646" height="250" alt="Get it on Google Play">
-      </a>
-      <span class="soon">App Store: coming soon</span>
+      <div class="badges">
+        <a class="badge" href="https://apps.apple.com/app/id6822231355">
+          <img class="apple" src="app-store-badge.svg" width="120" height="40" alt="Download on the App Store">
+        </a>
+        <a class="badge" href="https://play.google.com/store/apps/details?id=com.squigglepig.app">
+          <img src="google-play-badge.png" width="646" height="250" alt="Get it on Google Play">
+        </a>
+      </div>
     </section>
 
     <p class="alt">or</p>
     <!-- The web build of the game, served by its own Pages project (see README, Hosting). -->
     <a class="neon-btn" href="https://play.squigglepig.app/">Play on the web</a>
 
-    <p class="legal">Google Play and the Google Play logo are trademarks of Google LLC.</p>
+    <p class="legal">Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+      Google Play and the Google Play logo are trademarks of Google LLC.</p>
   </main>
 </body>
 </html>

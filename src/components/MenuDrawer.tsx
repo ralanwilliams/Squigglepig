@@ -15,6 +15,7 @@ import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../th
 import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
 import { Backdrop } from './Backdrop';
 import {
+  APP_STORE_REVIEW_URL,
   APP_STORE_URL,
   CONTACT_EMAIL,
   DEVELOPER_URL,
@@ -81,9 +82,13 @@ function open(url: string) {
   return Linking.openURL(url);
 }
 
+// Each platform's own store, opened in the store app where there is one. On the
+// web, an iPhone or iPad goes to the App Store and everything else to Play.
 function rate() {
   if (Platform.OS === 'android') return open(PLAY_STORE_APP_URL).catch(() => open(PLAY_STORE_URL));
-  return open(APP_STORE_URL ?? PLAY_STORE_URL);
+  if (Platform.OS === 'ios') return open(APP_STORE_REVIEW_URL).catch(() => open(APP_STORE_URL));
+  const apple = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  return open(apple ? APP_STORE_URL : PLAY_STORE_URL);
 }
 
 function MenuDrawer({
@@ -146,10 +151,7 @@ function MenuDrawer({
   const support: Row[] = [
     { icon: 'play', label: 'How to play', onPress: howToPlay, trailing: 'chevron' },
     { icon: 'feedback', label: 'Send feedback', onPress: feedback, trailing: 'external' },
-    // No App Store listing yet, so iOS has nowhere to send a rating.
-    ...(Platform.OS === 'ios' && !APP_STORE_URL
-      ? []
-      : [{ icon: 'star', label: 'Rate this app', onPress: rate, trailing: 'external' } as Row]),
+    { icon: 'star', label: 'Rate this app', onPress: rate, trailing: 'external' },
     { icon: 'help', label: 'Help & FAQ', onPress: () => open(HELP_URL), trailing: 'external' },
   ];
   const toggleNotifications = () =>

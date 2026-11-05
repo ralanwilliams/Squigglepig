@@ -1,6 +1,6 @@
 // Shareable room links. The https form opens the app directly where the OS has
-// verified that squigglepig.app belongs to it (Android App Links today, iOS
-// Universal Links once associatedDomains is set up); everywhere else it lands on
+// verified that squigglepig.app belongs to it (Android App Links and iOS
+// Universal Links, from the files in site/.well-known); everywhere else it lands on
 // the small fallback page in site/join.html, which shows the code and offers the
 // squigglepig:// scheme as an "open in app" button, a store link, and the same
 // room in the web build (play.squigglepig.app/join?room=…). The link always
@@ -17,9 +17,9 @@ export function roomLink(room: string) {
 export const CONTACT_EMAIL = 'alan@ralanwilliams.com';
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.squigglepig.app';
 export const PLAY_STORE_APP_URL = 'market://details?id=com.squigglepig.app'; // opens the Play Store app itself
-// TODO: the App Store listing, once the Apple developer account exists. While
-// it's null, iOS hides "Rate this app".
-export const APP_STORE_URL: string | null = null;
+export const APP_STORE_URL = 'https://apps.apple.com/app/id6822231355';
+// Opens the App Store app itself, on the listing's Write a Review sheet.
+export const APP_STORE_REVIEW_URL = 'itms-apps://apps.apple.com/app/id6822231355?action=write-review';
 export const HELP_URL = `${LINK_ORIGIN}/help`;
 export const PRIVACY_URL = 'https://squigglepig.app/privacy';
 export const TERMS_URL = `${LINK_ORIGIN}/terms`;
