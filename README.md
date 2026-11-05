@@ -139,7 +139,7 @@ Two Pages projects deploy from this repo's `master` branch:
 
 | Domain | What | Build command | Output |
 |---|---|---|---|
-| squigglepig.app | Landing page, `/join` invite page, `.well-known/assetlinks.json` (Android App Links) | none | `site` |
+| squigglepig.app | Landing page, `/join` invite page, `.well-known/assetlinks.json` (Android App Links), `.well-known/apple-app-site-association` (iOS Universal Links) | none | `site` |
 | play.squigglepig.app | The game, web build | `npm run build:web` | `dist` |
 
 The game project needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`

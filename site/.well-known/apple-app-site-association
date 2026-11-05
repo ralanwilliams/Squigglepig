@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["7RHJS5XDSU.com.squigglepig.app"],
+        "components": [
+          { "/": "/join*", "comment": "Room invites: squigglepig.app/join?room=ABCD" }
+        ]
+      }
+    ]
+  }
+}

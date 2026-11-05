@@ -11,6 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.squigglepig.app",
+      "associatedDomains": [
+        "applinks:squigglepig.app"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
