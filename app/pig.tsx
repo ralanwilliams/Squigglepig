@@ -1,40 +1,61 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { PigInput } from '../src/components/PigInput';
+import { TabPages, Tabs } from '../src/components/Tabs';
 import { WinnerPig } from '../src/avatar/WinnerPig';
 import { partSource, useMyAvatar, useThemeSkins } from '../src/avatar/avatar';
 import { DEFAULT_SAY } from '../src/avatar/bubbles';
-import { partsOf, placeRank, type ThemePart } from '../src/avatar/themeParts';
+import { PLACES, partsOf, placeOf, type Place, type ThemePart } from '../src/avatar/themeParts';
 import { Card, RewardTile } from '../src/rewards/RewardTile';
 import { propThumb } from '../src/rewards/RewardThumb';
 import { BUBBLE_MAX, rewardsOf, slotOf, type Reward } from '../src/rewards/catalog';
 import { cleanBubbleText, useInventory } from '../src/rewards/inventory';
-import { font, type Theme } from '../src/theme/tokens';
 import { useSkin, useTheme, useThemedStyles } from '../src/theme/theme';
 import type { Skin } from '../src/theme/skins';
-import { FONT_CAP, useUi } from '../src/theme/responsive';
+import { useUi } from '../src/theme/responsive';
 
 // Your pig, from the menu's Rewards: how everyone in the room sees you when
 // you win (src/avatar). The pig on the left (above, held upright), dressed as
-// it is now; on the right two groups of cards, and tapping one puts it on the
-// pig, tapping it again takes it off.
+// it is now; on the right a row of tabs, one per place on the pig, and under
+// it that place's cards: tapping one puts it on the pig, tapping it again
+// takes it off.
 //
-// Accessories: every outfit there is, won or not (src/rewards/catalog.ts),
-// and the parts of every theme the player can use (the birthday or holiday
-// in season, and the themes they've won: src/avatar/themeParts.ts), in one
-// list ordered by where they go on the pig (themeParts.ts placeRank): hats,
-// eyewear, neckwear, what it holds, what's at its feet, what floats about
-// it. The pig wears one thing in each place — a crown or the witch hat, the
-// sunglasses or a visor — so putting one on takes off what was there
-// (inventory.tsx wear, setPart). The theme showing dresses the pig in all of
-// its own parts until they're taken off; another theme's part goes on in
-// place of the same part (a longbow for the pumpkin).
+// What's on offer: every outfit there is, won or not (src/rewards/catalog.ts),
+// and the parts of every theme the player can use (the birthday or holiday in
+// season, and the themes they've won: src/avatar/themeParts.ts). Each goes in
+// the tab for where it sits on the pig (themeParts.ts placeOf), named for
+// what's really in it so nothing there is a surprise:
 //
-// Speech bubbles: the bubbles, one at a time, and what the bubble says. The
-// words are kept as typed while the field is in use, and saved (cleaned: one
-// line, at most BUBBLE_MAX characters) when it's left or the screen is, so a
-// space typed at the end isn't trimmed away mid-word.
+//   Head     hats, and the mohawk, sweatband and bunny ears
+//   Face     sunglasses, shades, masks, brows
+//   Body     the bow tie, badges, emblems, capes, the jersey
+//   Holding  what's in its hooves (and the quiver on its back)
+//   Feet     what's at its feet, and the ankle cast
+//   Sky      what floats about it: bats, clouds, birds, fireworks…
+//   Bubble   the speech bubbles, one at a time, and what the bubble says
+//
+// A tab with nothing in it isn't shown, and a dot marks each tab with
+// something from it on the pig, so it's easy to find what to take off. The
+// pig wears one thing in each place, so putting one on takes off what was
+// there (inventory.tsx wear, setPart). The theme showing dresses the pig in
+// all of its own parts until they're taken off; another theme's part goes on
+// in place of the same part (a longbow for the pumpkin).
+//
+// The bubble's words are kept as typed while the field is in use, and saved
+// (cleaned: one line, at most BUBBLE_MAX characters) when it's left or the
+// screen is, so a space typed at the end isn't trimmed away mid-word.
+type TabKey = Place | 'bubble';
+const TAB_LABELS: Record<TabKey, string> = {
+  head: 'Head',
+  eyes: 'Face',
+  neck: 'Body',
+  hold: 'Holding',
+  feet: 'Feet',
+  sky: 'Sky',
+  bubble: 'Bubble',
+};
+
 export default function Pig() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -96,56 +117,65 @@ export default function Pig() {
     );
   };
 
-  const group = (label: string, cards: React.ReactNode[], after?: React.ReactNode) => (
-    <View style={{ gap: ui.sp(6) }}>
-      <Text style={[styles.groupTitle, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityRole="header">
-        {label}
-      </Text>
-      <View style={[styles.grid, { gap: ui.sp(6) }]}>{cards}</View>
-      {after}
-    </View>
-  );
-
-  // Outfits ahead of theme parts in the same place; sort is stable. A part
-  // that's there only by day (Lukas's badge) has no card at night, and one
-  // there only by night (Ash's cast) none by day.
-  const accessories = [
-    ...rewardsOf('outfit').map((r) => ({ rank: placeRank(r.slot), card: tile(r) })),
+  // Every card, with where it goes and whether it's on the pig now. Outfits
+  // ahead of theme parts in the same place. A part that's there only by day
+  // (Lukas's badge) has no card at night, and one there only by night (Ash's
+  // cast) none by day.
+  const items = [
+    ...rewardsOf('outfit').map((r) => ({ place: placeOf(r.slot), on: worn.includes(r.id), card: tile(r) })),
     ...themes.flatMap((s) =>
       partsOf(s)
         .filter((part) => !(dark ? part.dayOnly : part.nightOnly))
-        .map((part) => ({ rank: placeRank(part.key), card: themeTile(s, part) }))
+        .map((part) => ({ place: placeOf(part.key), on: partSource(mine, showing, part.key) === s.id, card: themeTile(s, part) }))
     ),
-  ]
-    .sort((a, b) => a.rank - b.rank)
-    .map((a) => a.card);
+  ];
+  const keys: TabKey[] = [...PLACES.filter((p) => items.some((i) => i.place === p)), 'bubble'];
+  const [tab, setTab] = useState<TabKey>('head');
+  const open = keys.includes(tab) ? tab : keys[0];
+  const isOn = (k: TabKey) => (k === 'bubble' ? !!bubble : items.some((i) => i.place === k && i.on));
 
   return (
     <Stage
       focus={<WinnerPig avatar={avatar} />}
+      // The tabs stay put while the cards under them change.
+      actionsAlign="top"
       actions={
         <>
-          {group('Accessories', accessories)}
-          {group(
-            'Speech bubbles',
-            rewardsOf('bubble').map(tile),
-            <PigInput
-              placeholder={`What your pig says (${DEFAULT_SAY})`}
-              value={draft}
-              onChangeText={setDraft}
-              onEndEditing={() => setBubbleText(draft)}
-              maxLength={BUBBLE_MAX}
-              autoCapitalize="sentences"
-              accessibilityLabel="What your pig says"
-            />
-          )}
+          <Tabs
+            layout="row"
+            tabs={keys.map((k) => ({ key: k, label: TAB_LABELS[k], marked: isOn(k) ? { spoken: 'on your pig' } : undefined }))}
+            selected={open}
+            onSelect={setTab}
+          />
+          {/* Every tab's cards are drawn, all one height (TabPages): the
+              tabs keep their size and place whichever is open. */}
+          <TabPages
+            open={keys.indexOf(open)}
+            pages={keys.map((k) => (
+              <View key={k} style={{ gap: ui.gap }}>
+                <View accessibilityLabel={TAB_LABELS[k]} style={[styles.grid, { gap: ui.sp(6) }]}>
+                  {k === 'bubble' ? rewardsOf('bubble').map(tile) : items.filter((i) => i.place === k).map((i) => i.card)}
+                </View>
+                {k === 'bubble' ? (
+                  <PigInput
+                    placeholder={`What your pig says (${DEFAULT_SAY})`}
+                    value={draft}
+                    onChangeText={setDraft}
+                    onEndEditing={() => setBubbleText(draft)}
+                    maxLength={BUBBLE_MAX}
+                    autoCapitalize="sentences"
+                    accessibilityLabel="What your pig says"
+                  />
+                ) : null}
+              </View>
+            ))}
+          />
         </>
       }
     />
   );
 }
 
-const makeStyles = (t: Theme) => StyleSheet.create({
-  groupTitle: { color: t.link, fontFamily: font.bold, letterSpacing: 1.2, textTransform: 'uppercase', paddingLeft: 4 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+const makeStyles = () => StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
 });

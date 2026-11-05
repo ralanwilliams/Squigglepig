@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BUBBLE_MAX, KINDS, oneEach, rewardById, slotOf, type Kind } from './catalog';
+import { cleanText } from '../lib/text';
 
 // What this player has won (src/rewards/catalog.ts): the ids of the rewards
 // they own; for each kind that is picked one at a time (a theme, a bubble),
@@ -36,11 +37,8 @@ const EMPTY: State = { owned: new Set(), chosen: {}, worn: [], parts: [], hidden
 const keyOf = (part: string) => part.slice(part.indexOf(':') + 1);
 
 // Speech-bubble words as the scoreboard will show them: one line, no runs of
-// spaces, at most BUBBLE_MAX characters (counted as the player sees them, so
-// an emoji is one).
-export function cleanBubbleText(text: string): string {
-  return Array.from(text.replace(/\s+/g, ' ').trim()).slice(0, BUBBLE_MAX).join('').trim();
-}
+// spaces, nothing invisible, at most BUBBLE_MAX characters (src/lib/text.ts).
+export const cleanBubbleText = (text: string) => cleanText(text, BUBBLE_MAX);
 
 // The saved value, read defensively: on the web anyone can edit it.
 function parse(raw: string | null): State {

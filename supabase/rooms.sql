@@ -80,6 +80,38 @@ returns boolean language sql stable security definer set search_path = '' as $$
   );
 $$;
 
+-- A name with what can't be seen taken out, as the app does before sending
+-- it (src/lib/text.ts, cleanText): every kind of space becomes a plain one;
+-- control characters, zero-width and direction marks and blank filler letters
+-- go; emoji glue (joiners, variation selectors, tag letters) stays only
+-- inside emoji and the scripts that need it. Without this, "Sam" and "Sam"
+-- with an invisible mark in it would be two names that look the same.
+create or replace function public.clean_name(p text)
+returns text language plpgsql immutable set search_path = '' as $$
+declare
+  s text := normalize(coalesce(p, ''), NFC);
+  was text;
+begin
+  s := regexp_replace(s, '[\u0009-\u000D\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]', ' ', 'g');
+  s := regexp_replace(s, '[\u0001-\u0008\u000E-\u001F\u007F-\u0084\u0086-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B\u200E\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFEFF\uFFA0\uFFF0-\uFFFB\U0001D173-\U0001D17A\U000E0001]', '', 'g');
+  -- Then the glue and joiners, over and over until nothing more goes: taking
+  -- one away can leave another next to plain ASCII ("Sam" + joiner + selector
+  -- loses the joiner, and then the selector sits after the m).
+  loop
+    was := s;
+    -- Variation selectors and tag letters only after a letter that isn't ASCII.
+    s := regexp_replace(s, '^[\uFE00-\uFE0F\U000E0020-\U000E007F]+', '');
+    s := regexp_replace(s, '(?<=[\u0001-\u007F])[\uFE00-\uFE0F\U000E0020-\U000E007F]+', '', 'g');
+    -- Joiners only one at a time, between two letters that aren't ASCII.
+    s := regexp_replace(s, '[\u200C\u200D]+([\u200C\u200D])', '\1', 'g');
+    s := regexp_replace(s, '^[\u200C\u200D]+|[\u200C\u200D]+$', '', 'g');
+    s := regexp_replace(s, '(?<=[\u0001-\u007F])[\u200C\u200D]+', '', 'g');
+    s := regexp_replace(s, '[\u200C\u200D]+(?=[\u0001-\u007F])', '', 'g');
+    exit when s = was;
+  end loop;
+  return btrim(regexp_replace(s, ' {2,}', ' ', 'g'));
+end $$;
+
 -- Send one notification to each of `users` who has a push token, through
 -- Expo's push service (which hands it to Apple or Google). pg_net sends it
 -- after the transaction commits, so a rolled-back change never notifies.
@@ -131,8 +163,8 @@ end $$;
 create or replace function public.create_room(p_name text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
-  chars constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  v_name text := btrim(p_name);
+  chars constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- also src/lib/text.ts
+  v_name text := public.clean_name(p_name);
   v_code text;
 begin
   if auth.uid() is null then raise exception 'not signed in'; end if;
@@ -165,12 +197,14 @@ drop function if exists public.join_room(text, text);
 create or replace function public.join_room(p_code text, p_name text, p_rejoin boolean default false)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
+  -- Codes are capitals, whatever case they're typed in.
   v_code text := upper(btrim(p_code));
-  v_name text := btrim(p_name);
+  v_name text := public.clean_name(p_name);
   r public.rooms;
   m public.room_members;
 begin
   if auth.uid() is null then raise exception 'not signed in'; end if;
+  if v_code !~ '^[A-Z0-9]{4}$' then return jsonb_build_object('status', 'not_found'); end if;
   select * into r from public.rooms where code = v_code for update;
   if not found then return jsonb_build_object('status', 'not_found'); end if;
   select * into m from public.room_members where room = v_code and user_id = auth.uid();
@@ -405,6 +439,7 @@ select cron.schedule('squigglepig-tidy-guests', '17 4 * * *', 'select public.tid
 -- ---- Who may call what -----------------------------------------------------
 
 revoke execute on function
+  public.clean_name(text),
   public.is_room_member(text),
   public.push(uuid[], text, text, jsonb),
   public.leave_room_as(text, uuid),

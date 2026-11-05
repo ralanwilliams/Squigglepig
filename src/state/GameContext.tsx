@@ -25,6 +25,25 @@ import { isBlankDrawing } from '../lib/drawing';
 import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
 import { showToast } from '../components/Toast';
 import { cleanAvatar, useMyAvatar, wireAvatar, type Avatar } from '../avatar/avatar';
+import { NAME_MAX, ROOM_CODE_LENGTH, cleanName, cleanPhrase, cleanRoomCode, isRoomCode } from '../lib/text';
+import {
+  asCell,
+  asCells,
+  asChains,
+  asIndex,
+  asInt,
+  asObj,
+  asPrompt,
+  asRoster,
+  asRulings,
+  asSeeds,
+  asStage,
+  asState,
+  asTarget,
+  type GameState,
+} from './wire';
+
+export { NAME_MAX };
 
 // ---- Game model: the "telephone" chain (a Telestrations booklet) ----
 //
@@ -68,10 +87,6 @@ export const isEmptyTurn = (c: Cell | undefined) =>
 
 const isSkipped = (c: Cell | undefined) => !!c && c.kind !== 'prompt' && !!c.skip;
 
-// Names are what the game keys scores and turns by, so the server keeps them
-// unique within a room (supabase/rooms.sql) and no longer than this.
-export const NAME_MAX = 24;
-
 // Prompts needed to seed every chain of every round without ever repeating one.
 // Worst case is the "all players maxed, one winner" scenario: a player scores at
 // most (N-1) per round, so ⌈target ÷ (N-1)⌉ rounds, each seeding N chains.
@@ -93,8 +108,12 @@ const FALLBACK_PROMPTS = [
   'a dragon who is afraid of fire',
 ];
 
-// How enterRoom went, and what to tell the player when it didn't.
-export type EntryStatus = Entry['status'] | 'no_keys' | 'no_name' | 'no_code';
+// How enterRoom went, and what to tell the player when it didn't. The room
+// code messages also say where a code comes from: someone who opens Join Game
+// first (an app reviewer, say) can take the code box for a login, when all it
+// wants is the code from whoever tapped Create Game.
+export type EntryStatus = Entry['status'] | 'no_keys' | 'no_name' | 'no_code' | 'bad_code';
+const CODE_HELP = 'Get it from the player who created the room, or go back and tap Create Game to start your own.';
 export function entryMessage(status: EntryStatus, code = ''): string {
   switch (status) {
     case 'ok':
@@ -102,11 +121,15 @@ export function entryMessage(status: EntryStatus, code = ''): string {
     case 'no_name':
       return 'Type a player name first.';
     case 'no_code':
-      return 'Type the room code first.';
+      return `You need a room code to join a game. ${CODE_HELP}`;
+    case 'bad_code':
+      return `Room codes are ${ROOM_CODE_LENGTH} letters and numbers. ${CODE_HELP}`;
     case 'bad_name':
       return `Names can be up to ${NAME_MAX} characters.`;
     case 'not_found':
-      return code ? `There's no room ${code}. Check the code and try again.` : 'That room has closed.';
+      return code
+        ? `There's no room ${code}. Check the code with the player who created the room, or go back and tap Create Game to start your own.`
+        : 'That room has closed.';
     case 'in_progress':
       return 'That game has already started. Try again when it ends.';
     case 'name_taken':
@@ -859,7 +882,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // Take on the game as `st` describes it (the host's answer, or the
   // snapshot a returning host restores) and go to its screen.
-  const applyState = (st: any) => {
+  const applyState = (st: GameState) => {
     const p: Phase = st.phase ?? 'lobby';
     // Still on the very stage the game is at (back from a short trip out of
     // the app): stay on this screen, so a drawing in progress isn't lost and a
@@ -929,7 +952,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // The host's answer to request-state (to one player), or a returning
   // host's restored game (to '*': everyone still catching up).
-  const onState = (st: any) => {
+  const onState = (st: GameState) => {
     const forMe = st.to === usernameRef.current || (st.to === '*' && !syncedRef.current);
     if (!forMe) return;
     applyState(st);
@@ -975,7 +998,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         markSynced();
         armForCurrentStage(false);
       } else if (snap) {
-        applyState(snap);
+        applyState(asState(snap));
         markSynced();
       } else {
         // A game with nothing saved to resume: start the room over.
@@ -1054,10 +1077,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // that happens to have the same code. Resolves to how it went;
   // entryMessage says what to tell the player.
   const enterRoom = async (roomCode: string | null, name: string, rejoin = false): Promise<EntryStatus> => {
-    const user = name.trim().slice(0, NAME_MAX);
-    const code = roomCode === null ? null : roomCode.trim().toUpperCase();
-    if (!user) return 'no_name';
+    const user = cleanName(name);
+    const code = roomCode === null ? null : cleanRoomCode(roomCode);
+    // The code first: on Join Game, a missing code is the thing to explain.
     if (code === '') return 'no_code';
+    if (code !== null && !isRoomCode(code)) return 'bad_code';
+    if (!user) return 'no_name';
     if (!supabaseReady) return 'no_keys';
     if (code && code === roomRef.current) {
       // Already in it: back to wherever that game is.
@@ -1107,45 +1132,91 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       config: { private: true, broadcast: { self: true }, presence: { key: userId } },
     });
 
-    channel
-      .on('broadcast', { event: 'to-prompts' }, ({ payload }) => onToPrompts(payload.target))
-      .on('broadcast', { event: 'prompt' }, ({ payload }) => onPrompt(payload.text, payload.author))
-      .on('broadcast', { event: 'view-ack' }, ({ payload }) => onViewAck(payload.username))
-      .on('broadcast', { event: 'round' }, ({ payload }) =>
-        onRound(payload.round, payload.roster, payload.seeds, payload.leader)
-      )
-      .on('broadcast', { event: 'cell' }, ({ payload }) => onCell(payload.chain, payload.stage, payload.cell))
-      .on('broadcast', { event: 'advance' }, ({ payload }) => onAdvance(payload.stage, payload.cells))
-      .on('broadcast', { event: 'to-reveal' }, ({ payload }) => onToReveal(payload.chains))
-      .on('broadcast', { event: 'reveal-state' }, ({ payload }) =>
-        onRevealState(payload.chain, payload.step, payload.rulings)
-      )
-      .on('broadcast', { event: 'chain-scored' }, ({ payload }) =>
-        onChainScored(payload.chain, payload.rulings)
-      )
-      .on('broadcast', { event: 'game-over' }, () => onGameOver())
-      .on('broadcast', { event: 'request-state' }, ({ payload }) => onRequestState(payload.username))
-      .on('broadcast', { event: 'state' }, ({ payload }) => onState(payload))
-      // From the server: the room's list changed, or the room closed.
-      .on('broadcast', { event: 'members' }, () => refreshMembers())
-      .on('broadcast', { event: 'room-closed' }, () => closeLocally(closedMessage(code)))
-      .on('presence', { event: 'sync' }, () => {
+    // Any member can send anything (a changed app isn't held to this one's
+    // rules), so every message is read through ./wire, and a handler that
+    // still throws is caught: a malformed message is ignored, never a crash.
+    const on = (event: string, handle: (p: Record<string, unknown>) => void) =>
+      channel.on('broadcast', { event }, ({ payload }) => {
+        try {
+          handle(asObj(payload));
+        } catch (e) {
+          console.warn(`[realtime] ignored a bad '${event}' message:`, e);
+        }
+      });
+    on('to-prompts', (p) => {
+      const t = asTarget(p.target);
+      if (t !== null) onToPrompts(t);
+    });
+    on('prompt', (p) => {
+      const prompt = asPrompt(p);
+      if (prompt) onPrompt(prompt.text, prompt.author);
+    });
+    on('view-ack', (p) => {
+      const who = cleanName(p.username);
+      if (who) onViewAck(who);
+    });
+    on('round', (p) => {
+      const round = asInt(p.round, 0, 100_000);
+      const roster = asRoster(p.roster);
+      const seeds = asSeeds(p.seeds);
+      if (round !== null && roster && seeds) onRound(round, roster, seeds, cleanName(p.leader));
+    });
+    on('cell', (p) => {
+      const chain = asIndex(p.chain);
+      const stage = asStage(p.stage);
+      const cell = asCell(p.cell);
+      if (chain !== null && stage !== null && cell) onCell(chain, stage, cell);
+    });
+    on('advance', (p) => {
+      const stage = asStage(p.stage);
+      if (stage) onAdvance(stage, asCells(p.cells));
+    });
+    on('to-reveal', (p) => {
+      const chains = asChains(p.chains);
+      if (chains) onToReveal(chains);
+    });
+    on('reveal-state', (p) => {
+      const chain = asIndex(p.chain);
+      const step = asStage(p.step);
+      if (chain !== null && step !== null) onRevealState(chain, step, asRulings(p.rulings));
+    });
+    on('chain-scored', (p) => {
+      const chain = asIndex(p.chain);
+      if (chain !== null) onChainScored(chain, asRulings(p.rulings));
+    });
+    on('game-over', () => onGameOver());
+    on('request-state', (p) => {
+      const who = cleanName(p.username);
+      if (who) onRequestState(who);
+    });
+    on('state', (p) => onState(asState(p)));
+    // From the server: the room's list changed, or the room closed.
+    on('members', () => refreshMembers());
+    on('room-closed', () => closeLocally(closedMessage(code)));
+    channel.on('presence', { event: 'sync' }, () => {
+      try {
         const state = channel.presenceState() as Record<string, any[]>;
         const latest = Object.values(state)
           .map((entries) => entries[entries.length - 1])
           .filter((m) => m?.userId);
         presenceRef.current = latest.map((m) => ({
           id: String(m.userId),
-          name: String(m.username ?? ''),
+          name: cleanName(m.username),
           synced: !!m.synced,
         }));
         setPresentIds(presenceRef.current.map((p) => p.id));
         const seen: Record<string, Avatar> = {};
-        for (const m of latest) if (m.username) seen[m.username] = cleanAvatar(m.avatar);
+        for (const m of latest) {
+          const who = cleanName(m.username);
+          if (who) seen[who] = cleanAvatar(m.avatar);
+        }
         setAvatars((was) => ({ ...was, ...seen }));
         updateHost();
         console.log('[realtime] here:', presenceRef.current.map((p) => p.name), '| host:', hostRef.current);
-      });
+      } catch (e) {
+        console.warn('[realtime] ignored a bad presence update:', e);
+      }
+    });
 
     channelRef.current = channel;
     channel.subscribe((s, err) => {
@@ -1291,7 +1362,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // Add one prompt to the shared pool (broadcast so the live count updates on
   // every device). Players keep adding until the pool is full and the game auto-starts.
   const addPrompt = (text: string) => {
-    const clean = text.trim();
+    const clean = cleanPhrase(text);
     if (!clean) return;
     send('prompt', { text: clean, author: usernameRef.current });
     touchRoom(roomRef.current);
@@ -1312,7 +1383,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const cell: Cell =
       phaseRef.current === 'draw'
         ? { kind: 'drawing', data, author: usernameRef.current }
-        : { kind: 'caption', text: data, author: usernameRef.current };
+        : { kind: 'caption', text: cleanPhrase(data), author: usernameRef.current };
     send('cell', { chain: c, stage: s, cell });
     if (!isEmptyTurn(cell)) touchRoom(roomRef.current);
     router.replace('/waiting');

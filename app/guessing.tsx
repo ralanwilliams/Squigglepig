@@ -10,6 +10,7 @@ import { PigInput } from '../src/components/PigInput';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { IMAGES } from '../src/assets/assets';
 import { useGame } from '../src/state/GameContext';
+import { PHRASE_MAX } from '../src/lib/text';
 import { TIMERS } from '../src/lib/timers';
 
 // Everyone captions simultaneously — each writes what they think the drawing
@@ -61,6 +62,7 @@ export default function Guessing() {
           placeholder={blank ? 'Something to draw' : 'Your guess'}
           value={guess}
           onChangeText={setGuess}
+          maxLength={PHRASE_MAX}
           onSubmitEditing={handle}
           returnKeyType="done"
           autoCapitalize="sentences"

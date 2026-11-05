@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Insets, View } from 'react-native';
 import Svg, { Circle, G, Mask, Path, Rect } from 'react-native-svg';
 import { GlyphSwitch } from './GlyphSwitch';
+import { glyphPop } from './glyphPop';
 import { useReducedMotion, useTheme, useThemeMode } from '../theme/theme';
 import { useUi } from '../theme/responsive';
 
@@ -86,12 +87,12 @@ export function ThemeToggle({ size = 26, hitSlop, color }: { size?: number; hitS
               text props there) while its animation fast path honours them, so
               a group carrying both would jump once an animation settled. */}
           <G transform="translate(17.4 7.2)">
-            <AnimatedG scale={starA}>
+            <AnimatedG {...glyphPop(starA)}>
               <Path d={STAR_A} fill={ink} />
             </AnimatedG>
           </G>
           <G transform="translate(20.2 11.6)">
-            <AnimatedG scale={starB}>
+            <AnimatedG {...glyphPop(starB)}>
               <Path d={STAR_B} fill={ink} />
             </AnimatedG>
           </G>

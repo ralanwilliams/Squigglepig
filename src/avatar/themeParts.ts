@@ -175,12 +175,15 @@ export function parsePart(id: string): { skin: Skin; key: string } | null {
 // groundhog and Ash's cast at the pig's feet, Lukas's badge, Chris's
 // emblem and cape and Ash's jersey with what's at the neck; any other with
 // what's at its feet.
-const PLACES = ['head', 'eyes', 'neck', 'hold', 'feet', 'sky'];
-const SITS: Record<string, string> = { earsWinner: 'head', quiver: 'hold', stumpGroundhog: 'feet', sheriffBadge: 'neck', heroEmblem: 'neck', heroCape: 'neck', jersey: 'neck', ankleCast: 'feet' };
-export function placeRank(key: string): number {
-  const i = PLACES.indexOf(SITS[key] ?? key);
-  return i < 0 ? PLACES.indexOf('feet') : i;
+// Your pig's tabs are these places, in this order.
+export const PLACES = ['head', 'eyes', 'neck', 'hold', 'feet', 'sky'] as const;
+export type Place = (typeof PLACES)[number];
+const SITS: Record<string, Place> = { earsWinner: 'head', quiver: 'hold', stumpGroundhog: 'feet', sheriffBadge: 'neck', heroEmblem: 'neck', heroCape: 'neck', jersey: 'neck', ankleCast: 'feet' };
+export function placeOf(key: string): Place {
+  const place = SITS[key] ?? key;
+  return (PLACES as readonly string[]).includes(place) ? (place as Place) : 'feet';
 }
+export const placeRank = (key: string): number => PLACES.indexOf(placeOf(key));
 
 // Whether a part (or an outfit's slot) is worn on the pig's head: a hat,
 // eyewear, Easter's ears. A pig holding something, or peeking over it, wears

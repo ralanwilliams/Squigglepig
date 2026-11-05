@@ -7,6 +7,7 @@ import { Glyph, type GlyphName } from './Glyph';
 import { Switch } from './Switch';
 import { showToast } from './Toast';
 import { AppMark } from './AppMark';
+import { TextLink } from './TextLink';
 import { GROUPS, type RewardsPath } from '../rewards/catalog';
 import { pushSupported, setNotificationsOn, useNotificationsOn } from '../lib/push';
 import { font, type Theme } from '../theme/tokens';
@@ -33,20 +34,19 @@ const NATIVE = Platform.OS !== 'web';
 // mirroring the sound and dark-mode switches in the top-right (Stage already keeps both
 // corners clear, so nothing moves to make room). It slides a drawer in from
 // the left holding the About information: the app icon, name and version,
-// then the Support / Accessibility / Rewards groups (Support ends with the
-// Privacy Policy, Terms of Service and Credits & licenses) and the
-// copyright line, which links to the developer's site. The drawer is painted
-// with the screen's own palette (background, text, link), so it follows
-// light / dark mode like everything else. Nothing scrolls: in two-pane
-// layouts the groups sit in two columns, and the body is a FitBox.
-// `onHowToPlay` replays the first-run walkthrough (Home owns it). The
-// Accessibility group holds the switches (High contrast, Reduce motion,
-// Seasonal themes); the first two show what is in effect — the phone's setting
-// until it is flipped here — and Seasonal themes is on until turned off (the
-// Rewards screen's Themes tab has the same switch, beside the theme cards).
-// Notifications (not on the web) is the one switch for every room
-// notification (src/lib/push.ts): on until turned off; if the phone itself
-// was told no, turning it on opens the phone's Settings.
+// then the Support / Settings / Rewards groups, and pinned to the bottom the
+// legal links (Privacy, Terms, Licenses) right over the copyright line, which
+// links to the developer's site. The drawer is painted with the screen's own palette
+// (background, text, link), so it follows light / dark mode like everything
+// else. Nothing scrolls: in two-pane layouts the groups sit in two columns,
+// and the body is a FitBox.
+// `onHowToPlay` replays the first-run walkthrough (Home owns it). Settings
+// holds the switches: High contrast and Reduce motion show what is in effect
+// — the phone's setting until it is flipped here — and Room notifications
+// (not on the web) is the one switch for every room notification
+// (src/lib/push.ts): on until turned off; if the phone itself was told no,
+// turning it on opens the phone's Settings. (Seasonal themes is on the
+// Rewards screen's Themes tab, beside the theme cards.)
 // Rewards opens what the player has won, a group at a time (app/rewards.tsx:
 // Art supplies, Themes), and Your pig (app/pig.tsx), its outfits and bubbles.
 // With reduced motion the drawer appears and goes without sliding.
@@ -100,7 +100,7 @@ function MenuDrawer({
   const styles = useThemedStyles(makeStyles);
   const frame = useAppFrame();
   const win = useWindowDimensions();
-  const { highContrast, setContrast, reducedMotion, setMotion, seasonal, setSeasonal } = useThemeMode();
+  const { highContrast, setContrast, reducedMotion, setMotion } = useThemeMode();
   const reduced = useReducedMotion();
   const notifyOn = useNotificationsOn() ?? true;
 
@@ -151,23 +151,16 @@ function MenuDrawer({
       ? []
       : [{ icon: 'star', label: 'Rate this app', onPress: rate, trailing: 'external' } as Row]),
     { icon: 'help', label: 'Help & FAQ', onPress: () => open(HELP_URL), trailing: 'external' },
-    // The stores want the privacy policy reachable in the app, and the
-    // bundled packages' licenses (and the Quick, Draw! credit) must ship with it.
-    { icon: 'shield', label: 'Privacy Policy', onPress: () => open(PRIVACY_URL), trailing: 'external' },
-    { icon: 'doc', label: 'Terms of Service', onPress: () => open(TERMS_URL), trailing: 'external' },
-    { icon: 'code', label: 'Credits & licenses', onPress: go('/licenses'), trailing: 'chevron' },
-  ];
-  const accessibility: Row[] = [
-    { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },
-    { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
-    { icon: 'season', label: 'Seasonal themes', on: seasonal, onPress: () => setSeasonal(!seasonal) },
   ];
   const toggleNotifications = () =>
     setNotificationsOn(!notifyOn).then((r) => {
       if (r === 'settings') showToast('Allow notifications for Squigglepig in your phone’s Settings', 4000);
     });
-  const notifications: Row[] = [
-    { icon: 'bell', label: 'Room notifications', on: notifyOn, onPress: toggleNotifications },
+  // Room notifications only where they're sent (not on the web).
+  const settings: Row[] = [
+    { icon: 'contrast', label: 'High contrast', on: highContrast, onPress: () => setContrast(highContrast ? 'normal' : 'high') },
+    { icon: 'motion', label: 'Reduce motion', on: reducedMotion, onPress: () => setMotion(reducedMotion ? 'full' : 'reduced') },
+    ...(pushSupported ? [{ icon: 'bell', label: 'Room notifications', on: notifyOn, onPress: toggleNotifications } as Row] : []),
   ];
   const rewards: Row[] = [
     { icon: 'hat', label: 'Your pig', onPress: go('/pig'), trailing: 'chevron' },
@@ -185,6 +178,27 @@ function MenuDrawer({
           <MenuRow key={r.label} row={r} ui={ui} theme={theme} styles={styles} />
         ))}
       </View>
+    </View>
+  );
+
+  // The legal links, side by side and quiet: the Privacy Policy and Terms of
+  // Service (the stores want the privacy policy reachable in the app), and
+  // the bundled packages' licenses with the Quick, Draw! credit, which must
+  // ship with it. Short on screen so the three fit on one line anywhere; a
+  // screen reader hears each one's full name. Pinned to the bottom, just
+  // over the copyright, packed tight (TextLink dense).
+  const dot = (
+    <Text style={[styles.dot, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} importantForAccessibility="no" accessibilityElementsHidden>
+      ·
+    </Text>
+  );
+  const legal = (
+    <View style={[styles.legal, { gap: ui.sp(10) }]}>
+      <TextLink label="Privacy" spoken="Privacy Policy" onPress={() => open(PRIVACY_URL)} size={13} role="link" dense />
+      {dot}
+      <TextLink label="Terms" spoken="Terms of Service" onPress={() => open(TERMS_URL)} size={13} role="link" dense />
+      {dot}
+      <TextLink label="Licenses" spoken="Licenses and credits" onPress={go('/licenses')} size={13} dense />
     </View>
   );
 
@@ -256,9 +270,9 @@ function MenuDrawer({
 
           <View style={styles.rule} />
 
-          {/* The groups, then the copyright on a line of its own across the
-              foot, under a rule, in the flow (so the FitBox makes room for it
-              rather than the groups running into it). */}
+          {/* The groups, then the foot across the bottom, under a rule, in the
+              flow (so the FitBox makes room for it rather than the groups
+              running into it): the legal links right over the copyright. */}
           <FitBox style={styles.flex} align="top">
             {ui.twoPane ? (
               <View style={[styles.columns, { gap: ui.gap }]}>
@@ -266,22 +280,23 @@ function MenuDrawer({
                   {section('Support', support)}
                 </View>
                 <View style={[styles.column, { gap: ui.sp(12) }]}>
-                  {section('Accessibility', accessibility)}
-                  {pushSupported ? section('Notifications', notifications) : null}
+                  {section('Settings', settings)}
                   {section('Rewards', rewards)}
                 </View>
               </View>
             ) : (
               <View style={{ gap: ui.sp(12) }}>
                 {section('Support', support)}
-                {section('Accessibility', accessibility)}
-                {pushSupported ? section('Notifications', notifications) : null}
+                {section('Settings', settings)}
                 {section('Rewards', rewards)}
               </View>
             )}
           </FitBox>
           <View style={styles.rule} />
-          {copyright}
+          <View>
+            {legal}
+            {copyright}
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -354,6 +369,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   label: { flex: 1, minWidth: 0, color: t.text, fontFamily: font.regular },
   staticLabel: { color: t.textMuted },
+  legal: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  dot: { color: t.textMuted, fontFamily: font.regular },
   copyright: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
   site: { color: t.link, textDecorationLine: 'underline' },
 });

@@ -94,6 +94,69 @@ function Avatar({ color, size = 26 }: { color: string; size?: number }) {
   return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />;
 }
 
+// A phone outline with its notch: a blank white screen, or with `app` the
+// app's own background, so the miniature buttons on it look as they do on Home.
+function Phone({ width = 62, height = 104, app, style }: { width?: number; height?: number; app?: boolean; style?: object }) {
+  const s = useThemedStyles(makeStyles);
+  return (
+    <Animated.View style={[s.phone, app && s.phoneApp, { width, height, borderRadius: width * 0.19 }, style]}>
+      <View style={s.notch} />
+    </Animated.View>
+  );
+}
+
+// The room code on its recessed chip; with `label`, the lobby's chip in
+// miniature, ROOM CODE over the code.
+function RoomCode({ width = 50, label }: { width?: number; label?: boolean }) {
+  const s = useThemedStyles(makeStyles);
+  return (
+    <View style={[s.code, { width, borderRadius: width * 0.12 }, label ? { paddingVertical: width * 0.1, gap: 2 } : { height: width * 0.48 }]}>
+      {label ? (
+        <Text style={s.codeLabel} allowFontScaling={false}>
+          ROOM CODE
+        </Text>
+      ) : null}
+      <Text style={[s.codeText, { fontSize: width * 0.22 }]} allowFontScaling={false}>
+        OINK
+      </Text>
+    </View>
+  );
+}
+
+// A PigButton in miniature: the teal bar with its uppercase label.
+function MiniButton({ label, width = 80 }: { label: string; width?: number }) {
+  const s = useThemedStyles(makeStyles);
+  return (
+    <View style={[s.miniButton, { width }]}>
+      <Text style={s.miniButtonText} allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// A finger's tap, centred on (x, y) at `at`: a pink ring that swells and fades.
+function TapRing({ t, at, x, y }: { t: T; at: number; x: number; y: number }) {
+  const s = useThemedStyles(makeStyles);
+  const size = 30;
+  return (
+    <Animated.View
+      style={[
+        s.tap,
+        {
+          left: x - size / 2,
+          top: y - size / 2,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          opacity: t.interpolate({ inputRange: [at, at + 0.02, at + 0.08, at + 0.1], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' }),
+          transform: [{ scale: ramp(t, at, at + 0.1, 0.5, 1.4, Easing.out(Easing.quad)) }],
+        },
+      ]}
+    />
+  );
+}
+
 // Two drawings, in a 160 × 120 sketch space: the pig in a hat everyone gets
 // asked to draw, and the pig in a crown it drifts into down the chain.
 // [path, length] — the length lets a stroke draw itself (dash offset).
@@ -151,19 +214,79 @@ function Sketch({ variant, width, draw }: { variant: keyof typeof SKETCH; width:
 }
 
 // ---------------------------------------------------------------------------
-// 1 · Gather: three phones appear, the room code on the first one flies to the
+// 1 · Host: the host's phone shows Home's Create Game and Join Game; a tap on
+// Create Game turns them into the room code, then a tap on Share sends copies
+// of the code flying off to the other players.
+// ---------------------------------------------------------------------------
+const HOST = { left: 108, top: 6, width: 104, height: 168 }; // the host's phone
+const BTN = { left: 120, width: 80 }; // the buttons on its screen
+const SENDS = [
+  { dx: -112, dy: -40, start: 0.6 },
+  { dx: 112, dy: -40, start: 0.6 },
+  { dx: -116, dy: 36, start: 0.64 },
+  { dx: 116, dy: 36, start: 0.64 },
+];
+
+export function HostScene() {
+  const { t } = useLoop(5200, 0.76);
+  // Home's two buttons: in after the phone, out once Create Game is tapped.
+  const home = t.interpolate({ inputRange: [0.1, 0.14, 0.32, 0.36], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' });
+  const press = t.interpolate({ inputRange: [0.22, 0.25, 0.28], outputRange: [1, 0.92, 1], extrapolate: 'clamp' });
+  return (
+    <SceneBox t={t}>
+      <Phone app width={HOST.width} height={HOST.height} style={{ left: HOST.left, top: HOST.top, transform: [{ scale: pop(t, 0.02, 0.1) }] }} />
+      <Animated.View style={{ position: 'absolute', left: W / 2 - 14, top: 184, transform: [{ scale: pop(t, 0.08) }] }}>
+        <Avatar color={AVATAR[0]} size={28} />
+      </Animated.View>
+
+      <Animated.View style={{ position: 'absolute', left: BTN.left, top: 70, opacity: home, transform: [{ scale: press }] }}>
+        <MiniButton label="Create Game" width={BTN.width} />
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute', left: BTN.left, top: 100, opacity: home }}>
+        <MiniButton label="Join Game" width={BTN.width} />
+      </Animated.View>
+      <TapRing t={t} at={0.2} x={W / 2} y={81} />
+
+      <Animated.View style={{ position: 'absolute', left: BTN.left, top: 54, transform: [{ scale: pop(t, 0.33) }] }}>
+        <RoomCode width={BTN.width} label />
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute', left: BTN.left, top: 116, transform: [{ scale: pop(t, 0.46) }] }}>
+        <MiniButton label="Share" width={BTN.width} />
+      </Animated.View>
+      <TapRing t={t} at={0.54} x={W / 2} y={127} />
+
+      {SENDS.map((c, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute',
+            left: W / 2 - 25,
+            top: 68,
+            opacity: t.interpolate({ inputRange: [c.start, c.start + 0.03, c.start + 0.16, c.start + 0.22], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' }),
+            transform: [
+              { translateX: ramp(t, c.start, c.start + 0.22, 0, c.dx, Easing.out(Easing.quad)) },
+              { translateY: ramp(t, c.start, c.start + 0.22, 0, c.dy, Easing.out(Easing.quad)) },
+            ],
+          }}
+        >
+          <RoomCode />
+        </Animated.View>
+      ))}
+    </SceneBox>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 2 · Gather: three phones appear, the room code on the first one flies to the
 // others, and a player pops in under each.
 // ---------------------------------------------------------------------------
 export function GatherScene() {
-  const s = useThemedStyles(makeStyles);
   const { t } = useLoop(4200, 0.8);
   const X = [70, 160, 250];
   return (
     <SceneBox t={t}>
       {X.map((cx, i) => (
-        <Animated.View key={`p${i}`} style={[s.phone, { left: cx - 31, top: 34, transform: [{ scale: pop(t, 0.02 + i * 0.06, 0.1) }] }]}>
-          <View style={s.notch} />
-        </Animated.View>
+        <Phone key={`p${i}`} style={{ left: cx - 31, top: 34, transform: [{ scale: pop(t, 0.02 + i * 0.06, 0.1) }] }} />
       ))}
       {X.map((cx, i) => {
         // The first phone shows the code; copies fly from it to the others.
@@ -173,10 +296,8 @@ export function GatherScene() {
             ? { transform: [{ scale: pop(t, 0.24) }] }
             : { opacity: ramp(t, start, start + 0.02), transform: [{ translateX: ramp(t, start, start + 0.12, X[0] - cx, 0) }] };
         return (
-          <Animated.View key={`c${i}`} style={[s.code, { left: cx - 25, top: 76 }, style]}>
-            <Text style={s.codeText} allowFontScaling={false}>
-              OINK
-            </Text>
+          <Animated.View key={`c${i}`} style={[{ position: 'absolute', left: cx - 25, top: 76 }, style]}>
+            <RoomCode />
           </Animated.View>
         );
       })}
@@ -190,7 +311,7 @@ export function GatherScene() {
 }
 
 // ---------------------------------------------------------------------------
-// 2 · Prompts: prompts drop into the trough one by one and the mud rises.
+// 3 · Prompts: prompts drop into the trough one by one and the mud rises.
 // ---------------------------------------------------------------------------
 const DROPS = [
   { x: 92, text: 'pig in a hat', start: 0.18 },
@@ -241,7 +362,7 @@ export function PromptsScene() {
 }
 
 // ---------------------------------------------------------------------------
-// 3 · Draw: the prompt pops up and the pig in a hat sketches itself.
+// 4 · Draw: the prompt pops up and the pig in a hat sketches itself.
 // ---------------------------------------------------------------------------
 export function DrawScene() {
   const { t } = useLoop(5000, 0.86);
@@ -258,7 +379,7 @@ export function DrawScene() {
 }
 
 // ---------------------------------------------------------------------------
-// 4 · Pass it on: the chain slides along, each step by a different player:
+// 5 · Pass it on: the chain slides along, each step by a different player:
 // prompt → drawing → guess → drawing → guess. The meaning drifts.
 // ---------------------------------------------------------------------------
 const CHAIN = [
@@ -321,7 +442,7 @@ export function ChainScene() {
 }
 
 // ---------------------------------------------------------------------------
-// 5 · Score: the prompt's writer (pink, with their prompt, underneath) rules
+// 6 · Score: the prompt's writer (pink, with their prompt, underneath) rules
 // on each step of the chain above: two matches pop ✓ and float +1, the
 // drifted crown gets ✗ and dims; then the judge makes way for the trophy.
 // ---------------------------------------------------------------------------
@@ -404,25 +525,19 @@ const makeStyles = (t: Theme) =>
     },
     phone: {
       position: 'absolute',
-      width: 62,
-      height: 104,
-      borderRadius: 12,
       borderWidth: 3,
       borderColor: t.link,
       backgroundColor: t.surface,
       alignItems: 'center',
     },
+    phoneApp: { backgroundColor: t.background },
     notch: { marginTop: 5, width: 18, height: 4, borderRadius: 2, backgroundColor: t.surfaceBorder },
-    code: {
-      position: 'absolute',
-      width: 50,
-      height: 24,
-      borderRadius: 6,
-      backgroundColor: t.surfaceInset,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    codeText: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, color: t.surfaceText },
+    code: { backgroundColor: t.surfaceInset, alignItems: 'center', justifyContent: 'center' },
+    codeText: { fontWeight: '700', letterSpacing: 1.5, color: t.surfaceText },
+    codeLabel: { fontSize: 8, lineHeight: 10, fontFamily: font.bold, letterSpacing: 1.2, color: t.textMuted },
+    miniButton: { height: 22, borderRadius: 4, paddingHorizontal: 6, backgroundColor: t.button, alignItems: 'center', justifyContent: 'center' },
+    miniButtonText: { fontSize: 9, lineHeight: 12, fontFamily: font.medium, letterSpacing: 0.5, textTransform: 'uppercase', color: t.buttonText },
+    tap: { position: 'absolute', borderWidth: 3, borderColor: t.accent },
     window: { position: 'absolute', left: 0, top: 24, width: W, height: 150, overflow: 'hidden' },
     chain: { flexDirection: 'row', alignItems: 'flex-start' },
     cell: { width: CELL, alignItems: 'center', gap: 10 },

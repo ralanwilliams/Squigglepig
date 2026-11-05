@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Insets, View } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
 import { GlyphSwitch } from './GlyphSwitch';
+import { glyphPop } from './glyphPop';
 import { useReducedMotion, useTheme } from '../theme/theme';
 import { useUi } from '../theme/responsive';
 import { setSoundOn, useSoundOn } from '../lib/sound';
@@ -76,7 +77,7 @@ function SpeakerGlyph({ on, px, ink }: { on: boolean; px: number; ink: string })
           </AnimatedG>
           {/* Position on a plain group, scale on an inner one (see ThemeToggle's stars). */}
           <G transform="translate(18.2 12)">
-            <AnimatedG scale={cross}>
+            <AnimatedG {...glyphPop(cross)}>
               <Path d={CROSS} />
             </AnimatedG>
           </G>
