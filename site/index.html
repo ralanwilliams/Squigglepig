@@ -152,8 +152,8 @@
       text-shadow: 0 0 6px var(--pink), 0 0 14px var(--pink);
     }
 
-    /* The two store badges, the same height, side by side where they fit and
-       stacked on a phone. */
+    /* The two store badges, Google Play first, the same height, side by side
+       where they fit and stacked on a phone. */
     .badges {
       display: flex;
       flex-wrap: wrap;
@@ -182,10 +182,11 @@
     /* Apple's own Download on the App Store badge (app-store-badge.svg, from
        developer.apple.com/app-store/marketing/guidelines, unaltered). It has
        no margin of its own, so it's shown 62px tall like Google's, with a
-       margin for the quarter-height clear space Apple asks for. */
+       margin for the quarter-height clear space Apple asks for (above it,
+       the Play badge's own margin gives that). */
     .badge img.apple {
       height: 62px;
-      margin: 15px 0;
+      margin: 0 0 15px;
     }
 
     /* The trademark notice the badge guidelines ask for, wherever it shows. */
@@ -247,11 +248,11 @@
     <section class="app">
       <h2>Get the app</h2>
       <div class="badges">
-        <a class="badge" href="https://apps.apple.com/app/id6822231355">
-          <img class="apple" src="app-store-badge.svg" width="120" height="40" alt="Download on the App Store">
-        </a>
         <a class="badge" href="https://play.google.com/store/apps/details?id=com.squigglepig.app">
           <img src="google-play-badge.png" width="646" height="250" alt="Get it on Google Play">
+        </a>
+        <a class="badge" href="https://apps.apple.com/app/id6822231355">
+          <img class="apple" src="app-store-badge.svg" width="120" height="40" alt="Download on the App Store">
         </a>
       </div>
     </section>
@@ -260,8 +261,8 @@
     <!-- The web build of the game, served by its own Pages project (see README, Hosting). -->
     <a class="neon-btn" href="https://play.squigglepig.app/">Play on the web</a>
 
-    <p class="legal">Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
-      Google Play and the Google Play logo are trademarks of Google LLC.</p>
+    <p class="legal">Google Play and the Google Play logo are trademarks of Google LLC.
+      Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
   </main>
 </body>
 </html>

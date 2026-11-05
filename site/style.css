@@ -73,8 +73,8 @@ p { margin: 8px 0; color: var(--muted); }
   box-shadow: inset 0 0 0 2px var(--button);
 }
 .note { font-size: 0.85rem; }
-/* The two store badges, the same height, side by side where they fit and
-   stacked on a phone. */
+/* The two store badges, Google Play first, the same height, side by side
+   where they fit and stacked on a phone. */
 .badges { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 8px; margin: 8px 0 0; }
 .badge { display: inline-block; }
 /* Google's own Get it on Google Play badge (google-play-badge.png, unaltered):
@@ -83,8 +83,9 @@ p { margin: 8px 0; color: var(--muted); }
 .badge img { display: block; height: 77px; width: auto; }
 /* Apple's own Download on the App Store badge (app-store-badge.svg,
    unaltered): no margin of its own, so it's shown 52px tall with the
-   quarter-height clear space Apple asks for. */
-.badge img.apple { height: 52px; margin: 13px 0; }
+   quarter-height clear space Apple asks for (above it, the Play badge's own
+   margin gives that). */
+.badge img.apple { height: 52px; margin: 0 0 13px; }
 /* The trademark notice the badge guidelines ask for, wherever it shows. */
 .legal { font-size: 0.7rem; margin-top: 16px; }
 [hidden] { display: none !important; }
