@@ -2,18 +2,19 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stage } from './Stage';
 import { PigButton } from './PigButton';
-import { ChainScene, DrawScene, GatherScene, PromptsScene, ScoreScene } from './WalkthroughScenes';
+import { ChainScene, DrawScene, GatherScene, HostScene, PromptsScene, ScoreScene } from './WalkthroughScenes';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 
-// The first-run walkthrough: five steps, each a looping animation with one
+// The first-run walkthrough: six steps, each a looping animation with one
 // line under it, laid out on the same Stage as every other screen (scene where
 // the pig goes, caption and buttons in the controls pane). Next / swipe to go
 // on, Skip to leave; finishing or skipping calls onDone, which Home records
 // (src/lib/tutorial.ts) so it never opens on its own again; the menu's "How to
 // play" row replays it. It replaces the old "Learn to Squiggle" paragraph.
 const STEPS = [
+  { Scene: HostScene, caption: 'The host taps Create Game, then shares the room code.' },
   { Scene: GatherScene, caption: 'Get 3 or more players into one room.' },
   { Scene: PromptsScene, caption: 'Everyone fills the trough with prompts.' },
   { Scene: DrawScene, caption: 'Draw the prompt you’re handed.' },

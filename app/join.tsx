@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
@@ -8,6 +9,7 @@ import { showToast } from '../src/components/Toast';
 import { IMAGES } from '../src/assets/assets';
 import { NAME_MAX, entryMessage, useGame } from '../src/state/GameContext';
 import { loadSession } from '../src/lib/session';
+import { cleanRoomCode } from '../src/lib/text';
 
 // Join an existing game by room code (was pages/JoinGame.js). The theme music
 // heard here is driven by the route in app/_layout.tsx, not by this screen.
@@ -15,10 +17,13 @@ import { loadSession } from '../src/lib/session';
 // opens this screen with the code filled in and the last-used name restored, so
 // the player only has to tap Lobby. The server says no to a game already in
 // progress or a name already taken in the room, and this screen says why.
+// The code box only takes what a code can be (src/lib/text.ts, cleanRoomCode):
+// typed or pasted, it's capitalised, anything else is left out, and it stops
+// at four. The server capitalises too, so case never matters.
 export default function Join() {
   const { enterRoom, room: current } = useGame();
   const params = useLocalSearchParams<{ room?: string }>();
-  const linked = typeof params.room === 'string' ? params.room.trim().toUpperCase() : '';
+  const linked = cleanRoomCode(params.room);
   const [room, setRoom] = useState(linked);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +53,8 @@ export default function Join() {
     setBusy(true);
     const status = await enterRoom(room, name);
     setBusy(false);
-    if (status !== 'ok') showToast(entryMessage(status, room.trim().toUpperCase()), 3500);
+    // Long enough to read the room code messages, which say what to do next.
+    if (status !== 'ok') showToast(entryMessage(status, room), 6000);
   };
 
   return (
@@ -56,7 +62,19 @@ export default function Join() {
       focus={<Logo source={IMAGES.join} />}
       actions={
         <>
-          <PigInput placeholder="Room Code" value={room} onChangeText={setRoom} autoCapitalize="characters" maxLength={8} />
+          <PigInput
+            placeholder="Room Code"
+            value={room}
+            onChangeText={(text) => setRoom(cleanRoomCode(text))}
+            // Android keyboards that compose words (suggestions) can repeat
+            // letters when the box rewrites what's typed; this keyboard
+            // doesn't compose, and puts the number row on screen too.
+            keyboardType={Platform.OS === 'android' ? 'visible-password' : 'default'}
+            autoCapitalize="characters"
+            autoComplete="off"
+            importantForAutofill="no"
+            spellCheck={false}
+          />
           <PigInput placeholder="Player Name" value={name} onChangeText={setName} maxLength={NAME_MAX} />
           <PigButton name={busy ? 'Joining…' : 'Lobby'} onPress={join} />
         </>

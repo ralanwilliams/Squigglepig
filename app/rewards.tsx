@@ -9,7 +9,7 @@ import { PigButton } from '../src/components/PigButton';
 import { DrawingBoard, useDrawingStore, type DrawingBoardHandle } from '../src/components/DrawingBoard';
 import { IMAGES } from '../src/assets/assets';
 import { RewardTile } from '../src/rewards/RewardTile';
-import { KindTabs } from '../src/rewards/KindTabs';
+import { TabPages, Tabs } from '../src/components/Tabs';
 import { GROUPS, KINDS, REWARDS, isNone, noneOf, rewardsOf, type Group, type Kind } from '../src/rewards/catalog';
 import { useInventory } from '../src/rewards/inventory';
 import { useChoose } from '../src/rewards/useChoose';
@@ -58,46 +58,50 @@ export default function Rewards() {
   const group: Group = asked && asked in GROUPS ? (asked as Group) : 'art';
   const kinds = kindsOf(group);
   const [kind, setKind] = useState<Kind>(kinds[0]);
-  const list = rewardsOf(kind);
-  const none = noneOf(kind);
-  const inUse = chosen(kind);
-  const cards = none && list.some((r) => !r.soon) ? [none, ...list] : list;
   const { seasonal, setSeasonal } = useThemeMode();
-  // A theme is in use while it's showing: the chosen one, unless a birthday
-  // or holiday is on over it, when no card is, and tapping it brings it back.
   const showing = useSkin();
-  const covered = kind === 'theme' && showing !== (UNLOCKABLE[inUse ?? ''] ?? null);
-  const used = (id: string | null) => !covered && id === (inUse ?? null);
-
-  // Put a card to use (a theme with the sweep: useChoose).
-  const use = (id: string | null) => {
-    if (!used(id)) putToUse(kind, id);
-  };
 
   const show = GROUPS[group].show;
   // The drawing's kept here, so it lasts through the phone turning.
   const board = useRef<DrawingBoardHandle>(null);
   const drawing = useDrawingStore();
-  const grid = (
-    <View accessibilityLabel={KINDS[kind].label} style={[styles.grid, { gap: ui.sp(6) }]}>
-      {cards.map((r) => {
-        const usable = !!none && !r.soon && (isNone(r) || owns(r.id));
-        return (
-          <RewardTile
-            key={r.id}
-            reward={r}
-            owned={isNone(r) || owns(r.id)}
-            chosen={usable && used(isNone(r) ? null : r.id)}
-            onPress={usable ? () => use(isNone(r) ? null : r.id) : undefined}
-            compact
-          />
-        );
-      })}
-    </View>
-  );
 
-  const seasonalRow =
-    kind === 'theme' ? (
+  // One kind's cards. Every kind of the group is drawn (TabPages keeps them
+  // all one height); only the open one shows.
+  const gridFor = (k: Kind) => {
+    const list = rewardsOf(k);
+    const none = noneOf(k);
+    const inUse = chosen(k);
+    const cards = none && list.some((r) => !r.soon) ? [none, ...list] : list;
+    // A theme is in use while it's showing: the chosen one, unless a birthday
+    // or holiday is on over it, when no card is, and tapping it brings it back.
+    const covered = k === 'theme' && showing !== (UNLOCKABLE[inUse ?? ''] ?? null);
+    const used = (id: string | null) => !covered && id === (inUse ?? null);
+    // Put a card to use (a theme with the sweep: useChoose).
+    const use = (id: string | null) => {
+      if (!used(id)) putToUse(k, id);
+    };
+    return (
+      <View accessibilityLabel={KINDS[k].label} style={[styles.grid, { gap: ui.sp(6) }]}>
+        {cards.map((r) => {
+          const usable = !!none && !r.soon && (isNone(r) || owns(r.id));
+          return (
+            <RewardTile
+              key={r.id}
+              reward={r}
+              owned={isNone(r) || owns(r.id)}
+              chosen={usable && used(isNone(r) ? null : r.id)}
+              onPress={usable ? () => use(isNone(r) ? null : r.id) : undefined}
+              compact
+            />
+          );
+        })}
+      </View>
+    );
+  };
+
+  const seasonalRow = (k: Kind) =>
+    k === 'theme' ? (
       <Pressable
         accessibilityRole="switch"
         accessibilityState={{ checked: seasonal }}
@@ -117,15 +121,19 @@ export default function Rewards() {
     ) : null;
 
   const tabs = (
-    <KindTabs
-      kinds={kinds}
-      selected={kind}
-      onSelect={setKind}
-      count={(k) => {
+    <Tabs
+      tabs={kinds.map((k) => {
         const total = rewardsOf(k).length;
         const owned = rewardsOf(k).filter((r) => owns(r.id)).length;
-        return { text: `${owned} / ${total}`, spoken: `${owned} of ${total} unlocked` };
-      }}
+        return {
+          key: k,
+          label: KINDS[k].label,
+          glyph: KINDS[k].glyph,
+          count: { text: `${owned} / ${total}`, spoken: `${owned} of ${total} unlocked` },
+        };
+      })}
+      selected={kind}
+      onSelect={setKind}
     />
   );
 
@@ -152,11 +160,20 @@ export default function Rewards() {
   return (
     <Stage
       focus={show === 'canvas' ? <DrawingBoard ref={board} store={drawing} /> : <Logo source={IMAGES.home} />}
+      // The tabs stay put while the cards under them change.
+      actionsAlign="top"
       actions={
         <>
           {tabs}
-          {grid}
-          {seasonalRow}
+          <TabPages
+            open={kinds.indexOf(kind)}
+            pages={kinds.map((k) => (
+              <View key={k} style={{ gap: ui.gap }}>
+                {gridFor(k)}
+                {seasonalRow(k)}
+              </View>
+            ))}
+          />
           {drawingButtons}
           {dev}
         </>

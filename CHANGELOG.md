@@ -7,6 +7,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [2.8.1]
 
 ### Changed
+- Your pig has a row of tabs, one for each place on the pig (Head, Face, Body, Holding, Feet, Sky) and one for the speech bubble, showing one group of cards at a time instead of everything at once. A dot marks each tab with something on your pig, and a tab with nothing in it isn't shown
+- On Your pig and Rewards, the tabs and the buttons under the cards stay in the same place and size whichever tab is open
+- A shorter menu: Privacy, Terms and Licenses are small links near the bottom instead of rows of their own; High contrast, Reduce motion and Room notifications are together under Settings; and Seasonal themes is now only in Rewards › Themes, beside the theme cards
+- How to play opens with a new first step: the host taps Create Game, then shares the room code with everyone else
+- The room code box only takes the letters and numbers a room code can have, in capitals however they're typed or pasted, and stops at four
+- Prompts and guesses can be up to 60 characters
+- Messages at the bottom of the screen are a small card in the app's own style, wrap neatly when they're long, fade in and out, and are read out by screen readers
+- Join Game explains where a room code comes from when it's left empty, too short or doesn't match a room: from the player who created the room, or tap Create Game to start your own
 - Every screen's background has a soft polka-dot pattern in the theme's own colours (plain in high contrast)
 - squigglepig.app and its invite page use Google's official Get it on Google Play badge
 - Rewards › Art supplies has a drawing canvas beside your brushes and stickers, the same one as in the game, so you can try out what you've won (with Clear and Undo). The drawing isn't kept
@@ -15,6 +23,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The winner's speech bubble comes and goes, 3 seconds on and 3 off: Speech and Shout fade, Thought and Heart pop up like bubbles, and the royal scroll, now smaller, hangs rolled up and unrolls downward to show its message
 
 ### Fixed
+- Names, prompts, guesses and speech bubbles drop invisible characters, so no two players can have names that look the same
+- A garbled message from another phone in the room is ignored, instead of closing the app
+- The sound switch no longer shows its ✕ behind the speaker while the sound is on, and the moon's stars no longer show beside the sun in light mode
 - The words in every speech bubble fit by their real width, so long or wide messages stay inside the bubble, and the heart's words sit inside the heart rather than up in its lobes
 - Bobby's blaster and Lukas's rifle now sit behind the pig's front hoof, not over it, and Bobby's blaster sits a little lower in his hooves
 - The number on Ash's jersey no longer flickers to a thinner font while the app switches between light and dark

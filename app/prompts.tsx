@@ -8,6 +8,7 @@ import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { useGame } from '../src/state/GameContext';
 import { TIMERS } from '../src/lib/timers';
+import { PHRASE_MAX } from '../src/lib/text';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
@@ -98,6 +99,7 @@ export default function Prompts() {
           placeholder="A puffin drinking hot chocolate"
           value={draft}
           onChangeText={setDraft}
+          maxLength={PHRASE_MAX}
           onSubmitEditing={add}
           blurOnSubmit={false}
           returnKeyType="done"

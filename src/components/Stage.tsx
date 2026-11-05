@@ -19,7 +19,9 @@ import { useThemedStyles } from '../theme/theme';
 // The focus pane is plain flex — art fills it. The actions pane is a FitBox: if
 // its content is shorter than the pane it is centred and the slack becomes
 // breathing room; if it is taller it is scaled down as a unit until it fits.
-// A screen whose focus can also vary in height passes `fitFocus`.
+// A screen whose focus can also vary in height passes `fitFocus`. One whose
+// actions change height in place (tabs over cards: Your pig) passes
+// `actionsAlign="top"`, so what's at the top of the pane stays put.
 //
 // When a keyboard opens the window shrinks (Android `resize` mode / iOS
 // KeyboardAvoidingView), the panes shrink with it and FitBox re-fits — so
@@ -29,11 +31,13 @@ export function Stage({
   focus,
   actions,
   fitFocus,
+  actionsAlign = 'center',
 }: {
   header?: React.ReactNode;
   focus: React.ReactNode;
   actions?: React.ReactNode;
   fitFocus?: boolean;
+  actionsAlign?: 'center' | 'top';
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -76,7 +80,7 @@ export function Stage({
   // (ReactCommon/yoga/yoga/algorithm/CalculateLayout.cpp, computeFlexBasisForChild).
   // Remounting discards the cached basis.
   const actionsPane = actions ? (
-    <FitBox key={twoPane ? 'rail' : 'pane'} style={twoPane ? { width: ui.railW } : styles.pane}>
+    <FitBox key={twoPane ? 'rail' : 'pane'} align={actionsAlign} style={twoPane ? { width: ui.railW } : styles.pane}>
       <View style={{ gap: ui.gap }}>{actions}</View>
     </FitBox>
   ) : null;
