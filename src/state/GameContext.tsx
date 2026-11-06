@@ -97,6 +97,9 @@ export const promptsNeededFor = (players: number, target: number) =>
 // write a chain's final caption is whoever wrote its prompt, so there is nothing
 // to actually guess.
 export const MIN_PLAYERS = 3;
+// The most a room holds. The server turns away a 13th ('room_full', join_room
+// in supabase/rooms.sql, which has the same number).
+export const MAX_PLAYERS = 12;
 
 // Used to seed chains when nobody entered prompts (keeps a game from stalling).
 const FALLBACK_PROMPTS = [
@@ -132,6 +135,8 @@ export function entryMessage(status: EntryStatus, code = ''): string {
         : 'That room has closed.';
     case 'in_progress':
       return 'That game has already started. Try again when it ends.';
+    case 'room_full':
+      return `That room is full: it has the most players a room can hold (${MAX_PLAYERS}). Try again if someone leaves, or go back and tap Create Game to start your own.`;
     case 'name_taken':
       return 'Someone in that room already has that name. Pick another.';
     case 'no_keys':

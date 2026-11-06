@@ -15,7 +15,7 @@ import { FONT_CAP, useUi } from '../theme/responsive';
 // play" row replays it. It replaces the old "Learn to Squiggle" paragraph.
 const STEPS = [
   { Scene: HostScene, caption: 'The host taps Create Game, then shares the room code.' },
-  { Scene: GatherScene, caption: 'Get 3 or more players into one room.' },
+  { Scene: GatherScene, caption: 'Get 3 to 12 players into one room.' },
   { Scene: PromptsScene, caption: 'Everyone fills the trough with prompts.' },
   { Scene: DrawScene, caption: 'Draw the prompt you’re handed.' },
   { Scene: ChainScene, caption: 'Guess the drawing you’re passed. Your guess gets drawn next.' },

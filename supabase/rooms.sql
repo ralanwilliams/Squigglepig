@@ -188,7 +188,10 @@ begin
 end $$;
 
 -- Join a room by its code, or come back to one you're already in (from the
--- background, or a reopened app). Newcomers can only join in the lobby.
+-- background, or a reopened app). Newcomers can only join in the lobby, and
+-- only while it has fewer than 12 players ('room_full'; MAX_PLAYERS in
+-- src/state/GameContext.tsx says the same). The room row is locked first, so
+-- two people joining at once can't both take the last place.
 -- A returning member keeps the name they joined with: the game's scores are
 -- kept by name. With p_rejoin (the app reopening into its saved room) it only
 -- comes back: if the caller isn't in that room any more it's 'not_found',
@@ -200,6 +203,7 @@ declare
   -- Codes are capitals, whatever case they're typed in.
   v_code text := upper(btrim(p_code));
   v_name text := public.clean_name(p_name);
+  max_players constant int := 12;
   r public.rooms;
   m public.room_members;
 begin
@@ -215,6 +219,9 @@ begin
   end if;
   if p_rejoin then return jsonb_build_object('status', 'not_found'); end if;
   if found or r.phase <> 'lobby' then return jsonb_build_object('status', 'in_progress'); end if;
+  if (select count(*) from public.room_members where room = v_code) >= max_players then
+    return jsonb_build_object('status', 'room_full');
+  end if;
   if char_length(v_name) not between 1 and 24 then return jsonb_build_object('status', 'bad_name'); end if;
   if exists (select 1 from public.room_members where room = v_code and lower(name) = lower(v_name)) then
     return jsonb_build_object('status', 'name_taken');
