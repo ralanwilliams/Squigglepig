@@ -6,7 +6,7 @@ import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { showToast } from '../src/components/Toast';
 import { IMAGES } from '../src/assets/assets';
-import { useGame, MIN_PLAYERS } from '../src/state/GameContext';
+import { useGame, MAX_PLAYERS, MIN_PLAYERS } from '../src/state/GameContext';
 import { roomLink } from '../src/lib/links';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
@@ -170,7 +170,9 @@ export default function Lobby() {
 
         <View style={styles.playersHead}>
           <Text style={[styles.playersLabel, { fontSize: ui.f(11) }]} maxFontSizeMultiplier={FONT_CAP}>PLAYERS</Text>
-          <Text style={[styles.playersCount, { fontSize: ui.f(11) }]} maxFontSizeMultiplier={FONT_CAP}>{players.length}</Text>
+          <Text style={[styles.playersCount, { fontSize: ui.f(11) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityLabel={`${players.length} of ${MAX_PLAYERS}`}>
+            {players.length}/{MAX_PLAYERS}
+          </Text>
         </View>
         <View style={{ gap: ui.sp(2) }}>
           {shown.map((p) => (

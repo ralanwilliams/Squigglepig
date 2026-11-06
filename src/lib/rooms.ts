@@ -20,7 +20,7 @@ export type RoomPhase = 'lobby' | 'playing';
 
 export type Entry =
   | { status: 'ok'; room: string; name: string; userId: string }
-  | { status: 'not_found' | 'in_progress' | 'name_taken' | 'bad_name' | 'offline' };
+  | { status: 'not_found' | 'in_progress' | 'room_full' | 'name_taken' | 'bad_name' | 'offline' };
 
 export type RoomState =
   | { status: 'ok'; phase: RoomPhase; members: Member[]; snapshot: any }

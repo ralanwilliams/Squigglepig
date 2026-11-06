@@ -21,7 +21,6 @@ const GLYPHS = {
       <Path d="M9.6 9.4a2.5 2.5 0 1 1 3.5 2.3c-.7.35-1.1.8-1.1 1.6v.3M12 16.8v.01" />
     </>
   ),
-  code: <Path d="M9 7l-5 5 5 5M15 7l5 5-5 5" />,
   contrast: (
     <>
       <Circle cx="12" cy="12" r="9" />

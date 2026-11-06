@@ -1,6 +1,5 @@
 import type React from 'react';
 import type { GlyphName } from '../../components/Glyph';
-import { bigger } from './bigger';
 import { memory } from './memory';
 import { pigpen } from './pigpen';
 import { trivia } from './trivia';
@@ -12,7 +11,7 @@ import { truffles } from './truffles';
 //
 // To add a game, give it a folder beside trivia/ exporting a Game, and list it
 // in GAMES. The Solo button on Home and the game list (app/arcade) show
-// whatever is playable here; a `dev` game shows in development builds only.
+// whatever is playable here.
 
 // What a round is drawn into: Stage's two panes, with the timer, round count
 // and pot added by the run. `focus` is the art pane (the question, the
@@ -77,12 +76,12 @@ export type Game<S = unknown> = {
   // end. Level n's puzzle (from 1) at difficulty d (0 … 4, easiest first:
   // DifficultyMeter.tsx DIFFICULTIES). A full-screen game's only.
   endless?: (level: number, difficulty: number) => S;
-  dev?: true; // a test game, for development builds only
 };
 
-export const GAMES: Game<any>[] = [trivia, memory, truffles, pigpen, bigger];
+export const GAMES: Game<any>[] = [trivia, memory, truffles, pigpen];
 
-// The games this build offers.
-export const PLAYABLE = GAMES.filter((g) => __DEV__ || !g.dev);
+// The games this build offers, in alphabetical order (the game list shows
+// them this way, whatever order GAMES is in).
+export const PLAYABLE = [...GAMES].sort((a, b) => a.label.localeCompare(b.label));
 
 export const gameById = (id: string | undefined) => PLAYABLE.find((g) => g.id === id);
