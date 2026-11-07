@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Heading } from '../src/components/Heading';
-import { Countdown, deadlineIn } from '../src/components/Countdown';
+import { Countdown, deadlineFor } from '../src/components/Countdown';
 import { DrawingImage } from '../src/components/DrawingImage';
 import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
@@ -30,7 +30,7 @@ const EMPTY_CANVAS = JSON.stringify({ w: SPACE.w, h: SPACE.h, strokes: [] });
 export default function Reveal() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { chains, revealIndex, revealStep, rulings, judge, isJudge, scores, players, departed, vote } =
+  const { chains, revealIndex, revealStep, rulings, judge, isJudge, scores, players, departed, vote, turnEndsAt } =
     useGame();
 
   const chain = chains[revealIndex];
@@ -38,9 +38,11 @@ export default function Reveal() {
 
   // One deadline per chain, fixed when the chain comes up: Stage rebuilds its
   // panes (remounting the Countdown) when the phone turns, and the clock must
-  // not restart mid-reveal. Changing chains does start a fresh one.
+  // not restart mid-reveal. Changing chains does start a fresh one. It's the
+  // game's (each chain starts the stage's clock again: turnEndsAt), so a
+  // phone back in the room mid-chain shows only what's left.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const revealUntil = useMemo(() => deadlineIn(TIMERS.reveal), [revealIndex]);
+  const revealUntil = useMemo(() => deadlineFor(TIMERS.reveal, turnEndsAt), [revealIndex, turnEndsAt]);
 
   if (!chain) {
     return <Stage focus={<Heading>Tallying…</Heading>} />;

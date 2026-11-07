@@ -1,19 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
 import { router, useIsFocused } from 'expo-router';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { Heading } from '../src/components/Heading';
 import { PigButton } from '../src/components/PigButton';
-import { MenuButton } from '../src/components/MenuDrawer';
 import { SnoutSecret } from '../src/components/SnoutSecret';
-import { Walkthrough } from '../src/components/Walkthrough';
 import { showToast } from '../src/components/Toast';
 import { IMAGES } from '../src/assets/assets';
 import { entryMessage, useGame } from '../src/state/GameContext';
 import { PLAYABLE } from '../src/arcade/games';
 import { clearSession, loadSession } from '../src/lib/session';
-import { markTutorialDone, tutorialDone } from '../src/lib/tutorial';
+import { showWalkthrough, tutorialDone } from '../src/lib/tutorial';
 
 // The saved room is gone back into once per launch (a second home screen, or
 // coming back to this one, doesn't try again).
@@ -25,7 +22,8 @@ let launchChecked = false;
 // the room has gone, it says so and stays here. Otherwise, until the player
 // has finished or skipped it once, the first-run walkthrough opens over it
 // (src/lib/tutorial.ts). Play Solo (app/arcade) shows whenever there's a solo
-// game this build offers (src/arcade/games).
+// game this build offers (src/arcade/games). The menu's ☰ shows once the
+// check is done.
 //
 // The room's lobby sits over this screen, so Back from the lobby (or the
 // scoreboard) comes here with the player still in the room: Back to room
@@ -35,12 +33,14 @@ let launchChecked = false;
 // there under another screen: the app opening on a room link (Join). Then the
 // link is what the player came for (joining takes them out of any other
 // room), so the saved room isn't gone back into, and the walkthrough waits
-// until home is on screen.
+// until home is on screen. (It's the app's one walkthrough, the menu's How to
+// play too: showWalkthrough. If going elsewhere closes it before it's
+// finished or skipped, it opens again the next time home is on screen.)
 export default function Home() {
   const { enterRoom, room, returnToRoom } = useGame();
   const focused = useIsFocused();
   const [checking, setChecking] = useState(!launchChecked && focused);
-  const [walkthrough, setWalkthrough] = useState(false);
+  const rejoined = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -53,6 +53,7 @@ export default function Home() {
           if (status === 'ok') {
             // In the room (its screen is over this one now): this is the home
             // screen to come back to, no walkthrough over it.
+            rejoined.current = true;
             if (active) setChecking(false);
             return;
           }
@@ -62,20 +63,25 @@ export default function Home() {
           showToast(entryMessage(status), 4000);
         }
       }
-      const done = await tutorialDone();
-      if (!active) return;
-      setWalkthrough(!done);
-      setChecking(false);
+      if (active) setChecking(false);
     })();
     return () => {
       active = false;
     };
   }, []);
 
-  const finishWalkthrough = () => {
-    markTutorialDone();
-    setWalkthrough(false);
-  };
+  // The first-run walkthrough, whenever home is on screen until it's been
+  // finished or skipped (not over a home the launch went back into a room from).
+  useEffect(() => {
+    if (checking || !focused || rejoined.current) return;
+    let active = true;
+    tutorialDone().then((done) => {
+      if (active && !done) showWalkthrough();
+    });
+    return () => {
+      active = false;
+    };
+  }, [checking, focused]);
 
   // Same Stage as the real home screen so the pig doesn't jump when the buttons
   // swap in.
@@ -86,28 +92,21 @@ export default function Home() {
   }
 
   return (
-    <View style={styles.fill}>
-      <Stage
-        focus={
-          <Logo source={IMAGES.home}>
-            <SnoutSecret />
-          </Logo>
-        }
-        actions={
-          <>
-            {room ? <PigButton name={`Back to room ${room}`} onPress={returnToRoom} /> : null}
-            <PigButton name="Create Game" onPress={() => router.push('/create')} />
-            <PigButton name="Join Game" onPress={() => router.push('/join')} />
-            {PLAYABLE.length ? <PigButton name="Play Solo" onPress={() => router.push('/arcade')} /> : null}
-          </>
-        }
-      />
-      <MenuButton onHowToPlay={() => setWalkthrough(true)} />
-      <Walkthrough visible={walkthrough && focused} onDone={finishWalkthrough} />
-    </View>
+    <Stage
+      menu
+      focus={
+        <Logo source={IMAGES.home}>
+          <SnoutSecret />
+        </Logo>
+      }
+      actions={
+        <>
+          {room ? <PigButton name={`Back to room ${room}`} onPress={returnToRoom} /> : null}
+          <PigButton name="Create Game" onPress={() => router.push('/create')} />
+          <PigButton name="Join Game" onPress={() => router.push('/join')} />
+          {PLAYABLE.length ? <PigButton name="Play Solo" onPress={() => router.push('/arcade')} /> : null}
+        </>
+      }
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  fill: { flex: 1 },
-});

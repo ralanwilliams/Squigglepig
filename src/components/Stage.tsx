@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
 import { cornerReserve } from './CornerControls';
+import { MenuButton } from './MenuDrawer';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
@@ -23,6 +24,10 @@ import { useThemedStyles } from '../theme/theme';
 // actions change height in place (tabs over cards: Your pig) passes
 // `actionsAlign="top"`, so what's at the top of the pane stays put.
 //
+// `menu` puts the menu's ☰ in the header band's top-left corner
+// (MenuDrawer.tsx), across from the sound and dark-mode switches; the band
+// already keeps clear of both corners.
+//
 // When a keyboard opens the window shrinks (Android `resize` mode / iOS
 // KeyboardAvoidingView), the panes shrink with it and FitBox re-fits — so
 // inputs stay where they are, above the keyboard, without any scrolling.
@@ -32,12 +37,14 @@ export function Stage({
   actions,
   fitFocus,
   actionsAlign = 'center',
+  menu,
 }: {
   header?: React.ReactNode;
   focus: React.ReactNode;
   actions?: React.ReactNode;
   fitFocus?: boolean;
   actionsAlign?: 'center' | 'top';
+  menu?: boolean;
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -98,6 +105,7 @@ export function Stage({
           {actionsPane}
         </View>
       </KeyboardAvoidingView>
+      {menu ? <MenuButton /> : null}
     </View>
   );
 }

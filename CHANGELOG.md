@@ -14,6 +14,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The lobby says who you're waiting for ("Waiting for Alan to start…"), and its status line is one short line: "Connected · 4 players · 1 away"
 - Drawings are sent with only the points their lines need, so a detailed drawing arrives faster and looks the same
 - A room left 10 minutes without anyone doing anything in it is closed for everyone straight away
+- The menu (☰) is on more screens: Create Game, Join Game, the lobby, Play Solo, Your pig, Art supplies and Themes, as well as Home. From the lobby you're still in the room, Back brings you back to it, and if the game starts while you're on Your pig or Rewards, you're taken straight to it
+- Filling the trough gives 30 seconds for each prompt it needs, instead of 2 minutes however many it needs: 4:30 for 3 players playing to 5 points, 6:00 for 12. The game still starts the moment the trough is full
+- After reading your prompt, tapping Got it shows Player ready and keeps the prompt on screen, instead of going to the waiting screen. Once everyone is ready, the drawing starts for all at once
 
 ### Fixed
 - A drawing handed in could turn up at the reveal as a blank canvas, and cost its artist a point. A very detailed drawing was too big to send, and a drawing that went missing on its way to the host was filled in blank, wiping out the copy everyone else had. Big messages now go in pieces, a drawing that doesn't arrive is sent again, a blank never replaces a real drawing, and whatever is on the canvas when a turn ends is always handed in
@@ -24,6 +27,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The lobby no longer redraws itself, with a jump, when you arrive in it, reconnect or come back to it, and the host's controls no longer move the card while the room loads
 - On phones, the royal scroll's message now shows as the scroll unrolls, not only once it's all the way open
 - Two players tapping New game at the same moment no longer empties the trough, and no prompt is handed out twice in a game, even when the host changes
+- Back in a game after closing the app, the timers for filling the trough, reading your prompt and judging show the time that's actually left, as drawing and guessing now do, instead of starting over from the full time
 
 ## [2.9.0]
 

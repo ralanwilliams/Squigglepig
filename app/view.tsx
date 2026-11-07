@@ -2,8 +2,9 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
-import { Countdown, deadlineIn } from '../src/components/Countdown';
+import { Countdown, deadlineFor } from '../src/components/Countdown';
 import { PigButton } from '../src/components/PigButton';
+import { ButtonNote } from '../src/components/ButtonNote';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { IMAGES } from '../src/assets/assets';
 import { useGame } from '../src/state/GameContext';
@@ -13,18 +14,21 @@ import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
 
 // Round 1: you're shown the prompt of the chain you OWN. You don't draw it —
-// everyone else does — but you'll be the judge of this chain at scoring. Read it,
-// then tap to move on to drawing everyone else's prompts.
+// everyone else does — but you'll be the judge of this chain at scoring. Read
+// it, then tap Got it: the button turns into Player ready, the prompt stays
+// up, and once everyone in the round is ready (or the clock runs out) the
+// drawing starts for all of you at once.
 export default function RoundOne() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { prev, readyView } = useGame();
+  const { prev, readyView, viewReady, turnEndsAt } = useGame();
   const text = prev && 'text' in prev ? prev.text : '';
 
   // Fixed once per screen: Stage rebuilds its panes (remounting the Countdown)
   // when the layout flips between one and two panes, and the clock must not
-  // restart when the phone turns.
-  const [until] = useState(() => deadlineIn(TIMERS.view));
+  // restart when the phone turns. The game's deadline (deadlineFor), so a
+  // phone back in the room mid-way shows only what's left.
+  const [until] = useState(() => deadlineFor(TIMERS.view, turnEndsAt));
   const expired = useRef(false);
   const expire = () => {
     if (expired.current) return;
@@ -55,7 +59,11 @@ export default function RoundOne() {
           {text || '…'}
         </Text>
       </View>
-      <PigButton name="Got it — let's draw!" onPress={() => readyView()} />
+      {viewReady ? (
+        <ButtonNote text="Player ready" live />
+      ) : (
+        <PigButton name="Got it — let's draw!" onPress={() => readyView()} />
+      )}
       <LeaveButton />
     </>
   );

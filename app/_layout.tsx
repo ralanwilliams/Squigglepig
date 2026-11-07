@@ -16,12 +16,13 @@ import { InventoryProvider } from '../src/rewards/inventory';
 import { ThemeProvider, ThemeSnapshotTarget, ThemeTransition, useTheme } from '../src/theme/theme';
 import { CornerControlsOverlay } from '../src/components/CornerControls';
 import { ToastOverlay } from '../src/components/Toast';
+import { WalkthroughOverlay } from '../src/components/Walkthrough';
 import { TroughDropLayer } from '../src/components/TroughDrops';
 import { playMusic, preloadSounds, stopMusic } from '../src/lib/sound';
 import { useAppFrame } from '../src/theme/responsive';
 
 // Screens with the theme playing: everything from launch up to the moment the
-// round starts (plus /licenses and /rewards, which open from Home's menu, the
+// round starts (plus /licenses and /rewards, which open from the menu, the
 // solo game list, /arcade, and Your pig, /pig). It stops on /view (the "your
 // prompt" screen) and stays off through drawing, guessing, reveal and the
 // scoreboard, and through a solo run (/arcade/<game>); if a new game drops
@@ -88,7 +89,8 @@ export default function RootLayout() {
 // the old screen away when the theme flips, seasonal props falling into the
 // trough from the top of the screen, and the sound and dark-mode switches
 // floating over every screen — in that order, so the toggle's glyph keeps morphing on top
-// while the wipe passes underneath it.
+// while the wipe passes underneath it. Then the toasts, and the walkthrough
+// (a modal, over everything: first launch, and the menu's How to play).
 //
 // On web all of it sits in a frame centred in the browser window, capped in
 // width so an ultrawide monitor doesn't pull the panes apart (useAppFrame);
@@ -136,6 +138,7 @@ function Shell() {
         <TroughDropLayer />
         <CornerControlsOverlay />
         <ToastOverlay />
+        <WalkthroughOverlay />
       </View>
       {STANDALONE ? (
         <>
