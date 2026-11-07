@@ -5,6 +5,7 @@ import { font } from '../theme/tokens';
 import { useMorph, useReducedMotion, useSkin, useTheme } from '../theme/theme';
 import { PROPS, type Prop, type TextSlot } from '../theme/skins/props';
 import { morphPlacement, morphProp, nightProp, shownAt } from '../theme/skins/morph';
+import { unrollRanges } from '../theme/skins/unroll';
 import { onThePig } from '../theme/skins/layout';
 import { DIGITS, DIGIT_EM, emWidth } from '../theme/skins/glyphs';
 import type { ArtName, Placement } from '../theme/skins';
@@ -86,7 +87,8 @@ const TOSS_PATH = {
 // of its size; one that bubbles pops up over POP_MS from POP_FROM, a little
 // past its size and back; the scroll unrolls over UNROLL_MS, after it's been
 // seen rolled up for SCROLL_WAIT_MS when it's first put on. Each goes the way
-// it came, over its *_OUT_MS. Rolled up, the scroll is SHUT of its length.
+// it came, over its *_OUT_MS. Rolled up, the scroll is SHUT of its length
+// (skins/unroll.ts).
 const ON_MS = 3000;
 const OFF_MS = 3000;
 const FADE_MS = 400;
@@ -98,7 +100,6 @@ const POP_FROM = 0.2;
 const UNROLL_MS = 900;
 const UNROLL_OUT_MS = 700;
 const SCROLL_WAIT_MS = 600;
-const SHUT = 0.02;
 const COMING: Record<NonNullable<Prop['appear']>, [number, number]> = {
   fade: [FADE_MS, FADE_OUT_MS],
   bubble: [POP_MS, POP_OUT_MS],
@@ -285,25 +286,25 @@ function Piece({ p: day, i, window, imageW, imageH }: { p: Placement; i: number;
     </Svg>
   );
 
-  // The scroll: its paper (and words) seen through a window that opens down
-  // from the top roll (the window lengthens while what's in it is shrunk
-  // back, so nothing in it stretches), and the bottom roll carried down with
-  // the window's edge. Rolled up, the bottom roll is on the top one and
-  // there's nothing to read.
+  // The scroll: its paper (and words) seen through a window whose bottom
+  // edge comes down from the top roll, with the bottom roll carried down on
+  // that edge (skins/unroll.ts: the window slides, the paper in it slides
+  // back and so stays put; nothing is squashed or stretched). Rolled up, the
+  // bottom roll is on the top one and there's nothing to read. Everything
+  // here can run on the native driver.
   let drawing: React.ReactNode = art(prop, p.text);
   if (appear === 'unroll' && prop.unroll) {
     const toDp = (y: number) => (y + pad) / unit;
     const top = toDp(prop.unroll.top);
     const length = toDp(prop.unroll.bottom) - top;
-    const open = shown.interpolate({ inputRange: [0, 1], outputRange: [SHUT, 1] });
-    const drop = shown.interpolate({ inputRange: [0, 1], outputRange: [-(1 - SHUT) * length, 0] });
+    const slides = unrollRanges(length);
+    const drop = shown.interpolate({ inputRange: [0, 1], outputRange: slides.drop });
+    const hold = shown.interpolate({ inputRange: [0, 1], outputRange: slides.hold });
     const part = (roll?: 'top' | 'bottom') => ({ ...prop, text: roll ? undefined : prop.text, shapes: prop.shapes.filter((s) => s.roll === roll) });
     drawing = (
       <View style={{ width: bw, height: bh }}>
-        <Animated.View style={{ position: 'absolute', left: 0, top, width: bw, height: length, overflow: 'hidden', transformOrigin: 'top', transform: [{ scaleY: open }] }}>
-          <Animated.View
-            style={{ position: 'absolute', left: 0, top: -top, width: bw, height: bh, transformOrigin: `50% ${top}px`, transform: [{ scaleY: Animated.divide(1, open) }] }}
-          >
+        <Animated.View style={{ position: 'absolute', left: 0, top, width: bw, height: length, overflow: 'hidden', transform: [{ translateY: drop }] }}>
+          <Animated.View style={{ position: 'absolute', left: 0, top: -top, width: bw, height: bh, transform: [{ translateY: hold }] }}>
             {art(part(), p.text)}
           </Animated.View>
         </Animated.View>

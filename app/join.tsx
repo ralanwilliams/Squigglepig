@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { PigButton } from '../src/components/PigButton';
@@ -21,7 +21,7 @@ import { cleanRoomCode } from '../src/lib/text';
 // typed or pasted, it's capitalised, anything else is left out, and it stops
 // at four. The server capitalises too, so case never matters.
 export default function Join() {
-  const { enterRoom, room: current } = useGame();
+  const { enterRoom, room: current, returnToRoom } = useGame();
   const params = useLocalSearchParams<{ room?: string }>();
   const linked = cleanRoomCode(params.room);
   const [room, setRoom] = useState(linked);
@@ -38,11 +38,12 @@ export default function Join() {
     };
   }, []);
 
-  // A link to the room we're already in: drop back to wherever that game is.
+  // A link to the room we're already in: back to wherever that game is (the
+  // room's own screen, as it was, if this opened over it: returnToRoom).
   // Checked once on arrival only — joining from here sets `current` to the same
   // code, and that must not bounce the player back out of the new lobby.
   useEffect(() => {
-    if (linked && linked === current && router.canGoBack()) router.back();
+    if (linked && linked === current) returnToRoom();
   }, []);
 
   // A link tapped mid-game opens this screen over the old room; joining from

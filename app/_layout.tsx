@@ -28,6 +28,18 @@ import { useAppFrame } from '../src/theme/responsive';
 // everyone back into /prompts or /lobby it starts again from the top.
 const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/rewards', '/pig', '/arcade', '/join', '/create', '/lobby', '/prompts', '/waiting']);
 
+// A game's own screens, where swiping back (iOS) does nothing: the game moves
+// the player on by itself, and Leave game is the way out. (Android's back
+// button is held the same way in GameContext.) The lobby and the scoreboard
+// aren't here: Back from them goes home, still in the room.
+const GAME_SCREENS = ['prompts', 'view', 'drawing', 'guessing', 'waiting', 'reveal'];
+
+// Home is always at the bottom of the stack, even when the app opens on a
+// room link (Join): Back from Join, or from the lobby it leads to, comes home
+// with the player still in the room. Home holds back its launch work and its
+// walkthrough while it's under another screen (app/index.tsx).
+export const unstable_settings = { anchor: 'index' };
+
 // Installed as a PWA (Add to Home Screen; on an iPhone, navigator.standalone):
 // the system bars are always black, whatever the palette (Shell).
 const STANDALONE =
@@ -114,7 +126,11 @@ function Shell() {
               animation: 'fade',
               contentStyle: { backgroundColor: theme.background },
             }}
-          />
+          >
+            {GAME_SCREENS.map((name) => (
+              <Stack.Screen key={name} name={name} options={{ gestureEnabled: false }} />
+            ))}
+          </Stack>
         </ThemeSnapshotTarget>
         <ThemeTransition />
         <TroughDropLayer />

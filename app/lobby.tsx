@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
@@ -75,14 +75,20 @@ export default function Lobby() {
   const canStart = players.length >= MIN_PLAYERS;
   const connected = status === 'connected';
 
-  const here = players.length - away.length;
+  // One short line, whatever it says (shrunk to fit if it must be), so the
+  // band keeps its height and the screen under it never moves. A lost
+  // connection comes back by itself (the channel rejoins), so it says so;
+  // what went wrong goes to the log, not the screen.
   const banner =
     status === 'connecting'
       ? 'Connecting to server…'
       : status === 'error'
-        ? `⚠ Connection error: ${statusDetail || 'unknown'}`
+        ? '⚠ Connection lost. Reconnecting…'
         : `Connected · ${players.length} player${players.length === 1 ? '' : 's'}` +
-          (away.length ? ` · ${here} here, ${away.length} away` : '');
+          (away.length ? ` · ${away.length} away` : '');
+  useEffect(() => {
+    if (status === 'error') console.warn('[lobby] connection lost:', statusDetail || 'unknown');
+  }, [status, statusDetail]);
 
   // Roster rows the pane can hold at full size beneath the card's fixed chrome.
   const visible = Math.max(4, Math.floor((ui.paneH - ui.sp(300)) / ui.sp(34)));
@@ -93,7 +99,8 @@ export default function Lobby() {
     <Text
       style={[styles.status, { fontSize: ui.f(13) }, connected ? styles.ok : styles.warn]}
       maxFontSizeMultiplier={FONT_CAP}
-      numberOfLines={2}
+      numberOfLines={1}
+      adjustsFontSizeToFit
     >
       {banner}
     </Text>
@@ -103,6 +110,10 @@ export default function Lobby() {
 
   const step = ui.sp(32);
   const avatar = ui.sp(26);
+  // The host's controls (the points-to-win row, then Start) and everyone
+  // else's "waiting" share one slot of this height, so the card doesn't grow
+  // or shrink when this phone turns out to be the host (or stops being it).
+  const controlsH = step + ui.sp(3) * 2 + ui.sp(10) + ui.sp(44);
 
   const actions = (
     <View style={{ gap: ui.sp(8) }}>
@@ -121,52 +132,54 @@ export default function Lobby() {
           </Text>
         </View>
 
-        {isHost ? (
-          <>
-            <View style={styles.settingRow}>
-              <Text style={[styles.settingLabel, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
-                Points to win
-              </Text>
-              <View style={[styles.pill, { padding: ui.sp(3), gap: ui.sp(2) }]}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => bump(-1)}
-                  style={[styles.step, { width: step, height: step, borderRadius: step / 2 }]}
-                  hitSlop={8}
-                >
-                  <Text style={[styles.stepText, { fontSize: ui.f(20) }]} maxFontSizeMultiplier={FONT_CAP}>−</Text>
-                </Pressable>
-                <Text
-                  style={[styles.stepVal, { minWidth: ui.sp(34), fontSize: ui.f(19) }]}
-                  maxFontSizeMultiplier={FONT_CAP}
-                >
-                  {target}
+        <View style={[styles.controls, { minHeight: controlsH, gap: ui.sp(10) }]}>
+          {isHost ? (
+            <>
+              <View style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
+                  Points to win
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => bump(1)}
-                  style={[styles.step, { width: step, height: step, borderRadius: step / 2 }]}
-                  hitSlop={8}
-                >
-                  <Text style={[styles.stepText, { fontSize: ui.f(20) }]} maxFontSizeMultiplier={FONT_CAP}>+</Text>
-                </Pressable>
+                <View style={[styles.pill, { padding: ui.sp(3), gap: ui.sp(2) }]}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => bump(-1)}
+                    style={[styles.step, { width: step, height: step, borderRadius: step / 2 }]}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.stepText, { fontSize: ui.f(20) }]} maxFontSizeMultiplier={FONT_CAP}>−</Text>
+                  </Pressable>
+                  <Text
+                    style={[styles.stepVal, { minWidth: ui.sp(34), fontSize: ui.f(19) }]}
+                    maxFontSizeMultiplier={FONT_CAP}
+                  >
+                    {target}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => bump(1)}
+                    style={[styles.step, { width: step, height: step, borderRadius: step / 2 }]}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.stepText, { fontSize: ui.f(20) }]} maxFontSizeMultiplier={FONT_CAP}>+</Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-            {canStart ? (
-              <PigButton name="Start Game" onPress={() => startGame(target)} />
-            ) : (
-              <View style={[styles.startDisabled, { minHeight: ui.sp(44), borderRadius: ui.sp(8) }]}>
-                <Text style={[styles.startDisabledText, { fontSize: ui.f(15) }]} maxFontSizeMultiplier={FONT_CAP}>
-                  Need {MIN_PLAYERS}+ players
-                </Text>
-              </View>
-            )}
-          </>
-        ) : (
-          <Text style={[styles.waiting, { fontSize: ui.f(15), paddingVertical: ui.sp(6) }]} maxFontSizeMultiplier={FONT_CAP}>
-            Waiting for the host to start…
-          </Text>
-        )}
+              {canStart ? (
+                <PigButton name="Start Game" onPress={() => startGame(target)} />
+              ) : (
+                <View style={[styles.startDisabled, { minHeight: ui.sp(44), borderRadius: ui.sp(8) }]}>
+                  <Text style={[styles.startDisabledText, { fontSize: ui.f(15) }]} maxFontSizeMultiplier={FONT_CAP}>
+                    Need {MIN_PLAYERS}+ players
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <Text style={[styles.waiting, { fontSize: ui.f(15) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={2}>
+              {connected && host ? `Waiting for ${host} to start…` : 'Waiting for the host to start…'}
+            </Text>
+          )}
+        </View>
 
         <View style={styles.playersHead}>
           <Text style={[styles.playersLabel, { fontSize: ui.f(11) }]} maxFontSizeMultiplier={FONT_CAP}>PLAYERS</Text>
@@ -284,6 +297,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     textTransform: 'uppercase',
   },
   waiting: { fontFamily: font.regular, color: t.surfaceText, textAlign: 'center' },
+  controls: { justifyContent: 'center' },
 
   // Players roster.
   playersHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

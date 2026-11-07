@@ -6,6 +6,7 @@ import { Stickers, Strokes } from './DrawingArt';
 import { InkPicker } from './InkPicker';
 import { StickerControls, StickerPicker, type StickerAct } from './StickerPicker';
 import { SPACE, STROKE, inkFor, type Drawing, type Sticker } from '../lib/drawing';
+import { thinStroke } from '../lib/strokes';
 import { rewardsOf } from '../rewards/catalog';
 import { STICKER_ART, stickersIn } from '../stickers/art';
 import { PROPS, type Prop } from '../theme/skins/props';
@@ -23,6 +24,11 @@ import { canvas as paper, font, layout, type Theme } from '../theme/tokens';
 const ASPECT = SPACE.w / SPACE.h;
 
 type Zoom = 1 | 2;
+
+// Development builds show how big the drawing is as it's sent, on the canvas
+// (src/dev/DrawingSize.tsx). Behind __DEV__, which is constant-folded away in
+// release bundles, so the readout never reaches them.
+const DrawingSize = __DEV__ ? (require('../dev/DrawingSize') as typeof import('../dev/DrawingSize')).DrawingSize : null;
 
 // Points closer than this (units) to the previous one are dropped: they're
 // touch jitter, and they'd bloat the path without changing its shape.
@@ -117,6 +123,22 @@ const newStore = (): DrawingStore => ({
 export function useDrawingStore(): DrawingStore {
   return useRef(newStore()).current;
 }
+
+// The drawing in a store, as it's sent (src/lib/drawing.ts): each stroke
+// with only the points its shape needs (src/lib/strokes.ts), so a detailed
+// drawing stays small (`thin` false: every point, for the development size
+// readout to compare). A drawing all in black without stickers goes without
+// `inks` or `stickers`, exactly as before either.
+export function drawingData(store: DrawingStore, thin = true): string {
+  const strokes = thin ? store.committed.current.map(thinStroke) : store.committed.current;
+  const out: Drawing = { w: SPACE.w, h: SPACE.h, strokes };
+  if (store.inks.current.some((i) => i !== null)) out.inks = store.inks.current;
+  if (store.placed.current.length) out.stickers = store.placed.current.map(({ id, x, y, s, r }) => ({ id, x, y, s, r }));
+  return JSON.stringify(out);
+}
+
+// Whether a store has anything drawn in it.
+export const drawingStarted = (store: DrawingStore) => store.committed.current.length > 0 || store.placed.current.length > 0;
 
 export type DrawingBoardHandle = {
   undo: () => void;
@@ -421,14 +443,10 @@ export const DrawingBoard = forwardRef<DrawingBoardHandle, { store?: DrawingStor
   }, []);
 
   // ---- Actions -------------------------------------------------------------
-  // A drawing all in black without stickers goes without `inks` or
-  // `stickers`, exactly as before either.
+  // The stroke under the finger goes in first.
   const data = () => {
     commit(false);
-    const out: Drawing = { w: SPACE.w, h: SPACE.h, strokes: committed.current };
-    if (inks.current.some((i) => i !== null)) out.inks = inks.current;
-    if (placed.current.length) out.stickers = placed.current.map(({ id, x, y, s, r }) => ({ id, x, y, s, r }));
-    return JSON.stringify(out);
+    return drawingData(kept);
   };
   const undo = () => {
     const last = history.current[history.current.length - 1];
@@ -594,6 +612,16 @@ export const DrawingBoard = forwardRef<DrawingBoardHandle, { store?: DrawingStor
             </Pressable>
           ))}
         </View>
+
+        {DrawingSize ? (
+          <DrawingSize
+            changes={[committed.current, inks.current, placed.current]}
+            sent={() => drawingData(kept)}
+            raw={() => drawingData(kept, false)}
+            hidden={picking || tray}
+            ui={ui}
+          />
+        ) : null}
 
         {/* While a sticker is selected its controls have the canvas's foot. */}
         {zoom === 2 && !sel ? (

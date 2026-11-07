@@ -1,6 +1,5 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { router } from 'expo-router';
 import { useGame } from '../state/GameContext';
 import { font, type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
@@ -10,20 +9,17 @@ import { FONT_CAP, useUi } from '../theme/responsive';
 // (closing the app just makes the player "away"). Leaving tells the server and
 // unsubscribes; mid-game the player is taken out of the rotation, or, if that
 // would leave fewer than 3, their turns run out the clock until the round
-// ends (their pooled prompts simply go unused). See GameContext.
+// ends (their pooled prompts simply go unused), and the home screen it was
+// opened from comes back (GameContext leaveRoom).
 // Visually a quiet text link, but padded + hit-slopped to a full 44dp target.
 export function LeaveButton({ label = 'Leave game' }: { label?: string }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const { leaveRoom } = useGame();
-  const leave = () => {
-    leaveRoom();
-    router.replace('/');
-  };
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={leave}
+      onPress={leaveRoom}
       style={[styles.leave, { minHeight: ui.sp(36), paddingVertical: ui.sp(8) }]}
       hitSlop={8}
     >

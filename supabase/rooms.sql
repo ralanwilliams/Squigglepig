@@ -134,8 +134,34 @@ begin
   );
 end $$;
 
+-- Whether a room has gone 10 minutes without anyone doing anything in it.
+-- Such a room is closed: close_idle_rooms deletes it on its next run (within
+-- a minute), and until then nobody can join it, come back to it, start a
+-- game in it or keep it open (join_room, room_state, start_game, touch_room,
+-- leave_room_as), so it's never half there.
+create or replace function public.room_is_idle(p_last_active timestamptz)
+returns boolean language sql stable set search_path = '' as $$
+  select p_last_active < now() - interval '10 minutes';
+$$;
+
+-- Close a room: tell the phones still connected, then delete it (its members
+-- and snapshot go too). Telling them is best effort: if the message can't go,
+-- the room still closes (and the app notices next time it asks).
+create or replace function public.close_room(p_code text)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  begin
+    perform realtime.send(jsonb_build_object('reason', 'idle'), 'room-closed', 'room:' || p_code, true);
+  exception when others then
+    raise warning 'room-closed for % not sent: %', p_code, sqlerrm;
+  end;
+  delete from public.rooms where code = p_code;
+end $$;
+
 -- Take `who` out of a room: in the lobby they're gone; mid-game they're marked
--- as left (still on the scoreboard). The last one out closes the room.
+-- as left (still on the scoreboard). The last one out closes the room; anyone
+-- else leaving counts as something done in it, unless it has already closed
+-- for being idle.
 create or replace function public.leave_room_as(p_code text, p_user uuid)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
@@ -152,7 +178,7 @@ begin
   if not exists (select 1 from public.room_members where room = p_code and left_at is null) then
     delete from public.rooms where code = p_code;
   else
-    update public.rooms set last_active_at = now() where code = p_code;
+    update public.rooms set last_active_at = now() where code = p_code and not public.room_is_idle(last_active_at);
   end if;
 end $$;
 
@@ -188,10 +214,12 @@ begin
 end $$;
 
 -- Join a room by its code, or come back to one you're already in (from the
--- background, or a reopened app). Newcomers can only join in the lobby, and
--- only while it has fewer than 12 players ('room_full'; MAX_PLAYERS in
--- src/state/GameContext.tsx says the same). The room row is locked first, so
--- two people joining at once can't both take the last place.
+-- background, or a reopened app). A room that has been idle 10 minutes is
+-- closed, for everyone ('not_found'): it goes now, if the sweep hasn't got
+-- to it yet. Newcomers can only join in the lobby, and only while fewer than
+-- 12 players are in it ('room_full'; MAX_PLAYERS in src/state/rules.ts says
+-- the same). The room row is locked first, so two people joining at once
+-- can't both take the last place.
 -- A returning member keeps the name they joined with: the game's scores are
 -- kept by name. With p_rejoin (the app reopening into its saved room) it only
 -- comes back: if the caller isn't in that room any more it's 'not_found',
@@ -211,6 +239,10 @@ begin
   if v_code !~ '^[A-Z0-9]{4}$' then return jsonb_build_object('status', 'not_found'); end if;
   select * into r from public.rooms where code = v_code for update;
   if not found then return jsonb_build_object('status', 'not_found'); end if;
+  if public.room_is_idle(r.last_active_at) then
+    perform public.close_room(v_code);
+    return jsonb_build_object('status', 'not_found');
+  end if;
   select * into m from public.room_members where room = v_code and user_id = auth.uid();
   if found and m.left_at is null then
     update public.room_members set nudged = false where room = v_code and user_id = auth.uid();
@@ -219,7 +251,7 @@ begin
   end if;
   if p_rejoin then return jsonb_build_object('status', 'not_found'); end if;
   if found or r.phase <> 'lobby' then return jsonb_build_object('status', 'in_progress'); end if;
-  if (select count(*) from public.room_members where room = v_code) >= max_players then
+  if (select count(*) from public.room_members where room = v_code and left_at is null) >= max_players then
     return jsonb_build_object('status', 'room_full');
   end if;
   if char_length(v_name) not between 1 and 24 then return jsonb_build_object('status', 'bad_name'); end if;
@@ -248,7 +280,8 @@ end $$;
 
 -- The room as the caller's app needs it: its phase, everyone in it (oldest
 -- first) and, when asked, the host's last snapshot of the game. 'closed' if
--- the room is gone or the caller isn't in it any more.
+-- the room is gone (or idle long enough to be on its way) or the caller
+-- isn't in it any more.
 create or replace function public.room_state(p_code text, p_snapshot boolean default false)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare
@@ -256,7 +289,7 @@ declare
   r public.rooms;
 begin
   select * into r from public.rooms where code = v_code;
-  if not found or not public.is_room_member('room:' || v_code) then
+  if not found or public.room_is_idle(r.last_active_at) or not public.is_room_member('room:' || v_code) then
     return jsonb_build_object('status', 'closed');
   end if;
   return jsonb_build_object(
@@ -276,19 +309,21 @@ begin
 end $$;
 
 -- Someone did something in the room (or opened the app into it): it isn't
--- idle, and they're back, so they can be nudged again later.
+-- idle, and they're back, so they can be nudged again later. A room already
+-- idle 10 minutes is closed, and stays closed.
 create or replace function public.touch_room(p_code text)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
   v_code text := upper(btrim(p_code));
 begin
   if not public.is_room_member('room:' || v_code) then return; end if;
-  update public.rooms set last_active_at = now() where code = v_code;
+  update public.rooms set last_active_at = now() where code = v_code and not public.room_is_idle(last_active_at);
+  if not found then return; end if;
   update public.room_members set nudged = false where room = v_code and user_id = auth.uid() and nudged;
 end $$;
 
 -- Start a game: the room closes to newcomers. Needs 3 players in the room
--- (away ones count).
+-- (away ones count), and a room that hasn't closed for being idle.
 create or replace function public.start_game(p_code text)
 returns boolean language plpgsql security definer set search_path = '' as $$
 declare
@@ -298,8 +333,9 @@ begin
   if (select count(*) from public.room_members where room = v_code and left_at is null) < 3 then
     return false;
   end if;
-  update public.rooms set phase = 'playing', snapshot = null, last_active_at = now() where code = v_code;
-  return true;
+  update public.rooms set phase = 'playing', snapshot = null, last_active_at = now()
+  where code = v_code and not public.room_is_idle(last_active_at);
+  return found;
 end $$;
 
 -- The game is over: back to the lobby, open to newcomers again. Players who
@@ -412,16 +448,16 @@ create trigger room_members_changed
 
 -- ---- Housekeeping ----------------------------------------------------------
 
--- Close every room nobody has done anything in for 10 minutes: tell the
--- phones still connected, then delete it (its members and snapshot go too).
+-- Close every room nobody has done anything in for 10 minutes (close_room:
+-- tell the phones still connected, then delete it). One that can't be told
+-- doesn't hold up the rest.
 create or replace function public.close_idle_rooms()
 returns void language plpgsql security definer set search_path = '' as $$
 declare
   v_code text;
 begin
-  for v_code in select code from public.rooms where last_active_at < now() - interval '10 minutes' loop
-    perform realtime.send(jsonb_build_object('reason', 'idle'), 'room-closed', 'room:' || v_code, true);
-    delete from public.rooms where code = v_code;
+  for v_code in select code from public.rooms where public.room_is_idle(last_active_at) loop
+    perform public.close_room(v_code);
   end loop;
 end $$;
 
@@ -449,6 +485,8 @@ revoke execute on function
   public.clean_name(text),
   public.is_room_member(text),
   public.push(uuid[], text, text, jsonb),
+  public.room_is_idle(timestamptz),
+  public.close_room(text),
   public.leave_room_as(text, uuid),
   public.create_room(text),
   public.join_room(text, text, boolean),

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
-import { router } from 'expo-router';
+import { AppState, BackHandler } from 'react-native';
+import { router, usePathname } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '../lib/supabase';
 import { TIMERS, HOST_GRACE } from '../lib/timers';
@@ -21,7 +21,8 @@ import {
   type RoomPhase,
 } from '../lib/rooms';
 import { registerForPush } from '../lib/push';
-import { isBlankDrawing } from '../lib/drawing';
+import { CHUNK_GAP_MS, Joiner, chunkId, split } from '../lib/chunks';
+import { holdsBack, isRoomScreen, lobbyOnCatchUp, navFor } from './nav';
 import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
 import { showToast } from '../components/Toast';
 import { cleanAvatar, useMyAvatar, wireAvatar, type Avatar } from '../avatar/avatar';
@@ -35,6 +36,7 @@ import {
   asObj,
   asPrompt,
   asRoster,
+  asRound,
   asRulings,
   asSeeds,
   asStage,
@@ -42,64 +44,71 @@ import {
   asTarget,
   type GameState,
 } from './wire';
+import {
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  activeMembers as activeOf,
+  chainForStage,
+  drawSeeds as drawSeedsFrom,
+  promptKey,
+  computeSkips as skipsFor,
+  electHost as electHostOf,
+  effectiveLeader as leaderOf,
+  finalStage,
+  isEmptyTurn,
+  isGameOn,
+  isTurnPhase,
+  judgeFor,
+  mergeCell,
+  mergeChains,
+  nextShown,
+  phaseForStage,
+  playerForChain,
+  presentNames as presentOf,
+  prevFor,
+  promptsNeededFor,
+  tallyRulings as tally,
+  verdictForAdvance,
+  verdictForCell,
+  verdictForChainScored,
+  verdictForGameOver,
+  verdictForRevealStep,
+  verdictForRound,
+  verdictForToReveal,
+  verdictForViewAck,
+  type Cell,
+  type Chain,
+  type Phase,
+  type Position,
+  type Presence,
+  type Prev,
+  type Prompt,
+  type Verdict,
+} from './rules';
 
-export { NAME_MAX };
-
-// ---- Game model: the "telephone" chain (a Telestrations booklet) ----
-//
-// A Chain is an alternating list of cells. cells[0] is always a text prompt
-// (drawn from the shared pool). Odd indices are drawings, even indices (>=2)
-// are captions. Every stage advances every chain by exactly one cell, so all
-// players are doing the SAME action each stage (all drawing, or all captioning).
-//
-// `skip` marks the turn of a player who tapped Leave game while 3 or more
-// others carried on: they're out of the rotation, so their turn is passed
-// over (not shown at the reveal, no penalty). Every other missed turn is
-// filled in empty, under the name of the player who owed it.
-export type Cell =
-  | { kind: 'prompt'; text: string; author: string }
-  | { kind: 'drawing'; data: string; author: string; skip?: true }
-  | { kind: 'caption'; text: string; author: string; skip?: true };
-export type Chain = { cells: Cell[] };
-
-// What the local player must respond to this stage (the previous cell of their
-// assigned chain): text to illustrate, or a drawing to caption. 'blank' is a
-// guessing turn with no drawing anywhere before it in the chain (they all came
-// back empty): the player writes something for the next one to draw instead.
-export type Prev =
-  | { kind: 'prompt' | 'caption'; text: string }
-  | { kind: 'drawing'; data: string }
-  | { kind: 'blank' };
+// The game's rules live in ./rules (tested on their own); the screens take
+// what they need of them from here, as they always have.
+export { NAME_MAX, MAX_PLAYERS, MIN_PLAYERS, promptsNeededFor };
+export { isBlankCell, isEmptyTurn } from './rules';
+export type { Cell, Chain, Phase, Prev } from './rules';
 
 export type ConnStatus = 'connecting' | 'connected' | 'error';
-export type Phase = 'lobby' | 'prompts' | 'view' | 'draw' | 'caption' | 'reveal' | 'gameover';
 
-// A blank drawing — an empty canvas handed in, or the clock running out —
-// costs the player who owed it a point, whether they were here or away.
-export const isBlankCell = (c: Cell | undefined) => !!c && c.kind === 'drawing' && !c.skip && isBlankDrawing(c.data);
-
-// A turn with nothing in it: skipped, a blank drawing, or an empty guess. The
-// reveal marks it ✗ by itself (there's nothing to judge), or passes over it if
-// it was skipped, and the next player in the chain is handed the last turn
-// before it that has something in it (prevFor).
-export const isEmptyTurn = (c: Cell | undefined) =>
-  !!c && c.kind !== 'prompt' && (!!c.skip || (c.kind === 'drawing' ? isBlankDrawing(c.data) : !(c.text ?? '').trim()));
-
-const isSkipped = (c: Cell | undefined) => !!c && c.kind !== 'prompt' && !!c.skip;
-
-// Prompts needed to seed every chain of every round without ever repeating one.
-// Worst case is the "all players maxed, one winner" scenario: a player scores at
-// most (N-1) per round, so ⌈target ÷ (N-1)⌉ rounds, each seeding N chains.
-export const promptsNeededFor = (players: number, target: number) =>
-  players >= 2 ? Math.ceil(target / (players - 1)) * players : Math.max(1, players);
-
-// The telephone flow needs at least 3 players: with 2, the only person who could
-// write a chain's final caption is whoever wrote its prompt, so there is nothing
-// to actually guess.
-export const MIN_PLAYERS = 3;
-// The most a room holds. The server turns away a 13th ('room_full', join_room
-// in supabase/rooms.sql, which has the same number).
-export const MAX_PLAYERS = 12;
+// One player's turn: the chain they add to at a stage of a round. A screen
+// keeps the turn it was opened for, so what it hands in lands there even if
+// the game has moved on meanwhile (submitCell).
+export type Turn = { round: number; stage: number; chain: number };
+const turnKey = (t: Turn) => `${t.round}:${t.chain}:${t.stage}`;
+const sameTurn = (a: Turn | null, b: Turn | null) =>
+  !!a && !!b && a.round === b.round && a.stage === b.stage && a.chain === b.chain;
+type Handed = Turn & { cell: Cell; echoed: boolean; tries: number };
+// A turn handed in that hasn't come back from the channel after this long is
+// sent again, up to HAND_IN_TRIES times in all.
+const HAND_IN_RETRY_MS = 4000;
+const HAND_IN_TRIES = 3;
+// How long the judge's phone waits on an empty turn before marking it ✗, so a
+// turn being sent again (mend) can land first.
+const AUTO_RULE_MS = 2000;
 
 // Used to seed chains when nobody entered prompts (keeps a game from stalling).
 const FALLBACK_PROMPTS = [
@@ -148,11 +157,6 @@ export function entryMessage(status: EntryStatus, code = ''): string {
 
 const closedMessage = (code: string) => `Room ${code} closed after ${IDLE_MINUTES} minutes of inactivity.`;
 
-// The live channel's view of a player: they have the app open right now.
-// `synced` says their phone holds the game as it stands (it isn't still
-// catching up after coming back), which is what makes them fit to host.
-type Presence = { id: string; name: string; synced: boolean };
-
 type Game = {
   username: string;
   room: string;
@@ -185,13 +189,20 @@ type Game = {
   isJudge: boolean;
   promptCount: number; // prompts in the shared pool so far
   promptsNeeded: number; // pool size that auto-starts the game
+  // This player's turn this stage (null between turns, or watching), and when
+  // its clock runs out (epoch ms, this phone's time).
+  turn: Turn | null;
+  turnEndsAt: number;
   // Actions
   enterRoom: (room: string | null, username: string, rejoin?: boolean) => Promise<EntryStatus>;
+  // Back to the room's screen from elsewhere in the app (Home's Back to room).
+  returnToRoom: () => void;
   leaveRoom: () => void;
   startGame: (target: number) => void;
   addPrompt: (text: string) => void;
   readyView: (byHand?: boolean) => void;
-  submitCell: (data: string) => void;
+  submitCell: (data: string, forTurn?: Turn | null, closing?: boolean) => void;
+  passTurn: (forTurn?: Turn | null) => void;
   vote: (correct: boolean) => void;
 };
 
@@ -259,6 +270,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [revealStep, setRevealStep] = useState(0);
   const [rulings, setRulings] = useState<Record<number, boolean>>({});
   const [promptCount, setPromptCount] = useState(0);
+  // This player's turn this stage, and when its clock runs out (this phone's
+  // time), for the drawing and guessing screens.
+  const [turn, setTurn] = useState<Turn | null>(null);
+  const [turnEndsAt, setTurnEndsAt] = useState(0);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribedRef = useRef(false);
@@ -304,10 +319,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoRuleRef = useRef(''); // the empty turn the judge's phone last marked by itself
   const advancedForRef = useRef(-1); // highest stage we've already emitted an advance for
+  // The turns this player has handed in this round, by turnKey: each is sent
+  // again if it doesn't come back from the channel (handIn), or if the host's
+  // copy of the game turns up with it empty (mend).
+  const handedRef = useRef(new Map<string, Handed>());
+  // Turns this phone has sent again (or seen sent again) to mend the room's
+  // copy of the game, by turnKey; a pending one waits its turn (mend).
+  const mendRef = useRef(new Map<string, ReturnType<typeof setTimeout> | null>());
 
   // Prompt pool (all clients accumulate, for host-handover safety).
   const allPromptsRef = useRef<{ text: string; author: string }[]>([]);
   const poolRef = useRef<{ text: string; author: string }[]>([]);
+  // Prompts already handed out this game (every phone notes each round's), so
+  // a host taking over doesn't hand one out again (drawSeeds).
+  const usedRef = useRef<Map<string, Prompt>>(new Map());
+  // When this phone last started a game's prompts (a second start right
+  // after is the same tap twice, from two phones: to-prompts).
+  const promptsAtRef = useRef(0);
   const viewAcksRef = useRef<Set<string>>(new Set()); // who has tapped through Round 1
 
   const hostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -322,17 +350,65 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   };
   const stageStartedAtRef = useRef(0);
 
+  // ---- Getting around ----
+  // In the lobby or on the scoreboard, Back goes home and the player stays in
+  // the room: they can play solo, dress their pig, and come back with Home's
+  // Back to room (returnToRoom). When the game starts, or moves on, `go`
+  // brings them to its screen wherever they are. During a game Back does
+  // nothing (the hardware button here; the swipe is off on those screens in
+  // app/_layout.tsx): the only way out is Leave game.
+  const pathname = usePathname();
+  const pathRef = useRef(pathname);
+  // The room's screen as the game last put it (or the player left it), for
+  // Back to room.
+  const roomScreenRef = useRef('/lobby');
+  useEffect(() => {
+    pathRef.current = pathname;
+    if (isRoomScreen(pathname)) roomScreenRef.current = pathname;
+  }, [pathname]);
+  // To the room's screen `path`, however it's reached from here (./nav).
+  // The router takes its calls in order, so 'rehome' is one move.
+  const go = (path: string, force = false) => {
+    roomScreenRef.current = path;
+    const how = navFor(pathRef.current, path, force);
+    if (how === 'stay') return;
+    if (how === 'push') router.push(path);
+    else if (how === 'rehome') {
+      router.dismissTo('/');
+      router.push(path);
+    } else router.replace(path);
+    pathRef.current = path; // until the navigator says so (two in a row)
+  };
+  // Home's Back to room, and a link to the room already in. Join opened by
+  // a link tapped in the room sits over the room's screen: back down to it,
+  // as it was (a drawing in progress and all), not a fresh copy over it. If
+  // it isn't there, dismissTo puts it in Join's place.
+  const returnToRoom = () => {
+    if (!roomRef.current) return;
+    const path = roomScreenRef.current;
+    const here = pathRef.current;
+    if (here === path) return;
+    if (here === '/' || isRoomScreen(here)) return go(path, true);
+    router.dismissTo(path);
+    pathRef.current = path;
+  };
+  // Out of the room: home, unless the player is somewhere else already.
+  const goHome = () => {
+    if (isRoomScreen(pathRef.current)) router.dismissTo('/');
+  };
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () =>
+      holdsBack(!!roomRef.current, phaseRef.current, pathRef.current)
+    );
+    return () => sub.remove();
+  }, []);
+
   // ---- Who's here ----
   // Everyone still in the room (not left), oldest first: the round roster.
-  const activeMembers = () => membersRef.current.filter((m) => m.leftAt == null);
+  const activeMembers = () => activeOf(membersRef.current);
   const orderedNames = () => activeMembers().map((m) => m.name);
   // The ones with the app open right now.
-  const presentNames = () => {
-    const here = new Set(presenceRef.current.map((p) => p.id));
-    return activeMembers()
-      .filter((m) => here.has(m.id))
-      .map((m) => m.name);
-  };
+  const presentNames = () => presentOf(membersRef.current, presenceRef.current);
   // User ids of players still in the room but away, optionally only those
   // named (this round's roster) — who gets a "your turn" notification.
   const awayIds = (names?: string[]) => {
@@ -342,8 +418,36 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       .map((m) => m.id);
   };
 
-  const send = (event: string, payload: any = {}) =>
-    channelRef.current?.send({ type: 'broadcast', event, payload });
+  // Everything goes out in the order it's sent. A message too big for the
+  // channel goes in pieces (src/lib/chunks.ts), a moment apart so a burst of
+  // them stays inside the channel's rate limit; anything sent meanwhile waits
+  // its turn behind them, so nobody gets a stage before the game it belongs to.
+  const outboxRef = useRef<{ channel: RealtimeChannel; event: string; payload: unknown }[]>([]);
+  const sendingRef = useRef(false);
+  const pump = () => {
+    if (sendingRef.current) return;
+    const next = outboxRef.current.shift();
+    if (!next) return;
+    if (next.channel !== channelRef.current) return pump(); // left that room
+    sendingRef.current = true;
+    next.channel.send({ type: 'broadcast', event: next.event, payload: next.payload });
+    setTimeout(() => {
+      sendingRef.current = false;
+      pump();
+    }, next.event === 'chunk' ? CHUNK_GAP_MS : 0);
+  };
+  const send = (event: string, payload: any = {}) => {
+    const channel = channelRef.current;
+    if (!channel) return;
+    const pieces = split(event, payload, chunkId());
+    if (!pieces && !sendingRef.current && !outboxRef.current.length) {
+      channel.send({ type: 'broadcast', event, payload });
+      return;
+    }
+    if (pieces) for (const piece of pieces) outboxRef.current.push({ channel, event: 'chunk', payload: piece });
+    else outboxRef.current.push({ channel, event, payload });
+    pump();
+  };
 
   const track = () => {
     if (!subscribedRef.current) return;
@@ -353,6 +457,59 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       synced: syncedRef.current,
       avatar: wireAvatar(myAvatarRef.current),
     });
+  };
+
+  // Where this phone's game is, to hold each game message up against (./rules).
+  const position = (): Position => ({
+    phase: phaseRef.current,
+    round: roundRef.current,
+    stage: stageRef.current,
+    revealIndex: revealIndexRef.current,
+    revealStep: revealStepRef.current,
+    chains: chainsRef.current.length,
+  });
+
+  // Whether the app is on screen. Off it (another app, a locked phone, a
+  // hidden browser tab) the phone can't keep the game's clock, so it doesn't
+  // host (pause, updateHost).
+  const awakeRef = useRef(AppState.currentState !== 'background');
+
+  // Catch up from the host: this phone may have missed something (it was off
+  // screen or reconnected, or a message showed it was behind). Until the
+  // host's answer comes (onState) it isn't caught up, so it can't host, and
+  // the room elects someone who is. At most one ask every couple of seconds,
+  // unless `now` (a fresh connection always asks).
+  const lastResyncRef = useRef(0);
+  const resync = (now = false) => {
+    if (!roomRef.current || !subscribedRef.current) return; // connecting asks once it's in
+    const t = Date.now();
+    if (!now && t - lastResyncRef.current < 2000) return;
+    lastResyncRef.current = t;
+    syncedRef.current = false;
+    track();
+    send('request-state', { username: usernameRef.current });
+    updateHost();
+  };
+
+  // Off screen mid-game: whatever its timers would do when the phone wakes
+  // may be long out of date, so it stops hosting at once (saving the game
+  // to the server first, for whoever picks it up), and tells the room it
+  // isn't caught up, so the host passes to someone who's here. Back on
+  // screen it catches up (resync). In the lobby and on the scoreboard
+  // there's no clock to keep, and the host stays put.
+  const pause = () => {
+    if (!roomRef.current || !isGameOn(phaseRef.current)) return;
+    if (snapTimerRef.current) {
+      clearTimeout(snapTimerRef.current);
+      snapTimerRef.current = null;
+    }
+    if (isHostRef.current && syncedRef.current) saveSnapshot(roomRef.current, buildState());
+    clearHostTimer();
+    clearStartDelay();
+    isHostRef.current = false;
+    hostRef.current = ''; // so hosting again later arms a fresh clock (updateHost)
+    syncedRef.current = false;
+    track();
   };
 
   const addGameNames = (...lists: string[][]) => {
@@ -414,6 +571,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     phaseRef.current = p;
     setPhase(p);
     stageStartedAtRef.current = Date.now();
+    setTurnEndsAt(stageStartedAtRef.current + durationFor(p) * 1000);
     armForCurrentStage(true);
   };
 
@@ -436,6 +594,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     promptCount: allPromptsRef.current.length,
     prompts: allPromptsRef.current,
     pool: poolRef.current,
+    used: [...usedRef.current.values()],
     viewAcks: [...viewAcksRef.current],
     stageStartedAt: stageStartedAtRef.current,
     savedAt: lastChangeRef.current,
@@ -453,36 +612,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }, 800);
   };
 
-  // ---- Chain assignment (pure, computed on every client) ----
-  // At stage s, player at roster position `pos` handles chain (pos - s) mod N.
-  // Over stages 1..N-1 this hands each chain to every player except (implicitly)
-  // never lets anyone touch the same chain twice.
-  const chainForStage = (pos: number, s: number, n: number) => ((pos - s) % n + n) % n;
-
-  // What the player handed `chain` at stage s responds to: the cell before
-  // theirs, or, when that turn came back empty, the last one before it that
-  // has something in it, so a chain never dies on a blank. A drawing turn
-  // always finds text (the prompt at worst); a guessing turn with no drawing
-  // anywhere before it gets 'blank'.
-  const prevFor = (chain: Chain | undefined, s: number): Prev | null => {
-    if (!chain) return null;
-    const wantDrawing = s % 2 === 0;
-    for (let i = s - 1; i >= 0; i--) {
-      const c = chain.cells[i];
-      if (!c || isEmptyTurn(c)) continue;
-      if (wantDrawing && c.kind === 'drawing') return { kind: 'drawing', data: c.data };
-      if (!wantDrawing && c.kind !== 'drawing') return { kind: c.kind, text: c.text };
-    }
-    return wantDrawing ? { kind: 'blank' } : null;
-  };
-
+  // ---- Chain assignment (./rules: chainForStage, prevFor) ----
   const routeForStage = (s: number) => {
     stageRef.current = s;
     setStage(s);
     const roster = rosterRef.current;
     const n = roster.length;
     // Stage 0 = Round 1 "view": read the prompt for the chain you own + judge.
-    const p: Phase = s === 0 ? 'view' : s % 2 === 1 ? 'draw' : 'caption';
+    const p = phaseForStage(s);
     const myPos = roster.indexOf(usernameRef.current);
     // A new turn: away players in the rotation get a notification (once
     // until they're back; the server keeps count).
@@ -491,7 +628,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // Not part of this round's roster -> watch.
       myChainRef.current = -1;
       setPrev(null);
-      router.replace('/waiting');
+      setTurn(null);
+      go('/waiting');
       beginStage(p);
       return;
     }
@@ -499,51 +637,97 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // chain you own — the one you'll judge at the end.
     const c = chainForStage(myPos, s, n);
     myChainRef.current = c;
+    setTurn({ round: roundRef.current, stage: s, chain: c });
     if (s === 0) {
       const seed = chainsRef.current[c]?.cells[0];
       setPrev(seed && seed.kind !== 'drawing' ? { kind: seed.kind, text: seed.text } : null);
-      router.replace('/view');
+      go('/view');
       beginStage('view');
       return;
     }
     setPrev(prevFor(chainsRef.current[c], s));
-    router.replace(p === 'draw' ? '/drawing' : '/guessing');
+    go(p === 'draw' ? '/drawing' : '/guessing');
     beginStage(p);
   };
 
-  // Who is out of this round's rotation: roster players who tapped Leave game,
-  // taken in the order they left, while 3 or more of the roster were still in
-  // after them. Worked out from the server's list on every phone alike, so a
-  // host handover agrees on it.
-  const computeSkips = () => {
-    const skip = new Set<string>();
-    const p = phaseRef.current;
-    if (p === 'view' || p === 'draw' || p === 'caption') {
-      const roster = rosterRef.current;
-      const leftAt = new Map(membersRef.current.filter((m) => m.leftAt != null).map((m) => [m.name, m.leftAt as number]));
-      const gone = roster.filter((nm) => leftAt.has(nm)).sort((a, b) => leftAt.get(a)! - leftAt.get(b)!);
-      let remaining = roster.length;
-      for (const nm of gone) {
-        remaining -= 1;
-        if (remaining >= MIN_PLAYERS) skip.add(nm);
-      }
-    }
-    skipRef.current = skip;
+  // The turn this player is on right now, if any.
+  const currentTurn = (): Turn | null =>
+    isTurnPhase(phaseRef.current) && myChainRef.current >= 0
+      ? { round: roundRef.current, stage: stageRef.current, chain: myChainRef.current }
+      : null;
+
+  // ---- Handing a turn in, and mending one that went missing ----
+  // A turn goes out on the channel and comes back to this phone too (every
+  // phone hears its own messages): back, it reached the room. If it doesn't
+  // come back within HAND_IN_RETRY_MS it's sent again, a couple of times,
+  // while its round lasts.
+  const sendHanded = (h: Handed) => {
+    h.tries += 1;
+    send('cell', { round: h.round, chain: h.chain, stage: h.stage, cell: h.cell });
+    setTimeout(() => {
+      if (handedRef.current.get(turnKey(h)) !== h || h.echoed || h.tries >= HAND_IN_TRIES) return;
+      if (!roomRef.current || roundRef.current !== h.round || !isGameOn(phaseRef.current)) return;
+      sendHanded(h);
+    }, HAND_IN_RETRY_MS);
+  };
+  const handIn = (t: Turn, cell: Cell) => {
+    const h: Handed = { ...t, cell, echoed: false, tries: 0 };
+    handedRef.current.set(turnKey(t), h);
+    sendHanded(h);
   };
 
-  // ---- Prompt pool ----
-  const drawSeeds = (n: number): { text: string; author: string }[] => {
-    if (poolRef.current.length < n) {
-      const source = allPromptsRef.current.length
-        ? allPromptsRef.current
-        : FALLBACK_PROMPTS.map((t) => ({ text: t, author: '' }));
-      poolRef.current = shuffle(source);
-    }
-    const seeds: { text: string; author: string }[] = [];
-    for (let i = 0; i < n; i++) {
-      seeds.push(poolRef.current.shift() ?? { text: FALLBACK_PROMPTS[i % FALLBACK_PROMPTS.length], author: '' });
-    }
-    return seeds;
+  // The host's copy of the game (its next-stage message, the reveal's
+  // chains, its answer to a phone catching up) has turn `t` empty, but this
+  // phone has it with something in it: the turn never reached the host,
+  // which filled it in blank. Send it again so every phone mends its copy
+  // (mergeCell keeps the real one). The player who handed it in sends it at
+  // once; anyone else who has it waits a moment and only sends it if nobody
+  // has meanwhile (the player may be away). Once per turn.
+  const mend = (t: Turn, incoming: Cell | undefined) => {
+    if (incoming && !isEmptyTurn(incoming)) return;
+    const key = turnKey(t);
+    if (mendRef.current.has(key)) return;
+    const mine = handedRef.current.get(key);
+    const have = mine?.cell ?? chainsRef.current[t.chain]?.cells[t.stage];
+    if (!have || isEmptyTurn(have)) return;
+    const resend = () => {
+      mendRef.current.set(key, null);
+      if (!roomRef.current || roundRef.current !== t.round || !isGameOn(phaseRef.current)) return;
+      console.log('[game] mending turn', key);
+      send('cell', { round: t.round, chain: t.chain, stage: t.stage, cell: have });
+    };
+    if (mine) resend();
+    else mendRef.current.set(key, setTimeout(resend, 400 + Math.random() * 1200));
+  };
+  // A turn this phone is waiting to send again arrived with something in it
+  // (someone else mended it first): nobody else need. (A turn simply handed
+  // in leaves mendRef alone, so it can still be mended if the host turns
+  // out to have missed it.)
+  const mended = (key: string) => {
+    const pending = mendRef.current.get(key);
+    if (pending === undefined) return;
+    if (pending) clearTimeout(pending);
+    mendRef.current.set(key, null);
+  };
+  const forgetTurns = () => {
+    handedRef.current.clear();
+    for (const pending of mendRef.current.values()) if (pending) clearTimeout(pending);
+    mendRef.current.clear();
+  };
+
+  // Who is out of this round's rotation (./rules computeSkips).
+  const computeSkips = () => {
+    skipRef.current = skipsFor(phaseRef.current, rosterRef.current, membersRef.current);
+  };
+
+  // ---- Prompt pool (./rules drawSeeds) ----
+  const drawSeeds = (n: number): Prompt[] => {
+    const drawn = drawSeedsFrom(poolRef.current, allPromptsRef.current, new Set(usedRef.current.keys()), n, shuffle, FALLBACK_PROMPTS);
+    poolRef.current = drawn.pool;
+    return drawn.seeds;
+  };
+  const noteUsed = (prompts: Prompt[]) => {
+    for (const p of prompts) usedRef.current.set(promptKey(p), p);
   };
 
   // ---- Round lifecycle (host emits, everyone reacts) ----
@@ -557,31 +741,32 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     roundRef.current = 0;
     const roster = orderedNames();
     if (roster.length < MIN_PLAYERS) {
-      send('game-over', {});
+      send('game-over', { round: 0 });
       return;
     }
     send('round', { round: 0, roster, seeds: drawSeeds(roster.length), leader: roster[0] });
   };
 
+  // The round number moves on when the 'round' message comes back (onRound),
+  // on every phone alike, the host's included.
   const nextRound = () => {
     if (!isHostRef.current) return;
-    roundRef.current += 1;
+    const next = roundRef.current + 1;
     const roster = orderedNames();
     if (roster.length < MIN_PLAYERS) {
-      send('game-over', {});
+      send('game-over', { round: roundRef.current });
       return;
     }
     send('round', {
-      round: roundRef.current,
+      round: next,
       roster,
       seeds: drawSeeds(roster.length),
-      leader: roster[roundRef.current % roster.length],
+      leader: roster[next % roster.length],
     });
   };
 
-  // Which roster position is responsible for chain c this stage (inverse of the
-  // chainForStage assignment): pos = (c + s) mod n.
-  const assignedPlayer = (c: number, s: number, n: number) => rosterRef.current[(c + s) % n];
+  // Who is responsible for chain c this stage (the inverse of chainForStage).
+  const assignedPlayer = (c: number, s: number) => playerForChain(rosterRef.current, c, s);
 
   const forceAdvance = () => {
     if (!isHostRef.current) return;
@@ -592,7 +777,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // turn for someone out of the rotation.
     chainsRef.current.forEach((ch, c) => {
       if (ch.cells[s]) return;
-      const who = n ? (assignedPlayer(c, s, n) ?? '') : '';
+      const who = n ? (assignedPlayer(c, s) ?? '') : '';
       const skip = skipRef.current.has(who) ? { skip: true as const } : {};
       ch.cells[s] =
         s % 2 === 1
@@ -602,22 +787,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     doAdvance();
   };
 
-  // Production runs stages 1..(n-1): each of the n-1 players who don't OWN a chain
-  // adds exactly one cell to it, so by the end everyone has touched every chain
-  // (the owner via the Round 1 view). Scoring judges every cell against the
-  // original prompt, so it doesn't matter whether the last cell is a drawing.
-  const finalStage = (n: number) => Math.max(1, n - 1);
-
+  // Production runs stages 1..finalStage(n) (./rules).
   const doAdvance = () => {
     if (!isHostRef.current) return;
     const s = stageRef.current;
     if (advancedForRef.current >= s) return; // already advanced past this stage
     advancedForRef.current = s;
     const n = rosterRef.current.length;
+    const round = roundRef.current;
     if (s >= finalStage(n)) {
-      send('to-reveal', { chains: chainsRef.current });
+      send('to-reveal', { round, chains: chainsRef.current });
     } else {
-      send('advance', { stage: s + 1, cells: chainsRef.current.map((ch) => ch.cells[s]) });
+      send('advance', { round, stage: s + 1, cells: chainsRef.current.map((ch) => ch.cells[s]) });
     }
   };
 
@@ -633,7 +814,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (n === 0) return;
     const filled = chainsRef.current.filter((ch) => ch.cells[s]).length;
     const settled = chainsRef.current.every(
-      (ch, c) => ch.cells[s] || skipRef.current.has(assignedPlayer(c, s, n))
+      (ch, c) => ch.cells[s] || skipRef.current.has(assignedPlayer(c, s) ?? '')
     );
     console.log('[game] stage', s, '—', filled, 'of', n, 'cells in, settled:', settled);
     if (settled) {
@@ -686,10 +867,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setScores({});
     allPromptsRef.current = [];
     poolRef.current = [];
+    usedRef.current = new Map();
     setPromptCount(0);
     chainsRef.current = [];
     setChains([]);
     roundRef.current = 0;
+    forgetTurns();
     gameNamesRef.current = new Set();
     setGameNames([]);
     dbPhaseRef.current = 'playing';
@@ -698,7 +881,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       syncedRef.current = true;
       track();
     }
-    router.replace('/prompts');
+    go('/prompts');
     beginStage('prompts');
     changed();
   };
@@ -727,6 +910,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const onRound = (round: number, roster: string[], seeds: { text: string; author: string }[], lead: string) => {
     clearStartDelay();
     roundRef.current = round;
+    forgetTurns();
+    noteUsed(seeds);
     rosterRef.current = roster;
     addGameNames(roster);
     leaderRef.current = lead;
@@ -746,32 +931,47 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     changed();
   };
 
+  // A turn handed in (or sent again to mend the room's copy). One already
+  // ruled at the reveal stays as it was judged.
   const onCell = (chain: number, s: number, cell: Cell) => {
     if (!chainsRef.current[chain]) return;
-    chainsRef.current[chain].cells[s] = cell;
+    const key = turnKey({ round: roundRef.current, chain, stage: s });
+    const mine = handedRef.current.get(key);
+    if (mine && cell.author === usernameRef.current) mine.echoed = true; // it reached the room
+    if (!isEmptyTurn(cell)) mended(key);
+    if (phaseRef.current === 'reveal' && chain === revealIndexRef.current && rulingsRef.current[s] !== undefined) return;
+    chainsRef.current[chain].cells[s] = mergeCell(chainsRef.current[chain].cells[s], cell) as Cell;
     setChains(chainsRef.current.map((c) => ({ cells: [...c.cells] })));
     if (s === stageRef.current) maybeAdvanceStage();
     changed();
   };
 
+  // The host's copy of the stage just played comes with the next one: a
+  // turn it has empty that this phone has real is kept (mergeCell), and sent
+  // again so the host and everyone else get it too (mend).
   const onAdvance = (newStage: number, cells: Cell[]) => {
+    const round = roundRef.current;
     cells.forEach((cell, i) => {
-      if (chainsRef.current[i] && cell) chainsRef.current[i].cells[newStage - 1] = cell;
+      if (!chainsRef.current[i] || !cell) return;
+      mend({ round, chain: i, stage: newStage - 1 }, cell);
+      chainsRef.current[i].cells[newStage - 1] = mergeCell(chainsRef.current[i].cells[newStage - 1], cell) as Cell;
     });
     setChains(chainsRef.current.map((c) => ({ cells: [...c.cells] })));
     routeForStage(newStage);
     changed();
   };
 
-  // The reveal shows a chain's cells from 1 on, passing over skipped turns.
-  // The first one shown after `from`; past the end means nothing is left.
-  const nextShown = (chain: Chain | undefined, from: number) => {
-    let i = from + 1;
-    while (chain && i < chain.cells.length && isSkipped(chain.cells[i])) i++;
-    return i;
+  // Every phone's copy of each turn, checked against the host's (onAdvance).
+  const mendAll = (incoming: Chain[], upTo: number) => {
+    const round = roundRef.current;
+    incoming.forEach((chain, c) => {
+      for (let s = 1; s <= upTo; s++) mend({ round, chain: c, stage: s }, chain.cells[s]);
+    });
   };
 
-  const onToReveal = (rvChains: Chain[]) => {
+  const onToReveal = (incoming: Chain[]) => {
+    mendAll(incoming, finalStage(rosterRef.current.length));
+    const rvChains = mergeChains(chainsRef.current, incoming);
     chainsRef.current = rvChains;
     setChains(rvChains);
     revealIndexRef.current = 0;
@@ -781,54 +981,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     rulingsRef.current = {};
     talliedRef.current = {};
     setRulings({});
-    router.replace('/reveal');
+    go('/reveal');
     beginStage('reveal');
     maybeAutoRule();
     changed();
   };
 
-  // Judge = the chain's original prompt author, if they have the app open;
-  // otherwise the round leader / host takes over so a chain never stalls on
-  // someone who isn't there.
-  const judgeForChain = (chainIdx: number, names: string[]) => {
-    const first = chainsRef.current[chainIdx]?.cells[0];
-    const author = first && first.kind === 'prompt' ? first.author : '';
-    if (author && names.includes(author)) return author;
-    return effectiveLeader(names);
-  };
+  // Judge = the chain's original prompt author if they have the app open,
+  // else the round leader / host (./rules judgeFor).
+  const judgeForChain = (chainIdx: number, names: string[]) =>
+    judgeFor(chainsRef.current[chainIdx], names, leaderRef.current);
 
-  // Score rulings as they land: every drawing or guess the judge marked as
-  // matching the ORIGINAL PROMPT earns that cell's author +1, the moment the
-  // judge rules it. (So both correct guesses and the drawings that faithfully
-  // carried the prompt score.) Every blank drawing costs its author 1, when
-  // the reveal reaches it or, at the latest, when its chain is committed
-  // (`final`). Each cell is counted once — talliedRef remembers which of the
-  // current chain's cells are already in the totals — so the ✓ beat, the
-  // chain's final commit and the host's timeout fallback all pass through
-  // here without double-counting.
+  // Score rulings as they land (./rules tallyRulings), each cell once.
   const tallyRulings = (chain: Chain, ruled: Record<number, boolean>, final = false) => {
-    let changedScores = false;
-    chain.cells.forEach((c, i) => {
-      if (!c || c.kind === 'prompt' || talliedRef.current[i] !== undefined) return;
-      const blank = isBlankCell(c);
-      if (ruled[i] === undefined && !(final && blank)) return;
-      talliedRef.current[i] = ruled[i] ?? false;
-      if (!c.author) return;
-      if (blank) {
-        scoresRef.current[c.author] = (scoresRef.current[c.author] ?? 0) - 1;
-        changedScores = true;
-      } else if (ruled[i] && !c.skip) {
-        scoresRef.current[c.author] = (scoresRef.current[c.author] ?? 0) + 1;
-        changedScores = true;
-      }
-    });
-    if (changedScores) setScores({ ...scoresRef.current });
+    if (tally(chain, ruled, talliedRef.current, scoresRef.current, final)) setScores({ ...scoresRef.current });
   };
 
   // Host-only fallback: if the judge stalls, commit whatever rulings exist and move on.
   const forceRevealChain = () => {
     if (!isHostRef.current) return;
-    send('chain-scored', { chain: revealIndexRef.current, rulings: rulingsRef.current });
+    send('chain-scored', { round: roundRef.current, chain: revealIndexRef.current, rulings: rulingsRef.current });
   };
 
   // Judge stepped the reveal cursor or ruled a guess — mirror it to everyone.
@@ -859,7 +1031,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (next >= chainsRef.current.length) {
       if (isHostRef.current) {
         const won = Object.values(scoresRef.current).some((v) => v >= targetRef.current);
-        if (won) send('game-over', {});
+        if (won) send('game-over', { round: roundRef.current });
         else nextRound();
       }
     } else {
@@ -874,15 +1046,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dbPhaseRef.current = 'lobby';
     // The room opens to newcomers again and the server forgets the game.
     if (isHostRef.current) endGameOnServer(roomRef.current);
-    router.replace('/scoreboard');
+    go('/scoreboard');
     beginStage('gameover');
   };
 
   // ---- Reconnect / late-join state sync ----
   // Only a host that is itself caught up answers.
+  // `sentAt` is the host's clock as it sends, so the phone catching up can
+  // tell how far into the stage the game is without the two clocks agreeing.
   const onRequestState = (who: string) => {
     if (!isHostRef.current || !syncedRef.current) return;
-    send('state', { to: who, ...buildState() });
+    send('state', { to: who, ...buildState(), sentAt: Date.now() });
   };
 
   // Take on the game as `st` describes it (the host's answer, or the
@@ -898,12 +1072,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       (st.stage ?? 0) === stageRef.current &&
       (st.round ?? 0) === roundRef.current &&
       (st.revealIndex ?? 0) === revealIndexRef.current;
+    // The same round of the same game: this phone's turns are kept where the
+    // host's copy has them empty, and sent again for everyone (mend).
+    const sameRound = isGameOn(p) && isGameOn(phaseRef.current) && (st.round ?? 0) === roundRef.current;
+    const incoming = st.chains ?? [];
+    if (sameRound) mendAll(incoming, p === 'reveal' ? finalStage(st.roster?.length ?? 0) : (st.stage ?? 0) - 1);
     targetRef.current = st.target ?? 5;
     setTarget(targetRef.current);
     leaderRef.current = st.leader ?? '';
     roundRef.current = st.round ?? 0;
     rosterRef.current = st.roster ?? [];
-    chainsRef.current = st.chains ?? [];
+    chainsRef.current = sameRound ? mergeChains(chainsRef.current, incoming) : incoming;
     setChains(chainsRef.current);
     scoresRef.current = st.scores ?? {};
     setScores({ ...scoresRef.current });
@@ -917,6 +1096,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setRulings(rulingsRef.current);
     if (Array.isArray(st.prompts)) allPromptsRef.current = st.prompts;
     if (Array.isArray(st.pool)) poolRef.current = st.pool;
+    // The prompts handed out so far (a host from before this was kept sends
+    // none: this round's own are known from its chains, at least).
+    usedRef.current = new Map();
+    noteUsed(st.used);
+    noteUsed(chainsRef.current.map((c) => c.cells[0]).filter((c): c is Extract<Cell, { kind: 'prompt' }> => c?.kind === 'prompt'));
     viewAcksRef.current = new Set(Array.isArray(st.viewAcks) ? st.viewAcks : []);
     setPromptCount(st.promptCount ?? allPromptsRef.current.length);
     advancedForRef.current = (st.stage ?? 0) - 1;
@@ -927,22 +1111,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } else if (p === 'view' || p === 'draw' || p === 'caption') {
       routeForStage(st.stage ?? (p === 'view' ? 0 : 1));
     } else if (p === 'reveal') {
-      router.replace('/reveal');
+      go('/reveal');
       beginStage('reveal');
     } else if (p === 'gameover') {
-      router.replace('/scoreboard');
+      go('/scoreboard');
       beginStage('gameover');
     } else if (p === 'prompts') {
-      router.replace('/prompts');
+      go('/prompts');
       beginStage('prompts');
     } else {
+      // The lobby: only if this phone isn't in it already (./nav lobbyOnCatchUp).
+      const was = phaseRef.current;
       phaseRef.current = 'lobby';
       setPhase('lobby');
-      router.replace('/lobby');
+      if (lobbyOnCatchUp(was, pathRef.current)) go('/lobby');
     }
-    // The clock carries on from where the stage started, not from now.
+    // The clock carries on from where the stage started, not from now: in
+    // this phone's time, from the sender's own reading as it sent this
+    // (sentAt). A snapshot has none, and is read as if the clocks agree.
     if (typeof st.stageStartedAt === 'number' && st.stageStartedAt > 0) {
-      stageStartedAtRef.current = st.stageStartedAt;
+      const elapsed = st.sentAt ? Math.max(0, st.sentAt - st.stageStartedAt) : Date.now() - st.stageStartedAt;
+      stageStartedAtRef.current = Date.now() - elapsed;
+      if (!same) setTurnEndsAt(stageStartedAtRef.current + durationFor(p) * 1000);
       if (isHostRef.current) armForCurrentStage(false);
     }
     lastChangeRef.current = Math.max(lastChangeRef.current, Number(st.savedAt) || 0);
@@ -990,11 +1180,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (res.phase !== 'playing') {
         // No game on (or it ended while this phone was away): the lobby, unless
         // this phone is already looking at the final scores.
-        if (midGame) {
+        if (lobbyOnCatchUp(local, pathRef.current)) {
           clearHostTimer();
           phaseRef.current = 'lobby';
           setPhase('lobby');
-          router.replace('/lobby');
+          go('/lobby');
         }
         return markSynced();
       }
@@ -1011,7 +1201,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         dbPhaseRef.current = 'lobby';
         return markSynced();
       }
-      send('state', { to: '*', ...buildState() });
+      send('state', { to: '*', ...buildState(), sentAt: Date.now() });
       changed();
       maybePromptsComplete();
       maybeAdvanceView();
@@ -1020,19 +1210,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }, 1200);
   };
 
-  // Elect the host from who's here: the longest in among those caught up,
-  // or, if nobody is, the longest in (who then restores the game).
-  const electHost = () => {
-    const here = new Map(presenceRef.current.map((p) => [p.id, p]));
-    const present = activeMembers().filter((m) => here.has(m.id));
-    const synced = present.filter((m) => here.get(m.id)!.synced);
-    return (synced[0] ?? present[0])?.name ?? '';
-  };
+  // Elect the host from who's here (./rules electHost).
+  const electHost = () => electHostOf(membersRef.current, presenceRef.current);
 
   const updateHost = () => {
     const hostName = electHost();
     const me = usernameRef.current;
-    const iAmHostNow = hostName !== '' && hostName === me;
+    // Never while off screen (pause): its presence says it isn't caught up,
+    // so the rest of the room elects someone else.
+    const iAmHostNow = hostName !== '' && hostName === me && (awakeRef.current || !isGameOn(phaseRef.current));
     const becameHost = iAmHostNow && hostRef.current !== me;
     hostRef.current = hostName;
     setHost(hostName);
@@ -1063,7 +1249,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (elect) updateHost();
   };
 
-  // Fetch who's in the room again (the server says when it changes).
+  // Fetch who's in the room again (the server says when it changes). If the
+  // server has a game on and this phone doesn't, or the other way round,
+  // this phone missed it starting or ending (it was off screen): catch up.
   const refreshMembers = async () => {
     const code = roomRef.current;
     if (!code) return;
@@ -1073,6 +1261,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (res.status !== 'ok') return;
     dbPhaseRef.current = res.phase;
     setMembers(res.members);
+    if ((res.phase === 'playing') !== isGameOn(phaseRef.current)) resync();
   };
 
   // ---- Public actions ----
@@ -1091,7 +1280,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!supabaseReady) return 'no_keys';
     if (code && code === roomRef.current) {
       // Already in it: back to wherever that game is.
-      if (router.canGoBack()) router.back();
+      returnToRoom();
       return 'ok';
     }
     const res = code ? await joinRoom(code, user, rejoin) : await createRoom(user);
@@ -1140,17 +1329,44 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // Any member can send anything (a changed app isn't held to this one's
     // rules), so every message is read through ./wire, and a handler that
     // still throws is caught: a malformed message is ignored, never a crash.
-    const on = (event: string, handle: (p: Record<string, unknown>) => void) =>
-      channel.on('broadcast', { event }, ({ payload }) => {
-        try {
-          handle(asObj(payload));
-        } catch (e) {
-          console.warn(`[realtime] ignored a bad '${event}' message:`, e);
-        }
-      });
+    // A message that came in pieces (src/lib/chunks.ts) is put back together
+    // and handed to the same handler as if it had come whole.
+    const handlers = new Map<string, (p: Record<string, unknown>) => void>();
+    const deliver = (event: string, payload: unknown) => {
+      const handle = handlers.get(event);
+      if (!handle) return;
+      try {
+        handle(asObj(payload));
+      } catch (e) {
+        console.warn(`[realtime] ignored a bad '${event}' message:`, e);
+      }
+    };
+    const on = (event: string, handle: (p: Record<string, unknown>) => void) => {
+      handlers.set(event, handle);
+      channel.on('broadcast', { event }, ({ payload }) => deliver(event, payload));
+    };
+    const joiner = new Joiner();
+    channel.on('broadcast', { event: 'chunk' }, ({ payload }) => {
+      const whole = joiner.add(payload);
+      if (whole) deliver(whole.event, whole.payload);
+    });
+    // Game messages are held up against where this phone's game is first
+    // (./rules, "Messages that come late"): applied, ignored as late, or the
+    // cue to catch up from the host.
+    const fits = (event: string, verdict: Verdict) => {
+      if (verdict === 'apply') return true;
+      console.log(`[realtime] '${event}':`, verdict === 'stale' ? 'late, ignored' : 'missed something, catching up');
+      if (verdict === 'resync') resync();
+      return false;
+    };
     on('to-prompts', (p) => {
       const t = asTarget(p.target);
-      if (t !== null) onToPrompts(t);
+      if (t === null) return;
+      // Two players tapping New game together send two: the second, a moment
+      // after the first, would empty the trough everyone has started filling.
+      if (phaseRef.current === 'prompts' && Date.now() - promptsAtRef.current < 10_000) return;
+      promptsAtRef.current = Date.now();
+      onToPrompts(t);
     });
     on('prompt', (p) => {
       const prompt = asPrompt(p);
@@ -1158,38 +1374,49 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
     on('view-ack', (p) => {
       const who = cleanName(p.username);
-      if (who) onViewAck(who);
+      if (who && fits('view-ack', verdictForViewAck(position(), asRound(p.round)))) onViewAck(who);
     });
     on('round', (p) => {
       const round = asInt(p.round, 0, 100_000);
       const roster = asRoster(p.roster);
       const seeds = asSeeds(p.seeds);
-      if (round !== null && roster && seeds) onRound(round, roster, seeds, cleanName(p.leader));
+      if (round === null || !roster || !seeds) return;
+      if (fits('round', verdictForRound(position(), round))) onRound(round, roster, seeds, cleanName(p.leader));
     });
     on('cell', (p) => {
       const chain = asIndex(p.chain);
       const stage = asStage(p.stage);
       const cell = asCell(p.cell);
-      if (chain !== null && stage !== null && cell) onCell(chain, stage, cell);
+      if (chain === null || stage === null || !cell) return;
+      if (fits('cell', verdictForCell(position(), chain, stage, asRound(p.round)))) onCell(chain, stage, cell);
     });
     on('advance', (p) => {
       const stage = asStage(p.stage);
-      if (stage) onAdvance(stage, asCells(p.cells));
+      if (!stage) return;
+      if (fits('advance', verdictForAdvance(position(), stage, asRound(p.round)))) onAdvance(stage, asCells(p.cells));
     });
     on('to-reveal', (p) => {
       const chains = asChains(p.chains);
-      if (chains) onToReveal(chains);
+      if (chains && fits('to-reveal', verdictForToReveal(position(), asRound(p.round)))) onToReveal(chains);
     });
     on('reveal-state', (p) => {
       const chain = asIndex(p.chain);
       const step = asStage(p.step);
-      if (chain !== null && step !== null) onRevealState(chain, step, asRulings(p.rulings));
+      if (chain === null || step === null) return;
+      if (fits('reveal-state', verdictForRevealStep(position(), chain, step, asRound(p.round)))) {
+        onRevealState(chain, step, asRulings(p.rulings));
+      }
     });
     on('chain-scored', (p) => {
       const chain = asIndex(p.chain);
-      if (chain !== null) onChainScored(chain, asRulings(p.rulings));
+      if (chain === null) return;
+      if (fits('chain-scored', verdictForChainScored(position(), chain, asRound(p.round)))) {
+        onChainScored(chain, asRulings(p.rulings));
+      }
     });
-    on('game-over', () => onGameOver());
+    on('game-over', (p) => {
+      if (fits('game-over', verdictForGameOver(position(), asRound(p.round)))) onGameOver();
+    });
     on('request-state', (p) => {
       const who = cleanName(p.username);
       if (who) onRequestState(who);
@@ -1235,9 +1462,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setStatusDetail('');
         // Connected again after being away: the game may have moved on, so
         // catch up before hosting anything.
-        syncedRef.current = false;
-        track();
-        channel.send({ type: 'broadcast', event: 'request-state', payload: { username: user } });
+        resync(true);
         refreshMembers();
       } else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') {
         subscribedRef.current = false;
@@ -1248,7 +1473,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    router.push('/lobby');
+    // The lobby goes right over home (Create or Join go, and whatever Join
+    // was opened over), so Back from it goes home, still in the room. A game
+    // already on (coming back to it
+    // after the app closed) shows the waiting screen until the host's answer
+    // brings this phone to the game's own screen (applyState): not the lobby
+    // first, and then the game.
+    go(dbPhaseRef.current === 'playing' ? '/waiting' : '/lobby', true);
     // The first lobby is where the phone asks to send notifications.
     registerForPush(true);
   };
@@ -1260,6 +1491,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
     snapTimerRef.current = null;
+    forgetTurns();
+    outboxRef.current = [];
     clearSession();
     const channel = channelRef.current;
     channelRef.current = null;
@@ -1281,6 +1514,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     scoresRef.current = {};
     allPromptsRef.current = [];
     poolRef.current = [];
+    usedRef.current = new Map();
     setPhase('lobby');
     setMembersState([]);
     setPresentIds([]);
@@ -1292,9 +1526,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setChains([]);
     setScores({});
     setPrev(null);
+    setTurn(null);
   };
 
-  // Leave game: the only way out of a room, short of it closing.
+  // Leave game: the only way out of a room, short of it closing. Back to the
+  // home screen.
   const leaveRoom = () => {
     const code = roomRef.current;
     if (code) {
@@ -1303,13 +1539,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       });
     }
     resetLocal();
+    goHome();
   };
 
-  // The room closed under us (idle too long): back to the home screen.
+  // The room closed under us (idle too long): back to the home screen, from
+  // the room's screens (a player looking around elsewhere stays there).
   const closeLocally = (message: string) => {
     if (!roomRef.current) return;
     resetLocal();
-    router.replace('/');
+    goHome();
     showToast(message, 4000);
   };
 
@@ -1321,14 +1559,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     registerForPush(false); // keeps the server's copy of the token fresh
   }, []);
 
-  // Back in the app: that counts as activity, the room may have closed (or
-  // changed) meanwhile, and the connection may need a nudge to come back.
+  // Off screen mid-game, the phone stops hosting (pause). Back in the app:
+  // that counts as activity, the room may have closed (or changed)
+  // meanwhile, the connection may need a nudge to come back, and the game
+  // may have moved on without this phone, so it catches up (resync; if the
+  // game started or ended meanwhile, refreshMembers notices).
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'background') {
+        awakeRef.current = false;
+        pause();
+        return;
+      }
+      if (s !== 'active') return;
+      awakeRef.current = true;
       const code = roomRef.current;
-      if (s !== 'active' || !code) return;
+      if (!code) return;
       if (!supabase.realtime.isConnected()) supabase.realtime.connect();
       touchRoom(code, true);
+      if (isGameOn(phaseRef.current)) resync();
       refreshMembers();
     });
     return () => sub.remove();
@@ -1351,17 +1600,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (status === 'connected') track();
   }, [myAvatar]);
 
+  // Once per tap: a second tap while the first is still on its way does
+  // nothing (two players tapping New game together is onToPrompts' to sort).
+  const startingRef = useRef(false);
   const startGame = async (t: number) => {
     const code = roomRef.current;
-    if (!code || orderedNames().length < MIN_PLAYERS) return;
-    // The server closes the room to newcomers first.
-    if (!(await startGameOnServer(code))) {
-      showToast('Couldn’t start the game. Check your connection and try again.', 3000);
-      return;
+    if (!code || startingRef.current || orderedNames().length < MIN_PLAYERS) return;
+    startingRef.current = true;
+    try {
+      // The server closes the room to newcomers first.
+      if (!(await startGameOnServer(code))) {
+        showToast('Couldn’t start the game. Check your connection and try again.', 3000);
+        return;
+      }
+      if (code !== roomRef.current) return;
+      dbPhaseRef.current = 'playing';
+      send('to-prompts', { target: Math.max(1, t) });
+      nudge(code, 'start', awayIds());
+    } finally {
+      startingRef.current = false;
     }
-    dbPhaseRef.current = 'playing';
-    send('to-prompts', { target: Math.max(1, t) });
-    nudge(code, 'start', awayIds());
   };
 
   // Add one prompt to the shared pool (broadcast so the live count updates on
@@ -1375,29 +1633,50 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // Round 1: tap through after reading the prompt of the chain you own (or
   // the clock does it for you).
+  // Only while Round 1's view is still on: a tap landing as the game moves on
+  // mustn't take the player off the drawing they've just been handed.
   const readyView = (byHand = true) => {
-    send('view-ack', { username: usernameRef.current });
+    if (phaseRef.current !== 'view') return;
+    send('view-ack', { round: roundRef.current, username: usernameRef.current });
     if (byHand) touchRoom(roomRef.current);
-    router.replace('/waiting');
+    go('/waiting');
   };
 
-  const submitCell = (data: string) => {
-    const c = myChainRef.current;
-    if (c < 0) return;
-    const s = stageRef.current;
+  // Hand in a turn: a drawing (JSON) on a drawing stage, a guess on a
+  // guessing one. `forTurn` is the turn the screen was opened for (its
+  // `turn`); without it, the current one. One handed in after its turn has
+  // passed (Submit tapped, or the clock running out, just as the stage moved
+  // on; or the screen closing with a drawing on it) still goes to that turn,
+  // where it mends the blank the host filled in (mergeCell), and the player
+  // stays where the game has taken them. An empty one that late is nothing
+  // to send. `closing`: handed in by a screen as it closes, which never
+  // moves the player (the screen is going because they're already going
+  // somewhere).
+  const submitCell = (data: string, forTurn?: Turn | null, closing = false) => {
+    const now = currentTurn();
+    const t = forTurn ?? now;
+    if (!t || t.chain < 0 || t.stage < 1 || !roomRef.current) return;
     const cell: Cell =
-      phaseRef.current === 'draw'
+      phaseForStage(t.stage) === 'draw'
         ? { kind: 'drawing', data, author: usernameRef.current }
         : { kind: 'caption', text: cleanPhrase(data), author: usernameRef.current };
-    send('cell', { chain: c, stage: s, cell });
+    const current = sameTurn(t, now);
+    if (handedRef.current.has(turnKey(t)) || (!current && (isEmptyTurn(cell) || t.round !== roundRef.current))) return;
+    handIn(t, cell);
     if (!isEmptyTurn(cell)) touchRoom(roomRef.current);
-    router.replace('/waiting');
+    if (current && !closing) go('/waiting');
+  };
+
+  // Let a guessing turn go without a guess (the clock ran out on an empty
+  // box): the host fills it in empty. Only if it's still that turn.
+  const passTurn = (forTurn?: Turn | null) => {
+    const now = currentTurn();
+    if (!forTurn || sameTurn(forTurn, now)) go('/waiting');
   };
 
   // The round leader judges the reveal, but if they don't have the app open
   // the role falls to the host (the earliest joiner here) so it never stalls.
-  const effectiveLeader = (names: string[]) =>
-    leaderRef.current && names.includes(leaderRef.current) ? leaderRef.current : (names[0] ?? '');
+  const effectiveLeader = (names: string[]) => leaderOf(leaderRef.current, names);
 
   const isJudgeNow = () =>
     usernameRef.current === judgeForChain(revealIndexRef.current, presentNames());
@@ -1415,13 +1694,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!chain || rulingsRef.current[step] !== undefined) return;
     const rulings = { ...rulingsRef.current, [step]: correct };
     const nextStep = nextShown(chain, step);
-    send('reveal-state', { chain: chainIdx, step, rulings }); // phase 1: the mark
+    const round = roundRef.current;
+    send('reveal-state', { round, chain: chainIdx, step, rulings }); // phase 1: the mark
     if (byHand) touchRoom(roomRef.current);
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     advanceTimerRef.current = setTimeout(() => {
-      if (revealIndexRef.current !== chainIdx) return; // chain already moved on
-      if (nextStep >= chain.cells.length) send('chain-scored', { chain: chainIdx, rulings });
-      else send('reveal-state', { chain: chainIdx, step: nextStep, rulings });
+      // Chain (or round) already moved on.
+      if (revealIndexRef.current !== chainIdx || roundRef.current !== round || phaseRef.current !== 'reveal') return;
+      if (nextStep >= chain.cells.length) send('chain-scored', { round, chain: chainIdx, rulings });
+      else send('reveal-state', { round, chain: chainIdx, step: nextStep, rulings });
     }, 900);
   };
 
@@ -1438,14 +1719,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (autoRuleRef.current === key) return;
     if (step >= chain.cells.length) {
       autoRuleRef.current = key;
-      send('chain-scored', { chain: ci, rulings: rulingsRef.current });
+      send('chain-scored', { round: roundRef.current, chain: ci, rulings: rulingsRef.current });
       return;
     }
     if (rulingsRef.current[step] !== undefined || !isEmptyTurn(chain.cells[step])) return;
     autoRuleRef.current = key;
+    const round = roundRef.current;
     setTimeout(() => {
-      if (revealIndexRef.current === ci && revealStepRef.current === step) vote(false, false);
-    }, 1200);
+      if (roundRef.current !== round || revealIndexRef.current !== ci || revealStepRef.current !== step) return;
+      // Still empty: it wasn't mended meanwhile (onCell).
+      if (isEmptyTurn(chainsRef.current[ci]?.cells[step])) vote(false, false);
+      else autoRuleRef.current = '';
+    }, AUTO_RULE_MS);
   };
 
   // What the screens see.
@@ -1494,12 +1779,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         isJudge: username !== '' && username === currentJudge,
         promptCount,
         promptsNeeded,
+        turn,
+        turnEndsAt,
         enterRoom,
+        returnToRoom,
         leaveRoom,
         startGame,
         addPrompt,
         readyView,
         submitCell,
+        passTurn,
         vote,
       }}
     >

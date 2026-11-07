@@ -1,4 +1,4 @@
-import type { Cell, Chain, Phase } from './GameContext';
+import type { Cell, Chain, Phase } from './rules';
 import { cleanName, cleanPhrase } from '../lib/text';
 
 // What arrives on a room's live channel, read defensively. The channel only
@@ -34,6 +34,8 @@ const list = (v: unknown, max: number): unknown[] => (Array.isArray(v) ? v.slice
 export const asNames = (v: unknown): string[] => list(v, MAX_PLAYERS).map(cleanName).filter(Boolean);
 
 export const asIndex = (v: unknown) => asInt(v, 0, MAX_PLAYERS);
+// The round a game message belongs to; null from an app that doesn't say.
+export const asRound = (v: unknown) => asInt(v, 0, 100_000);
 export const asStage = (v: unknown) => asInt(v, 0, MAX_STAGES);
 export const asTarget = (v: unknown) => asInt(v, 1, MAX_TARGET);
 
@@ -129,9 +131,14 @@ export function asState(v: unknown) {
     promptCount: asInt(st.promptCount, 0, MAX_PROMPTS) ?? prompts.length,
     prompts,
     pool: asPrompts(st.pool),
+    // Prompts handed out so far this game (a host from before this was kept
+    // sends none: []).
+    used: asPrompts(st.used),
     viewAcks: asNames(st.viewAcks),
     stageStartedAt: asTime(st.stageStartedAt),
     savedAt: asTime(st.savedAt),
+    // The host's clock as it sent this (a snapshot has none: 0).
+    sentAt: asTime(st.sentAt),
   };
 }
 export type GameState = ReturnType<typeof asState>;
