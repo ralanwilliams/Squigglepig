@@ -128,6 +128,31 @@ is meant to be public, but never put a secret key in `.env`. Files in `public/`
 into `dist/`. The icons are the app logo on teal; `og-image.png` (the link
 preview card, also in `site/`) is the Play Store feature graphic.
 
+### Tests
+```bash
+npm test            # the test suite (tests/), about 15 seconds
+npm run typecheck   # TypeScript, the app and the tests
+```
+No phone, emulator or Supabase project needed. The suite runs on Node's own
+test runner (through `tsx`) and covers the game's rules away from React
+(`src/state/rules.ts`: chains, scoring, who hosts and judges, and which
+late or out-of-order messages a phone ignores), getting around between the
+room's screens (`src/state/nav.ts`), big messages sent in pieces
+(`src/lib/chunks.ts`), drawings thinned before they're sent
+(`src/lib/strokes.ts`), and the server itself: `supabase/rooms.sql` runs in
+PGlite, a real Postgres in-process, with Supabase's own parts (auth,
+Realtime, pg_cron, pg_net) stood in for (`tests/helpers/db.ts`). Run it
+before pushing; a change to `rooms.sql` still has to be run in the Supabase
+SQL editor to reach the live server.
+
+### Drawing size (development builds)
+Every drawing canvas (the game's, and Rewards › Art supplies) shows how big the
+drawing is as it's handed in, against the 256 KB Supabase's free plan allows in
+one message, with a bar that turns amber at 75% and red past 100%, and its size
+before thinning (`src/dev/DrawingSize.tsx`). A drawing past the limit still
+arrives, in pieces (`src/lib/chunks.ts`), on every phone except ones still on
+2.9.0. The readout never reaches a release build.
+
 ### Local test tooling (optional)
 Anything in `src/dev/local/` is gitignored and only loads in dev builds. Drop a
 `.tsx` file there whose default export is a component and it appears at the

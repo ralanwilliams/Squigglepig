@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
 import { WorkStage } from '../src/components/WorkStage';
 import { Logo } from '../src/components/Logo';
 import { DrawingImage } from '../src/components/DrawingImage';
@@ -19,22 +18,40 @@ import { TIMERS } from '../src/lib/timers';
 // chain; if every one so far was blank (prev 'blank'), the player writes
 // something for the next player to draw instead, so the chain carries on.
 // Shares WorkStage with the drawing screen, so the pig, timer, input and Submit
-// sit exactly where "Draw this" and Submit were a moment ago.
+// sit exactly where "Draw this" and Submit were a moment ago. Like the drawing
+// screen it keeps the turn it opened on, and a guess typed but not handed in
+// when the game moves on is handed in as the screen closes.
 export default function Guessing() {
-  const { submitCell, prev } = useGame();
+  const { submitCell, passTurn, prev, turn, turnEndsAt } = useGame();
+  const [myTurn] = useState(turn);
   const [guess, setGuess] = useState('');
   const drawing = prev && prev.kind === 'drawing' ? prev.data : '';
   const blank = prev?.kind === 'blank';
+  const typed = useRef('');
+  typed.current = guess.trim();
+  const sent = useRef(false);
 
   const handle = () => {
-    if (guess.trim()) submitCell(guess.trim());
+    if (!typed.current || sent.current) return;
+    sent.current = true;
+    submitCell(typed.current, myTurn);
   };
 
   // Time's up: submit whatever was typed, or bow out of this pass if empty.
   const onExpire = () => {
-    if (guess.trim()) submitCell(guess.trim());
-    else router.replace('/waiting');
+    if (typed.current) handle();
+    else passTurn(myTurn);
   };
+
+  useEffect(
+    () => () => {
+      if (!sent.current && typed.current) {
+        sent.current = true;
+        submitCell(typed.current, myTurn, true);
+      }
+    },
+    []
+  );
 
   // The drawing you're captioning is the focus. With nothing to guess, the pig
   // fills the pane, under what to write instead.
@@ -55,6 +72,7 @@ export default function Guessing() {
     <WorkStage
       focus={focus}
       timeLimit={TIMERS.caption}
+      until={turnEndsAt}
       onExpire={onExpire}
       top={
         <PigInput

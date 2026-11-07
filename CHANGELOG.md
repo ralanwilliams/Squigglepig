@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- While you wait in the lobby you can do other things in the app: Back goes to the home screen and you stay in the room. Play solo or dress up your pig, then tap Back to room on the home screen; when the host starts the game, Squigglepig takes you straight to it
+
+### Changed
+- During a game, Back (Android's back button, or swiping back on iPhone and iPad) does nothing: the game moves you on by itself, and Leave game is the way out
+- The lobby says who you're waiting for ("Waiting for Alan to start…"), and its status line is one short line: "Connected · 4 players · 1 away"
+- Drawings are sent with only the points their lines need, so a detailed drawing arrives faster and looks the same
+- A room left 10 minutes without anyone doing anything in it is closed for everyone straight away
+
+### Fixed
+- A drawing handed in could turn up at the reveal as a blank canvas, and cost its artist a point. A very detailed drawing was too big to send, and a drawing that went missing on its way to the host was filled in blank, wiping out the copy everyone else had. Big messages now go in pieces, a drawing that doesn't arrive is sent again, a blank never replaces a real drawing, and whatever is on the canvas when a turn ends is always handed in
+- Coming back to the app (or to a browser tab) during a game could send the whole room back a step, starting the reveal over and scoring the same chains again. Every phone now ignores anything from a moment the game has moved past and catches up when it comes back, and a phone that goes off screen hands the host role to someone who's there, so the game doesn't wait on it
+- Going back from the lobby showed "Reconnecting…" and stayed there
+- After opening the app from a room link, Back from the Join screen or the lobby closed the app instead of going to the home screen
+- Trying to join a room that had closed from inactivity could say the room was full; it now says there's no such room
+- The lobby no longer redraws itself, with a jump, when you arrive in it, reconnect or come back to it, and the host's controls no longer move the card while the room loads
+- On phones, the royal scroll's message now shows as the scroll unrolls, not only once it's all the way open
+- Two players tapping New game at the same moment no longer empties the trough, and no prompt is handed out twice in a game, even when the host changes
+
 ## [2.9.0]
 
 ### Added

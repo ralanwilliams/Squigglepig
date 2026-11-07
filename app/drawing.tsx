@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PigCanvas } from '../src/components/PigCanvas';
 import { LeaveButton } from '../src/components/LeaveButton';
@@ -10,10 +10,14 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 
 // Everyone draws simultaneously, each illustrating the text (a pooled prompt on
 // the first pass, or the previous player's caption after that) they were handed.
+// The screen keeps the turn it opened on, so the drawing goes to that turn
+// whenever it's handed in (GameContext submitCell), and its clock is the
+// game's (turnEndsAt).
 export default function Drawing() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { submitCell, prev } = useGame();
+  const { submitCell, prev, turn, turnEndsAt } = useGame();
+  const [myTurn] = useState(turn);
   const text = prev && 'text' in prev ? prev.text : '';
 
   // Fills WorkStage's fixed-height top slot (same footprint as the guess input),
@@ -40,7 +44,13 @@ export default function Drawing() {
   );
 
   return (
-    <PigCanvas onSubmit={submitCell} timeLimit={TIMERS.draw} header={header} footer={<LeaveButton />} />
+    <PigCanvas
+      onSubmit={(data, closing) => submitCell(data, myTurn, closing)}
+      timeLimit={TIMERS.draw}
+      until={turnEndsAt}
+      header={header}
+      footer={<LeaveButton />}
+    />
   );
 }
 

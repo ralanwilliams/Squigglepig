@@ -38,6 +38,7 @@ const RAIL_MIN = 280;
 export function WorkStage({
   focus,
   timeLimit,
+  until: endsAt,
   onExpire,
   top,
   primary,
@@ -46,6 +47,10 @@ export function WorkStage({
 }: {
   focus: React.ReactNode;
   timeLimit?: number;
+  // When the clock runs out (epoch ms): the game's own deadline for the
+  // turn, so the screen hands in on time even if it opened late. Without it
+  // (or if it has already passed), timeLimit from now.
+  until?: number;
   onExpire?: () => void;
   top: React.ReactNode;
   primary: React.ReactNode;
@@ -59,7 +64,9 @@ export function WorkStage({
   // (and the Countdown remounted) whenever the layout flips between one and
   // two panes, and the clock must not start over when the phone turns. The
   // guard keeps a remount right at zero from firing `onExpire` twice.
-  const [until] = useState(() => (timeLimit ? deadlineIn(timeLimit) : 0));
+  const [until] = useState(() =>
+    !timeLimit ? 0 : endsAt && endsAt > Date.now() && endsAt <= deadlineIn(timeLimit) ? endsAt : deadlineIn(timeLimit)
+  );
   const expired = useRef(false);
   const expire = () => {
     if (expired.current) return;
