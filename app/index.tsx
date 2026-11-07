@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
+<<<<<<< Updated upstream
 import { StyleSheet, View } from 'react-native';
 import { router, useIsFocused } from 'expo-router';
+=======
+import { router } from 'expo-router';
+>>>>>>> Stashed changes
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { Heading } from '../src/components/Heading';
 import { PigButton } from '../src/components/PigButton';
-import { MenuButton } from '../src/components/MenuDrawer';
 import { SnoutSecret } from '../src/components/SnoutSecret';
-import { Walkthrough } from '../src/components/Walkthrough';
 import { showToast } from '../src/components/Toast';
 import { IMAGES } from '../src/assets/assets';
 import { entryMessage, useGame } from '../src/state/GameContext';
 import { PLAYABLE } from '../src/arcade/games';
 import { clearSession, loadSession } from '../src/lib/session';
-import { markTutorialDone, tutorialDone } from '../src/lib/tutorial';
+import { showWalkthrough, tutorialDone } from '../src/lib/tutorial';
 
 // The saved room is gone back into once per launch (a second home screen, or
 // coming back to this one, doesn't try again).
@@ -25,6 +27,7 @@ let launchChecked = false;
 // the room has gone, it says so and stays here. Otherwise, until the player
 // has finished or skipped it once, the first-run walkthrough opens over it
 // (src/lib/tutorial.ts). Play Solo (app/arcade) shows whenever there's a solo
+<<<<<<< Updated upstream
 // game this build offers (src/arcade/games).
 //
 // The room's lobby sits over this screen, so Back from the lobby (or the
@@ -41,6 +44,13 @@ export default function Home() {
   const focused = useIsFocused();
   const [checking, setChecking] = useState(!launchChecked && focused);
   const [walkthrough, setWalkthrough] = useState(false);
+=======
+// game this build offers (src/arcade/games). The menu's ☰ shows once the
+// check is done.
+export default function Home() {
+  const { enterRoom } = useGame();
+  const [checking, setChecking] = useState(true);
+>>>>>>> Stashed changes
 
   useEffect(() => {
     let active = true;
@@ -64,18 +74,13 @@ export default function Home() {
       }
       const done = await tutorialDone();
       if (!active) return;
-      setWalkthrough(!done);
+      if (!done) showWalkthrough();
       setChecking(false);
     })();
     return () => {
       active = false;
     };
   }, []);
-
-  const finishWalkthrough = () => {
-    markTutorialDone();
-    setWalkthrough(false);
-  };
 
   // Same Stage as the real home screen so the pig doesn't jump when the buttons
   // swap in.
@@ -86,6 +91,7 @@ export default function Home() {
   }
 
   return (
+<<<<<<< Updated upstream
     <View style={styles.fill}>
       <Stage
         focus={
@@ -105,9 +111,22 @@ export default function Home() {
       <MenuButton onHowToPlay={() => setWalkthrough(true)} />
       <Walkthrough visible={walkthrough && focused} onDone={finishWalkthrough} />
     </View>
+=======
+    <Stage
+      menu
+      focus={
+        <Logo source={IMAGES.home}>
+          <SnoutSecret />
+        </Logo>
+      }
+      actions={
+        <>
+          <PigButton name="Create Game" onPress={() => router.push('/create')} />
+          <PigButton name="Join Game" onPress={() => router.push('/join')} />
+          {PLAYABLE.length ? <PigButton name="Play Solo" onPress={() => router.push('/arcade')} /> : null}
+        </>
+      }
+    />
+>>>>>>> Stashed changes
   );
 }
-
-const styles = StyleSheet.create({
-  fill: { flex: 1 },
-});

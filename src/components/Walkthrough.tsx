@@ -1,18 +1,41 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { usePathname } from 'expo-router';
 import { Stage } from './Stage';
 import { PigButton } from './PigButton';
 import { ChainScene, DrawScene, GatherScene, HostScene, PromptsScene, ScoreScene } from './WalkthroughScenes';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
+import { closeWalkthrough, markTutorialDone, useWalkthroughOpen } from '../lib/tutorial';
 
 // The first-run walkthrough: six steps, each a looping animation with one
 // line under it, laid out on the same Stage as every other screen (scene where
 // the pig goes, caption and buttons in the controls pane). Next / swipe to go
-// on, Skip to leave; finishing or skipping calls onDone, which Home records
-// (src/lib/tutorial.ts) so it never opens on its own again; the menu's "How to
-// play" row replays it. It replaces the old "Learn to Squiggle" paragraph.
+// on, Skip to leave. It replaces the old "Learn to Squiggle" paragraph.
+//
+// Mounted once, in the root layout, and opened with showWalkthrough()
+// (src/lib/tutorial.ts): by Home on a first launch, and by the menu's "How to
+// play" row on any screen with the menu. Finishing or skipping it records
+// that it's been seen, so it never opens on its own again. Going to another
+// screen closes it without that (the host starting a game while it's open
+// over the lobby).
+export function WalkthroughOverlay() {
+  const visible = useWalkthroughOpen();
+  const pathname = usePathname();
+  const at = useRef(pathname);
+  useEffect(() => {
+    if (pathname === at.current) return;
+    at.current = pathname;
+    closeWalkthrough();
+  }, [pathname]);
+  const done = () => {
+    markTutorialDone();
+    closeWalkthrough();
+  };
+  return <Walkthrough visible={visible} onDone={done} />;
+}
+
 const STEPS = [
   { Scene: HostScene, caption: 'The host taps Create Game, then shares the room code.' },
   { Scene: GatherScene, caption: 'Get 3 to 12 players into one room.' },
@@ -24,7 +47,7 @@ const STEPS = [
 const LAST = STEPS.length - 1;
 const NATIVE = Platform.OS !== 'web';
 
-export function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void }) {
+function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
   const reduced = useReducedMotion();

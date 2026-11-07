@@ -2,29 +2,32 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
-import { Countdown, deadlineIn } from '../src/components/Countdown';
+import { Countdown } from '../src/components/Countdown';
 import { PigButton } from '../src/components/PigButton';
+import { ButtonNote } from '../src/components/ButtonNote';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { IMAGES } from '../src/assets/assets';
 import { useGame } from '../src/state/GameContext';
-import { TIMERS } from '../src/lib/timers';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
 
 // Round 1: you're shown the prompt of the chain you OWN. You don't draw it —
-// everyone else does — but you'll be the judge of this chain at scoring. Read it,
-// then tap to move on to drawing everyone else's prompts.
+// everyone else does — but you'll be the judge of this chain at scoring. Read
+// it, then tap Got it: the button turns into Player ready, the prompt stays
+// up, and once everyone in the round is ready (or the clock runs out) the
+// drawing starts for all of you at once.
 export default function RoundOne() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { prev, readyView } = useGame();
+  const { prev, readyView, viewReady, stageEndsAt } = useGame();
   const text = prev && 'text' in prev ? prev.text : '';
 
-  // Fixed once per screen: Stage rebuilds its panes (remounting the Countdown)
-  // when the layout flips between one and two panes, and the clock must not
-  // restart when the phone turns.
-  const [until] = useState(() => deadlineIn(TIMERS.view));
+  // The stage's deadline (what's left of it, for a phone back in the room
+  // mid-way), kept as the screen opened with it: Stage rebuilds its panes
+  // (remounting the Countdown) when the phone turns, and the clock must not
+  // restart, nor take up the next stage's on the way out.
+  const [until] = useState(stageEndsAt);
   const expired = useRef(false);
   const expire = () => {
     if (expired.current) return;
@@ -36,7 +39,7 @@ export default function RoundOne() {
 
   const actions = (
     <>
-      <Countdown seconds={TIMERS.view} until={until} onExpire={expire} />
+      {until ? <Countdown until={until} onExpire={expire} /> : null}
       <Text style={[styles.label, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
         YOUR CHAIN — YOU'LL JUDGE THIS ONE
       </Text>
@@ -55,7 +58,11 @@ export default function RoundOne() {
           {text || '…'}
         </Text>
       </View>
-      <PigButton name="Got it — let's draw!" onPress={() => readyView()} />
+      {viewReady ? (
+        <ButtonNote text="Player ready" live />
+      ) : (
+        <PigButton name="Got it — let's draw!" onPress={() => readyView()} />
+      )}
       <LeaveButton />
     </>
   );

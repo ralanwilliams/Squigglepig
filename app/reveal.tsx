@@ -1,14 +1,13 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Heading } from '../src/components/Heading';
-import { Countdown, deadlineIn } from '../src/components/Countdown';
+import { Countdown } from '../src/components/Countdown';
 import { DrawingImage } from '../src/components/DrawingImage';
 import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { RuleBadge } from '../src/components/RuleBadge';
 import { isBlankCell, isEmptyTurn, useGame } from '../src/state/GameContext';
-import { TIMERS } from '../src/lib/timers';
 import { font, layout, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
@@ -30,17 +29,11 @@ const EMPTY_CANVAS = JSON.stringify({ w: SPACE.w, h: SPACE.h, strokes: [] });
 export default function Reveal() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { chains, revealIndex, revealStep, rulings, judge, isJudge, scores, players, departed, vote } =
+  const { chains, revealIndex, revealStep, rulings, judge, isJudge, scores, players, departed, vote, stageEndsAt } =
     useGame();
 
   const chain = chains[revealIndex];
   const step = chain ? Math.min(revealStep, chain.cells.length - 1) : 0;
-
-  // One deadline per chain, fixed when the chain comes up: Stage rebuilds its
-  // panes (remounting the Countdown) when the phone turns, and the clock must
-  // not restart mid-reveal. Changing chains does start a fresh one.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const revealUntil = useMemo(() => deadlineIn(TIMERS.reveal), [revealIndex]);
 
   if (!chain) {
     return <Stage focus={<Heading>Tallying…</Heading>} />;
@@ -121,7 +114,10 @@ export default function Reveal() {
         <Heading size="h4">
           Chain {revealIndex + 1} of {chains.length}
         </Heading>
-        <Countdown seconds={TIMERS.reveal} until={revealUntil} />
+        {/* One deadline per chain (each chain starts the stage's clock again:
+            GameContext stageEndsAt), so it doesn't restart when the phone
+            turns, and a phone back in the room mid-chain shows what's left. */}
+        <Countdown until={stageEndsAt} />
       </View>
 
       <View style={[styles.darkCard, { borderRadius: ui.sp(8), padding: ui.sp(12), gap: ui.sp(4) }]}>

@@ -1,15 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Linking, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Keyboard, Linking, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, usePathname } from 'expo-router';
 import { FitBox } from './FitBox';
 import { Glyph, type GlyphName } from './Glyph';
 import { Switch } from './Switch';
 import { showToast } from './Toast';
 import { AppMark } from './AppMark';
 import { TextLink } from './TextLink';
-import { GROUPS, type RewardsPath } from '../rewards/catalog';
+import { GROUPS, groupOf, type RewardsPath } from '../rewards/catalog';
 import { pushSupported, setNotificationsOn, useNotificationsOn } from '../lib/push';
+import { showWalkthrough } from '../lib/tutorial';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
@@ -20,6 +21,7 @@ import {
   CONTACT_EMAIL,
   DEVELOPER_URL,
   HELP_URL,
+  MENU_PAGES,
   PLAY_STORE_APP_URL,
   PLAY_STORE_URL,
   PRIVACY_URL,
@@ -31,9 +33,11 @@ const OPEN_MS = 220;
 const CLOSE_MS = 180;
 const NATIVE = Platform.OS !== 'web';
 
-// The menu: a ☰ in the header band's top-LEFT corner of the home screen,
-// mirroring the sound and dark-mode switches in the top-right (Stage already keeps both
-// corners clear, so nothing moves to make room). It slides a drawer in from
+// The menu: a ☰ in the header band's top-LEFT corner, mirroring the sound and
+// dark-mode switches in the top-right (Stage already keeps both corners clear,
+// so nothing moves to make room). A screen asks for it with Stage's `menu`:
+// Home, Create Game, Join Game, the Lobby, Play Solo's game list, Your pig
+// and the Rewards screens (Art supplies, Themes). It slides a drawer in from
 // the left holding the About information: the app icon, name and version,
 // then the Support / Settings / Rewards groups, and pinned to the bottom the
 // legal links (Privacy, Terms, Licenses) right over the copyright line, which
@@ -41,7 +45,7 @@ const NATIVE = Platform.OS !== 'web';
 // (background, text, link), so it follows light / dark mode like everything
 // else. Nothing scrolls: in two-pane layouts the groups sit in two columns,
 // and the body is a FitBox.
-// `onHowToPlay` replays the first-run walkthrough (Home owns it). Settings
+// How to play replays the first-run walkthrough (src/lib/tutorial.ts). Settings
 // holds the switches: High contrast and Reduce motion show what is in effect
 // — the phone's setting until it is flipped here — and Room notifications
 // (not on the web) is the one switch for every room notification
@@ -50,11 +54,24 @@ const NATIVE = Platform.OS !== 'web';
 // Rewards screen's Themes tab, beside the theme cards.)
 // Rewards opens what the player has won, a group at a time (app/rewards.tsx:
 // Art supplies, Themes), and Your pig (app/pig.tsx), its outfits and bubbles.
-// With reduced motion the drawer appears and goes without sliding.
-export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
+// A row for the page already showing just closes the drawer. One of the
+// app's pages opened from another (MENU_PAGES: Your pig, Rewards, Licenses)
+// takes its place once the drawer has slid away, so Back goes to where the
+// menu was first opened; opened from anywhere else it goes on top at once,
+// and Back returns there (the Lobby included: the player is still in the
+// room). With reduced motion the drawer appears and goes without sliding.
+// Opening it puts a keyboard away (Join, Create, Your pig's bubble), and it
+// closes if its screen is covered while it's open (a room joined from Join
+// Game opening the Lobby over it).
+export function MenuButton() {
   const ui = useUi();
   const theme = useTheme();
   const [open, setOpen] = useState(false);
+  useFocusEffect(useCallback(() => () => setOpen(false), []));
+  const show = () => {
+    Keyboard.dismiss();
+    setOpen(true);
+  };
   return (
     <>
       <View
@@ -64,19 +81,20 @@ export function MenuButton({ onHowToPlay }: { onHowToPlay: () => void }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Menu"
-          onPress={() => setOpen(true)}
+          onPress={show}
           hitSlop={6}
           style={({ pressed }) => [styles.hit, { width: ui.sp(44), height: ui.sp(44), opacity: pressed ? 0.6 : 1 }]}
         >
           <Glyph name="menu" size={ui.sp(26)} color={theme.link} />
         </Pressable>
       </View>
-      <MenuDrawer open={open} onClose={() => setOpen(false)} onHowToPlay={onHowToPlay} />
+      <MenuDrawer open={open} onClose={() => setOpen(false)} />
     </>
   );
 }
 
 type Row = { icon: GlyphName; label: string; onPress?: () => void; trailing?: GlyphName; on?: boolean };
+type MenuPath = '/licenses' | RewardsPath;
 
 function open(url: string) {
   return Linking.openURL(url);
@@ -91,15 +109,7 @@ function rate() {
   return open(apple ? APP_STORE_URL : PLAY_STORE_URL);
 }
 
-function MenuDrawer({
-  open: visible,
-  onClose,
-  onHowToPlay,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onHowToPlay: () => void;
-}) {
+function MenuDrawer({ open: visible, onClose }: { open: boolean; onClose: () => void }) {
   const ui = useUi();
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -108,6 +118,10 @@ function MenuDrawer({
   const { highContrast, setContrast, reducedMotion, setMotion } = useThemeMode();
   const reduced = useReducedMotion();
   const notifyOn = useNotificationsOn() ?? true;
+  // The page showing, as a menu row names it (Rewards by its group).
+  const pathname = usePathname();
+  const group = groupOf(useLocalSearchParams<{ group?: string }>().group);
+  const here = pathname === '/rewards' ? `/rewards?group=${group}` : pathname;
 
   // Stay mounted through the closing slide; unmount once it has finished.
   const [mounted, setMounted] = useState(visible);
@@ -136,16 +150,34 @@ function MenuDrawer({
       onClose();
       showToast(`No email app found. Write to ${CONTACT_EMAIL}`, 4000);
     });
-  const go = (path: '/licenses' | RewardsPath) => () => {
+  // Something to do once the drawer has gone, called off if this screen goes
+  // first (the game starting meanwhile).
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (pending.current) clearTimeout(pending.current);
+    },
+    []
+  );
+  const afterClose = (fn: () => void, ms: number) => {
+    if (pending.current) clearTimeout(pending.current);
+    pending.current = setTimeout(fn, ms);
+  };
+
+  // Replacing the page under the drawer would take the drawer with it, so
+  // that waits for the slide out.
+  const go = (path: MenuPath) => () => {
     onClose();
-    router.push(path);
+    if (path === here) return;
+    if (MENU_PAGES.has(pathname)) afterClose(() => router.replace(path), reduced ? 0 : CLOSE_MS);
+    else router.push(path);
   };
 
   // The walkthrough is a modal too, and iOS won't present one while another is
   // still going away, so it opens once the drawer has slid out.
   const howToPlay = () => {
     onClose();
-    setTimeout(onHowToPlay, CLOSE_MS + 60);
+    afterClose(showWalkthrough, CLOSE_MS + 60);
   };
 
   const support: Row[] = [

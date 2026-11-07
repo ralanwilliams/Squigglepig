@@ -12,9 +12,10 @@ import { URGENT_AT } from '../lib/timers';
 // layout rebuilds itself when the phone turns (Stage's panes, WorkStage's rail)
 // remount the countdown, and without a fixed deadline it would start over at
 // `seconds` every time. Callers that hold state across the flip compute the
-// deadline once and pass it in; the clock then just reads it. Without `until`
-// the clock starts from `seconds` at mount, which suits a countdown that is
-// meant to restart with its parent (keyed per reveal step, say).
+// deadline once and pass it in; the clock then just reads it (a game stage's
+// is GameContext's stageEndsAt, so a phone back in the room mid-stage shows
+// what's left). Without `until` the clock starts from `seconds` at mount,
+// which suits a countdown that is meant to restart with its parent.
 //
 // `stoppedAt` (epoch ms) stops the clock there: it shows what was left at that
 // moment, dimmed, and never expires — a solo round once it's answered (the
@@ -33,7 +34,7 @@ export function Countdown({
   stoppedAt,
   colors,
 }: {
-  seconds: number;
+  seconds?: number; // from mount, when there's no `until`
   until?: number;
   onExpire?: () => void;
   size?: number; // base font size, scaled by the UI scale
@@ -42,7 +43,7 @@ export function Countdown({
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const [remaining, setRemaining] = useState(() => (until ? secondsLeft(until, stoppedAt) : seconds));
+  const [remaining, setRemaining] = useState(() => (until ? secondsLeft(until, stoppedAt) : (seconds ?? 0)));
   const fired = useRef(false);
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
@@ -52,7 +53,7 @@ export function Countdown({
       if (until) setRemaining(secondsLeft(until, stoppedAt));
       return;
     }
-    const deadline = until ?? Date.now() + seconds * 1000;
+    const deadline = until ?? Date.now() + (seconds ?? 0) * 1000;
     fired.current = false;
     const tick = () => {
       const left = secondsLeft(deadline);

@@ -6,6 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+<<<<<<< Updated upstream
 ### Added
 - While you wait in the lobby you can do other things in the app: Back goes to the home screen and you stay in the room. Play solo or dress up your pig, then tap Back to room on the home screen; when the host starts the game, Squigglepig takes you straight to it
 
@@ -24,6 +25,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The lobby no longer redraws itself, with a jump, when you arrive in it, reconnect or come back to it, and the host's controls no longer move the card while the room loads
 - On phones, the royal scroll's message now shows as the scroll unrolls, not only once it's all the way open
 - Two players tapping New game at the same moment no longer empties the trough, and no prompt is handed out twice in a game, even when the host changes
+=======
+### Changed
+- The menu (☰) is on more screens: Create Game, Join Game, the lobby, Play Solo, Your pig, Art supplies and Themes, as well as Home. From the lobby you're still in the room, Back brings you back to it, and if the game starts while you're on Your pig or Rewards, you're taken straight to it
+- Filling the trough gives 30 seconds for each prompt it needs, instead of 2 minutes however many it needs: 4:30 for 3 players playing to 5 points, 6:00 for 12. The game still starts the moment the trough is full
+- After reading your prompt, tapping Got it shows Player ready and keeps the prompt on screen, instead of going to the waiting screen. Once everyone is ready, the drawing starts for all at once
+
+### Fixed
+- Back in a game after closing the app, the timer shows the time that's actually left, instead of starting over from the full time
+>>>>>>> Stashed changes
 
 ## [2.9.0]
 

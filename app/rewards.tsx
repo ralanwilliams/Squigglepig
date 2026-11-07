@@ -10,7 +10,7 @@ import { DrawingBoard, useDrawingStore, type DrawingBoardHandle } from '../src/c
 import { IMAGES } from '../src/assets/assets';
 import { RewardTile } from '../src/rewards/RewardTile';
 import { TabPages, Tabs } from '../src/components/Tabs';
-import { GROUPS, KINDS, REWARDS, isNone, noneOf, rewardsOf, type Group, type Kind } from '../src/rewards/catalog';
+import { GROUPS, KINDS, REWARDS, groupOf, isNone, noneOf, rewardsOf, type Group, type Kind } from '../src/rewards/catalog';
 import { useInventory } from '../src/rewards/inventory';
 import { useChoose } from '../src/rewards/useChoose';
 import { font, type Theme } from '../src/theme/tokens';
@@ -22,8 +22,8 @@ import { FONT_CAP, useUi, type Ui } from '../src/theme/responsive';
 // is to win (src/rewards/catalog.ts) and which of it this player owns
 // (src/rewards/inventory.tsx), one group of kinds at a time (catalog GROUPS:
 // Art supplies, Themes; ?group= from the menu row), untitled: the menu row
-// says which. The art pane shows the group's rewards at work (catalog
-// GROUPS `show`); the rail has one tab per kind of reward, and under it that
+// says which, and the ☰ goes to another. The art pane shows the group's
+// rewards at work (catalog GROUPS `show`); the rail has one tab per kind of reward, and under it that
 // kind's rewards as a grid of the compact cards Your pig's rail has (the ring
 // and lock still say where the player stands, and a screen reader still
 // hears it). A kind with nothing in it yet gets no tab. Nothing scrolls: a
@@ -54,10 +54,12 @@ export default function Rewards() {
   const styles = useThemedStyles(makeStyles);
   const { owns, grant, reset, chosen } = useInventory();
   const putToUse = useChoose();
-  const asked = useLocalSearchParams<{ group?: string }>().group;
-  const group: Group = asked && asked in GROUPS ? (asked as Group) : 'art';
+  const group = groupOf(useLocalSearchParams<{ group?: string }>().group);
   const kinds = kindsOf(group);
-  const [kind, setKind] = useState<Kind>(kinds[0]);
+  // The open tab: the first, until one is picked (and if the group changes
+  // under it, the new group's first).
+  const [picked, setPicked] = useState<Kind>(kinds[0]);
+  const kind = kinds.includes(picked) ? picked : kinds[0];
   const { seasonal, setSeasonal } = useThemeMode();
   const showing = useSkin();
 
@@ -133,7 +135,7 @@ export default function Rewards() {
         };
       })}
       selected={kind}
-      onSelect={setKind}
+      onSelect={setPicked}
     />
   );
 
@@ -159,6 +161,7 @@ export default function Rewards() {
 
   return (
     <Stage
+      menu
       focus={show === 'canvas' ? <DrawingBoard ref={board} store={drawing} /> : <Logo source={IMAGES.home} />}
       // The tabs stay put while the cards under them change.
       actionsAlign="top"

@@ -15,14 +15,22 @@ import { DrawingBoard, drawingData, drawingStarted, useDrawingStore, type Drawin
 // goes (`onSubmit` with `closing`), so a drawing is never simply lost.
 export function PigCanvas({
   onSubmit,
+<<<<<<< Updated upstream
   timeLimit,
+=======
+>>>>>>> Stashed changes
   until,
   header,
   footer,
 }: {
+<<<<<<< Updated upstream
   onSubmit: (data: string, closing?: boolean) => void;
   timeLimit?: number;
   until?: number; // when the clock runs out (epoch ms), if not timeLimit from now
+=======
+  onSubmit: (data: string) => void;
+  until?: number; // when the time runs out (epoch ms; WorkStage)
+>>>>>>> Stashed changes
   header?: React.ReactNode;
   footer?: React.ReactNode;
 }) {
@@ -50,7 +58,10 @@ export function PigCanvas({
   return (
     <WorkStage
       focus={<DrawingBoard ref={board} store={store} />}
+<<<<<<< Updated upstream
       timeLimit={timeLimit}
+=======
+>>>>>>> Stashed changes
       until={until}
       onExpire={submit}
       top={header}
