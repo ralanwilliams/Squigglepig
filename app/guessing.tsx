@@ -10,7 +10,6 @@ import { LeaveButton } from '../src/components/LeaveButton';
 import { IMAGES } from '../src/assets/assets';
 import { useGame } from '../src/state/GameContext';
 import { PHRASE_MAX } from '../src/lib/text';
-import { TIMERS } from '../src/lib/timers';
 
 // Everyone captions simultaneously — each writes what they think the drawing
 // they were handed depicts. That caption becomes the next player's prompt.
@@ -22,8 +21,12 @@ import { TIMERS } from '../src/lib/timers';
 // screen it keeps the turn it opened on, and a guess typed but not handed in
 // when the game moves on is handed in as the screen closes.
 export default function Guessing() {
+<<<<<<< Updated upstream
   const { submitCell, passTurn, prev, turn, turnEndsAt } = useGame();
   const [myTurn] = useState(turn);
+=======
+  const { submitCell, prev, stageEndsAt } = useGame();
+>>>>>>> Stashed changes
   const [guess, setGuess] = useState('');
   const drawing = prev && prev.kind === 'drawing' ? prev.data : '';
   const blank = prev?.kind === 'blank';
@@ -71,8 +74,12 @@ export default function Guessing() {
   return (
     <WorkStage
       focus={focus}
+<<<<<<< Updated upstream
       timeLimit={TIMERS.caption}
       until={turnEndsAt}
+=======
+      until={stageEndsAt}
+>>>>>>> Stashed changes
       onExpire={onExpire}
       top={
         <PigInput

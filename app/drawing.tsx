@@ -3,7 +3,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PigCanvas } from '../src/components/PigCanvas';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { useGame } from '../src/state/GameContext';
-import { TIMERS } from '../src/lib/timers';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
 import { FONT_CAP, useUi } from '../src/theme/responsive';
@@ -16,8 +15,12 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 export default function Drawing() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+<<<<<<< Updated upstream
   const { submitCell, prev, turn, turnEndsAt } = useGame();
   const [myTurn] = useState(turn);
+=======
+  const { submitCell, prev, stageEndsAt } = useGame();
+>>>>>>> Stashed changes
   const text = prev && 'text' in prev ? prev.text : '';
 
   // Fills WorkStage's fixed-height top slot (same footprint as the guess input),
@@ -44,6 +47,7 @@ export default function Drawing() {
   );
 
   return (
+<<<<<<< Updated upstream
     <PigCanvas
       onSubmit={(data, closing) => submitCell(data, myTurn, closing)}
       timeLimit={TIMERS.draw}
@@ -51,6 +55,9 @@ export default function Drawing() {
       header={header}
       footer={<LeaveButton />}
     />
+=======
+    <PigCanvas onSubmit={submitCell} until={stageEndsAt} header={header} footer={<LeaveButton />} />
+>>>>>>> Stashed changes
   );
 }
 

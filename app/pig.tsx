@@ -136,6 +136,7 @@ export default function Pig() {
 
   return (
     <Stage
+      menu
       focus={<WinnerPig avatar={avatar} />}
       // The tabs stay put while the cards under them change.
       actionsAlign="top"

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Countdown, deadlineIn } from './Countdown';
+import { Countdown } from './Countdown';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
 import { PeekPig, peekPigHeight } from './PeekPig';
@@ -37,8 +37,12 @@ const RAIL_MIN = 280;
 
 export function WorkStage({
   focus,
+<<<<<<< Updated upstream
   timeLimit,
   until: endsAt,
+=======
+  until,
+>>>>>>> Stashed changes
   onExpire,
   top,
   primary,
@@ -46,11 +50,15 @@ export function WorkStage({
   footer,
 }: {
   focus: React.ReactNode;
+<<<<<<< Updated upstream
   timeLimit?: number;
   // When the clock runs out (epoch ms): the game's own deadline for the
   // turn, so the screen hands in on time even if it opened late. Without it
   // (or if it has already passed), timeLimit from now.
   until?: number;
+=======
+  until?: number; // when the timer runs out (epoch ms): the stage's, GameContext stageEndsAt
+>>>>>>> Stashed changes
   onExpire?: () => void;
   top: React.ReactNode;
   primary: React.ReactNode;
@@ -60,6 +68,7 @@ export function WorkStage({
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
 
+<<<<<<< Updated upstream
   // The deadline is fixed here, once per screen: the rail below is rebuilt
   // (and the Countdown remounted) whenever the layout flips between one and
   // two panes, and the clock must not start over when the phone turns. The
@@ -67,6 +76,16 @@ export function WorkStage({
   const [until] = useState(() =>
     !timeLimit ? 0 : endsAt && endsAt > Date.now() && endsAt <= deadlineIn(timeLimit) ? endsAt : deadlineIn(timeLimit)
   );
+=======
+  // The deadline is the one the screen opened with: the stage's, so a phone
+  // back in the room mid-stage counts down only what's left, and kept, so a
+  // screen on its way out never takes up the next stage's (and expires into
+  // it). The rail below is rebuilt (and the Countdown remounted) whenever the
+  // layout flips between one and two panes; the deadline doesn't move, so
+  // the clock doesn't start over when the phone turns. The guard keeps a
+  // remount right at zero from firing `onExpire` twice.
+  const [deadline] = useState(until ?? 0);
+>>>>>>> Stashed changes
   const expired = useRef(false);
   const expire = () => {
     if (expired.current) return;
@@ -116,7 +135,7 @@ export function WorkStage({
           <PeekPig width={pigW} />
         </View>
         <View style={[styles.timer, { height: rowH }]}>
-          {timeLimit ? <Countdown seconds={timeLimit} until={until} onExpire={expire} size={32} /> : null}
+          {deadline ? <Countdown until={deadline} onExpire={expire} size={32} /> : null}
         </View>
       </View>
       <View style={{ height: slotH, zIndex: 1 }}>{top}</View>

@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+<<<<<<< Updated upstream
 import { AppState, BackHandler } from 'react-native';
+=======
+import { AppState } from 'react-native';
+>>>>>>> Stashed changes
 import { router, usePathname } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '../lib/supabase';
-import { TIMERS, HOST_GRACE } from '../lib/timers';
+import { TIMERS, HOST_GRACE, promptsTime } from '../lib/timers';
 import { saveSession, clearSession, savePendingLeave, takePendingLeave } from '../lib/session';
 import {
   IDLE_MINUTES,
@@ -21,8 +25,13 @@ import {
   type RoomPhase,
 } from '../lib/rooms';
 import { registerForPush } from '../lib/push';
+<<<<<<< Updated upstream
 import { CHUNK_GAP_MS, Joiner, chunkId, split } from '../lib/chunks';
 import { holdsBack, isRoomScreen, lobbyOnCatchUp, navFor } from './nav';
+=======
+import { MENU_PAGES } from '../lib/links';
+import { isBlankDrawing } from '../lib/drawing';
+>>>>>>> Stashed changes
 import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
 import { showToast } from '../components/Toast';
 import { cleanAvatar, useMyAvatar, wireAvatar, type Avatar } from '../avatar/avatar';
@@ -189,10 +198,14 @@ type Game = {
   isJudge: boolean;
   promptCount: number; // prompts in the shared pool so far
   promptsNeeded: number; // pool size that auto-starts the game
+<<<<<<< Updated upstream
   // This player's turn this stage (null between turns, or watching), and when
   // its clock runs out (epoch ms, this phone's time).
   turn: Turn | null;
   turnEndsAt: number;
+=======
+  stageEndsAt: number; // when the current stage's clock runs out (epoch ms); what's left of it for a phone that's caught up
+>>>>>>> Stashed changes
   // Actions
   enterRoom: (room: string | null, username: string, rejoin?: boolean) => Promise<EntryStatus>;
   // Back to the room's screen from elsewhere in the app (Home's Back to room).
@@ -201,8 +214,13 @@ type Game = {
   startGame: (target: number) => void;
   addPrompt: (text: string) => void;
   readyView: (byHand?: boolean) => void;
+<<<<<<< Updated upstream
   submitCell: (data: string, forTurn?: Turn | null, closing?: boolean) => void;
   passTurn: (forTurn?: Turn | null) => void;
+=======
+  viewReady: boolean; // this player has tapped through Round 1 (or its clock ran out)
+  submitCell: (data: string) => void;
+>>>>>>> Stashed changes
   vote: (correct: boolean) => void;
 };
 
@@ -337,6 +355,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // after is the same tap twice, from two phones: to-prompts).
   const promptsAtRef = useRef(0);
   const viewAcksRef = useRef<Set<string>>(new Set()); // who has tapped through Round 1
+  // Whether this player is among them: Round 1 shows Player ready in place of
+  // its button (app/view.tsx).
+  const [viewReady, setViewReady] = useState(false);
 
   const hostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Host: the pause between the prompt pool filling and the first round going
@@ -349,6 +370,29 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   };
   const stageStartedAtRef = useRef(0);
+  // When the current stage's clock runs out (epoch ms), for its screen's
+  // countdown and the host's clock (startClock, below).
+  const stageEndsAtRef = useRef(0);
+  const [stageEndsAt, setStageEndsAt] = useState(0);
+
+  // ---- Which screen ----
+  // The game moves the player on by putting its next screen in place of the
+  // one they're on. One of the menu's pages (Your pig, Art supplies, Themes,
+  // Licenses: MENU_PAGES) opened over the lobby or another room screen is
+  // closed first, so the game takes the room screen's place instead of
+  // leaving it behind underneath (a lobby with a Start button, there to go
+  // Back to). The path is noted at once, so a second move before the screen
+  // has changed doesn't close another.
+  const pathname = usePathname();
+  const pathRef = useRef(pathname);
+  useEffect(() => {
+    pathRef.current = pathname;
+  }, [pathname]);
+  const showScreen = (path: string) => {
+    if (MENU_PAGES.has(pathRef.current) && router.canDismiss()) router.dismiss();
+    pathRef.current = path;
+    router.replace(path);
+  };
 
   // ---- Getting around ----
   // In the lobby or on the scoreboard, Back goes home and the player stays in
@@ -537,9 +581,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!isHostRef.current) return;
     hostTimerRef.current = setTimeout(fn, Math.max(1, seconds) * 1000);
   };
+  // How long each stage lasts. The trough's time follows its size (the
+  // players in the room and the points to win).
   const durationFor = (p: Phase) =>
     p === 'prompts'
-      ? TIMERS.prompts
+      ? promptsTime(promptsNeededFor(orderedNames().length, targetRef.current))
       : p === 'view'
         ? TIMERS.view
         : p === 'draw'
@@ -558,21 +604,39 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return () => {};
   };
 
-  const armForCurrentStage = (fullDuration: boolean) => {
+  // The current stage's clock, from when it started: now, as the stage begins
+  // on this phone, or, for a phone catching up (back in the room after closing
+  // the app, or a host taking over), when it began on the host's phone, so
+  // the countdown shows only what's left. The time is fixed here, so the
+  // trough's doesn't change if someone leaves while it's filling. Never more
+  // than the whole stage from now, in case this phone's clock is behind the
+  // host's.
+  const startClock = (startedAt: number) => {
+    stageStartedAtRef.current = startedAt;
+    const whole = durationFor(phaseRef.current) * 1000;
+    stageEndsAtRef.current = Math.min(startedAt + whole, Date.now() + whole);
+    setStageEndsAt(stageEndsAtRef.current);
+  };
+
+  // The host's clock: forces the stage on once its time (and a little grace)
+  // is up.
+  const armForCurrentStage = () => {
     const p = phaseRef.current;
     if (p === 'lobby' || p === 'gameover') return;
-    const remaining = fullDuration
-      ? durationFor(p)
-      : durationFor(p) - (Date.now() - stageStartedAtRef.current) / 1000;
-    startHostTimer(remaining + HOST_GRACE, forceFor(p));
+    startHostTimer((stageEndsAtRef.current - Date.now()) / 1000 + HOST_GRACE, forceFor(p));
   };
 
   const beginStage = (p: Phase) => {
     phaseRef.current = p;
     setPhase(p);
+<<<<<<< Updated upstream
     stageStartedAtRef.current = Date.now();
     setTurnEndsAt(stageStartedAtRef.current + durationFor(p) * 1000);
     armForCurrentStage(true);
+=======
+    startClock(Date.now());
+    armForCurrentStage();
+>>>>>>> Stashed changes
   };
 
   // ---- Snapshot (host) ----
@@ -628,8 +692,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // Not part of this round's roster -> watch.
       myChainRef.current = -1;
       setPrev(null);
+<<<<<<< Updated upstream
       setTurn(null);
       go('/waiting');
+=======
+      showScreen('/waiting');
+>>>>>>> Stashed changes
       beginStage(p);
       return;
     }
@@ -641,12 +709,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (s === 0) {
       const seed = chainsRef.current[c]?.cells[0];
       setPrev(seed && seed.kind !== 'drawing' ? { kind: seed.kind, text: seed.text } : null);
+<<<<<<< Updated upstream
       go('/view');
+=======
+      showScreen('/view');
+>>>>>>> Stashed changes
       beginStage('view');
       return;
     }
     setPrev(prevFor(chainsRef.current[c], s));
+<<<<<<< Updated upstream
     go(p === 'draw' ? '/drawing' : '/guessing');
+=======
+    showScreen(p === 'draw' ? '/drawing' : '/guessing');
+>>>>>>> Stashed changes
     beginStage(p);
   };
 
@@ -881,7 +957,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       syncedRef.current = true;
       track();
     }
+<<<<<<< Updated upstream
     go('/prompts');
+=======
+    showScreen('/prompts');
+>>>>>>> Stashed changes
     beginStage('prompts');
     changed();
   };
@@ -903,6 +983,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const onViewAck = (name: string) => {
     viewAcksRef.current.add(name);
+    if (name === usernameRef.current) setViewReady(true);
     maybeAdvanceView();
     changed();
   };
@@ -919,6 +1000,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     revealIndexRef.current = 0;
     setRevealIndex(0);
     viewAcksRef.current = new Set();
+    setViewReady(false);
     // Chain c is OWNED by roster[c]: they view its prompt in Round 1 and judge it
     // at the reveal (judge = prompt author). The pooled prompt's original writer
     // is irrelevant to ownership.
@@ -981,7 +1063,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     rulingsRef.current = {};
     talliedRef.current = {};
     setRulings({});
+<<<<<<< Updated upstream
     go('/reveal');
+=======
+    showScreen('/reveal');
+>>>>>>> Stashed changes
     beginStage('reveal');
     maybeAutoRule();
     changed();
@@ -1046,7 +1132,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dbPhaseRef.current = 'lobby';
     // The room opens to newcomers again and the server forgets the game.
     if (isHostRef.current) endGameOnServer(roomRef.current);
+<<<<<<< Updated upstream
     go('/scoreboard');
+=======
+    showScreen('/scoreboard');
+>>>>>>> Stashed changes
     beginStage('gameover');
   };
 
@@ -1102,6 +1192,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     noteUsed(st.used);
     noteUsed(chainsRef.current.map((c) => c.cells[0]).filter((c): c is Extract<Cell, { kind: 'prompt' }> => c?.kind === 'prompt'));
     viewAcksRef.current = new Set(Array.isArray(st.viewAcks) ? st.viewAcks : []);
+    setViewReady(viewAcksRef.current.has(usernameRef.current));
     setPromptCount(st.promptCount ?? allPromptsRef.current.length);
     advancedForRef.current = (st.stage ?? 0) - 1;
     if (p !== 'lobby' && p !== 'gameover') dbPhaseRef.current = 'playing';
@@ -1111,6 +1202,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } else if (p === 'view' || p === 'draw' || p === 'caption') {
       routeForStage(st.stage ?? (p === 'view' ? 0 : 1));
     } else if (p === 'reveal') {
+<<<<<<< Updated upstream
       go('/reveal');
       beginStage('reveal');
     } else if (p === 'gameover') {
@@ -1118,12 +1210,22 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       beginStage('gameover');
     } else if (p === 'prompts') {
       go('/prompts');
+=======
+      showScreen('/reveal');
+      beginStage('reveal');
+    } else if (p === 'gameover') {
+      showScreen('/scoreboard');
+      beginStage('gameover');
+    } else if (p === 'prompts') {
+      showScreen('/prompts');
+>>>>>>> Stashed changes
       beginStage('prompts');
     } else {
       // The lobby: only if this phone isn't in it already (./nav lobbyOnCatchUp).
       const was = phaseRef.current;
       phaseRef.current = 'lobby';
       setPhase('lobby');
+<<<<<<< Updated upstream
       if (lobbyOnCatchUp(was, pathRef.current)) go('/lobby');
     }
     // The clock carries on from where the stage started, not from now: in
@@ -1134,6 +1236,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       stageStartedAtRef.current = Date.now() - elapsed;
       if (!same) setTurnEndsAt(stageStartedAtRef.current + durationFor(p) * 1000);
       if (isHostRef.current) armForCurrentStage(false);
+=======
+      showScreen('/lobby');
+    }
+    // The clock carries on from where the stage started, not from now. (Set
+    // before the screen changes, so a screen opening now counts down what's
+    // left.)
+    if (typeof st.stageStartedAt === 'number' && st.stageStartedAt > 0) {
+      startClock(st.stageStartedAt);
+      if (isHostRef.current) armForCurrentStage();
+>>>>>>> Stashed changes
     }
     lastChangeRef.current = Math.max(lastChangeRef.current, Number(st.savedAt) || 0);
     computeSkips();
@@ -1184,14 +1296,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           clearHostTimer();
           phaseRef.current = 'lobby';
           setPhase('lobby');
+<<<<<<< Updated upstream
           go('/lobby');
+=======
+          showScreen('/lobby');
+>>>>>>> Stashed changes
         }
         return markSynced();
       }
       const snap = res.snapshot;
       if (midGame && lastChangeRef.current >= (Number(snap?.savedAt) || 0)) {
         markSynced();
-        armForCurrentStage(false);
+        armForCurrentStage();
       } else if (snap) {
         applyState(asState(snap));
         markSynced();
@@ -1232,7 +1348,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (becameHost && phaseRef.current !== 'lobby' && !hostTimerRef.current) {
-      armForCurrentStage(false); // took over mid-round — resume the clock
+      armForCurrentStage(); // took over mid-round — resume the clock
     }
     // Someone leaving may be exactly what unblocks the current stage (a
     // skipped player is no longer waited for), so re-check completion now.
@@ -1547,7 +1663,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const closeLocally = (message: string) => {
     if (!roomRef.current) return;
     resetLocal();
+<<<<<<< Updated upstream
     goHome();
+=======
+    showScreen('/');
+>>>>>>> Stashed changes
     showToast(message, 4000);
   };
 
@@ -1632,6 +1752,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Round 1: tap through after reading the prompt of the chain you own (or
+<<<<<<< Updated upstream
   // the clock does it for you).
   // Only while Round 1's view is still on: a tap landing as the game moves on
   // mustn't take the player off the drawing they've just been handed.
@@ -1640,6 +1761,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     send('view-ack', { round: roundRef.current, username: usernameRef.current });
     if (byHand) touchRoom(roomRef.current);
     go('/waiting');
+=======
+  // the clock does it for you). The player stays on Round 1, which says
+  // Player ready at once (the room hears it a moment later, this phone too:
+  // onViewAck); once everyone in the round is ready, the host starts the
+  // drawing and everyone goes straight to it.
+  const readyView = (byHand = true) => {
+    setViewReady(true);
+    send('view-ack', { username: usernameRef.current });
+    if (byHand) touchRoom(roomRef.current);
+>>>>>>> Stashed changes
   };
 
   // Hand in a turn: a drawing (JSON) on a drawing stage, a guess on a
@@ -1664,6 +1795,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (handedRef.current.has(turnKey(t)) || (!current && (isEmptyTurn(cell) || t.round !== roundRef.current))) return;
     handIn(t, cell);
     if (!isEmptyTurn(cell)) touchRoom(roomRef.current);
+<<<<<<< Updated upstream
     if (current && !closing) go('/waiting');
   };
 
@@ -1672,6 +1804,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const passTurn = (forTurn?: Turn | null) => {
     const now = currentTurn();
     if (!forTurn || sameTurn(forTurn, now)) go('/waiting');
+=======
+    showScreen('/waiting');
+>>>>>>> Stashed changes
   };
 
   // The round leader judges the reveal, but if they don't have the app open
@@ -1779,14 +1914,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         isJudge: username !== '' && username === currentJudge,
         promptCount,
         promptsNeeded,
+<<<<<<< Updated upstream
         turn,
         turnEndsAt,
+=======
+        stageEndsAt,
+>>>>>>> Stashed changes
         enterRoom,
         returnToRoom,
         leaveRoom,
         startGame,
         addPrompt,
         readyView,
+        viewReady,
         submitCell,
         passTurn,
         vote,
