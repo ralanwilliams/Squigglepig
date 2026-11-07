@@ -54,6 +54,12 @@ export const GROUPS = {
 
 export type Group = keyof typeof GROUPS;
 
+// The group a /rewards?group= link asks for, or Art supplies when it names
+// none (or something that isn't a group, like `toString`).
+export function groupOf(asked: string | string[] | undefined): Group {
+  return typeof asked === 'string' && Object.prototype.hasOwnProperty.call(GROUPS, asked) ? (asked as Group) : 'art';
+}
+
 // Where a kind's rewards are kept: the Rewards screen for a GROUPS kind, else
 // Your pig, where outfits and speech bubbles are put on. `path` is the route
 // (the menu's Rewards rows, src/components/MenuDrawer.tsx) and `go` names a

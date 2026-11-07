@@ -60,6 +60,7 @@ export default function Join() {
 
   return (
     <Stage
+      menu
       focus={<Logo source={IMAGES.join} />}
       actions={
         <>

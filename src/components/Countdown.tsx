@@ -94,6 +94,14 @@ export function Countdown({
 // state (or a ref) so it is computed once per screen, not once per render.
 export const deadlineIn = (seconds: number) => Date.now() + seconds * 1000;
 
+// A game screen's deadline: the game's own for the stage (GameContext
+// turnEndsAt), so a screen that opened late, or a phone back in the room
+// mid-stage, counts down only what's left. If that has already passed, or is
+// further off than the whole `seconds` (a clock out of step), the whole
+// `seconds` from now instead: the host's clock moves the game on either way.
+export const deadlineFor = (seconds: number, endsAt?: number) =>
+  endsAt && endsAt > Date.now() && endsAt <= deadlineIn(seconds) ? endsAt : deadlineIn(seconds);
+
 const makeStyles = (t: Theme) => StyleSheet.create({
   text: {
     textAlign: 'center',

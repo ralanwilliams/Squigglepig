@@ -25,5 +25,11 @@ export const PRIVACY_URL = 'https://squigglepig.app/privacy';
 export const TERMS_URL = `${LINK_ORIGIN}/terms`;
 export const DEVELOPER_URL = 'https://ralanwilliams.com';
 
+// The app's own pages the menu drawer opens: Your pig, Rewards (Art supplies
+// or Themes) and Licenses. Opened from another one of these, the new page
+// takes the old one's place (MenuDrawer.tsx), so they don't pile up. (When
+// the game moves on, it takes the player from any of them: src/state/nav.ts.)
+export const MENU_PAGES: ReadonlySet<string> = new Set(['/pig', '/rewards', '/licenses']);
+
 // The snout secret's reward (src/components/SnoutSecret.tsx).
 export const CV_URL = 'https://ralanwilliams.com/cv/en.pdf';

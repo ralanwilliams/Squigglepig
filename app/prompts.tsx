@@ -7,7 +7,7 @@ import { PigInput } from '../src/components/PigInput';
 import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { useGame } from '../src/state/GameContext';
-import { TIMERS } from '../src/lib/timers';
+import { promptsTime } from '../src/lib/timers';
 import { PHRASE_MAX } from '../src/lib/text';
 import { font, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
@@ -18,7 +18,10 @@ const VISIBLE = 6;
 
 // Setup: everyone drops prompts into the shared trough. It fills one step per
 // prompt (a live count — enough to seed every chain of every round without
-// repeats) and the game auto-starts the instant it's full.
+// repeats) and the game auto-starts the instant it's full. The clock gives 30
+// seconds for each prompt the trough needs (src/lib/timers.ts promptsTime),
+// counting down to the game's deadline (turnEndsAt), so a phone back in the
+// room mid-way shows only what's left.
 //
 // Same WorkStage frame as drawing and guessing: the pig peeks over the prompt
 // input with the timer beside it, and "Add" sits where Submit does — so the
@@ -27,7 +30,7 @@ const VISIBLE = 6;
 export default function Prompts() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { addPrompt, promptCount, promptsNeeded } = useGame();
+  const { addPrompt, promptCount, promptsNeeded, turnEndsAt } = useGame();
   const [mine, setMine] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
 
@@ -92,7 +95,8 @@ export default function Prompts() {
   return (
     <WorkStage
       focus={focus}
-      timeLimit={TIMERS.prompts}
+      timeLimit={promptsTime(promptsNeeded)}
+      until={turnEndsAt}
       top={
         <PigInput
           style={styles.fill}

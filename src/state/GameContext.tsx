@@ -3,7 +3,7 @@ import { AppState, BackHandler } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '../lib/supabase';
-import { TIMERS, HOST_GRACE } from '../lib/timers';
+import { TIMERS, HOST_GRACE, promptsTime } from '../lib/timers';
 import { saveSession, clearSession, savePendingLeave, takePendingLeave } from '../lib/session';
 import {
   IDLE_MINUTES,
@@ -201,6 +201,7 @@ type Game = {
   startGame: (target: number) => void;
   addPrompt: (text: string) => void;
   readyView: (byHand?: boolean) => void;
+  viewReady: boolean; // this player has tapped through Round 1 (or its clock ran out)
   submitCell: (data: string, forTurn?: Turn | null, closing?: boolean) => void;
   passTurn: (forTurn?: Turn | null) => void;
   vote: (correct: boolean) => void;
@@ -337,6 +338,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // after is the same tap twice, from two phones: to-prompts).
   const promptsAtRef = useRef(0);
   const viewAcksRef = useRef<Set<string>>(new Set()); // who has tapped through Round 1
+  // Whether this player is among them: Round 1 shows Player ready in place of
+  // its button (app/view.tsx).
+  const [viewReady, setViewReady] = useState(false);
 
   const hostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Host: the pause between the prompt pool filling and the first round going
@@ -537,9 +541,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!isHostRef.current) return;
     hostTimerRef.current = setTimeout(fn, Math.max(1, seconds) * 1000);
   };
+  // How long each stage lasts. The trough's time follows its size: 30 s for
+  // each prompt it needs (the players in the room and the points to win).
   const durationFor = (p: Phase) =>
     p === 'prompts'
-      ? TIMERS.prompts
+      ? promptsTime(promptsNeededFor(orderedNames().length, targetRef.current))
       : p === 'view'
         ? TIMERS.view
         : p === 'draw'
@@ -903,6 +909,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const onViewAck = (name: string) => {
     viewAcksRef.current.add(name);
+    if (name === usernameRef.current) setViewReady(true);
     maybeAdvanceView();
     changed();
   };
@@ -919,6 +926,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     revealIndexRef.current = 0;
     setRevealIndex(0);
     viewAcksRef.current = new Set();
+    setViewReady(false);
     // Chain c is OWNED by roster[c]: they view its prompt in Round 1 and judge it
     // at the reveal (judge = prompt author). The pooled prompt's original writer
     // is irrelevant to ownership.
@@ -1102,6 +1110,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     noteUsed(st.used);
     noteUsed(chainsRef.current.map((c) => c.cells[0]).filter((c): c is Extract<Cell, { kind: 'prompt' }> => c?.kind === 'prompt'));
     viewAcksRef.current = new Set(Array.isArray(st.viewAcks) ? st.viewAcks : []);
+    setViewReady(viewAcksRef.current.has(usernameRef.current));
     setPromptCount(st.promptCount ?? allPromptsRef.current.length);
     advancedForRef.current = (st.stage ?? 0) - 1;
     if (p !== 'lobby' && p !== 'gameover') dbPhaseRef.current = 'playing';
@@ -1634,12 +1643,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // Round 1: tap through after reading the prompt of the chain you own (or
   // the clock does it for you).
   // Only while Round 1's view is still on: a tap landing as the game moves on
-  // mustn't take the player off the drawing they've just been handed.
+  // mustn't count for the drawing they've just been handed.
+  // The player stays on Round 1, which says Player ready at once (the room
+  // hears it a moment later, this phone too: onViewAck); once everyone in the
+  // round is ready, the host starts the drawing and everyone goes straight to it.
   const readyView = (byHand = true) => {
     if (phaseRef.current !== 'view') return;
+    setViewReady(true);
     send('view-ack', { round: roundRef.current, username: usernameRef.current });
     if (byHand) touchRoom(roomRef.current);
-    go('/waiting');
   };
 
   // Hand in a turn: a drawing (JSON) on a drawing stage, a guess on a
@@ -1787,6 +1799,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         startGame,
         addPrompt,
         readyView,
+        viewReady,
         submitCell,
         passTurn,
         vote,

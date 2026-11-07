@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Countdown, deadlineIn } from './Countdown';
+import { Countdown, deadlineFor } from './Countdown';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
 import { PeekPig, peekPigHeight } from './PeekPig';
@@ -49,7 +49,7 @@ export function WorkStage({
   timeLimit?: number;
   // When the clock runs out (epoch ms): the game's own deadline for the
   // turn, so the screen hands in on time even if it opened late. Without it
-  // (or if it has already passed), timeLimit from now.
+  // (or if it has already passed), timeLimit from now (Countdown deadlineFor).
   until?: number;
   onExpire?: () => void;
   top: React.ReactNode;
@@ -64,9 +64,7 @@ export function WorkStage({
   // (and the Countdown remounted) whenever the layout flips between one and
   // two panes, and the clock must not start over when the phone turns. The
   // guard keeps a remount right at zero from firing `onExpire` twice.
-  const [until] = useState(() =>
-    !timeLimit ? 0 : endsAt && endsAt > Date.now() && endsAt <= deadlineIn(timeLimit) ? endsAt : deadlineIn(timeLimit)
-  );
+  const [until] = useState(() => (timeLimit ? deadlineFor(timeLimit, endsAt) : 0));
   const expired = useRef(false);
   const expire = () => {
     if (expired.current) return;

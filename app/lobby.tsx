@@ -3,6 +3,7 @@ import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
 import { PigButton } from '../src/components/PigButton';
+import { ButtonNote } from '../src/components/ButtonNote';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { showToast } from '../src/components/Toast';
 import { IMAGES } from '../src/assets/assets';
@@ -47,7 +48,9 @@ const COPY_LINK =
 // is dimmed and tagged AWAY (they're still in, until they tap Leave game); the
 // host is the longest-in player who has it open. Nothing scrolls: the roster
 // shows as many rows as the pane has room for and collapses the rest to "+N
-// more", and Stage's FitBox shrinks the card if it is still too tall.
+// more", and Stage's FitBox shrinks the card if it is still too tall. The
+// menu's pages open over it (the player is still in the room, and Back comes
+// back here); if the game starts meanwhile, the player is taken to it.
 export default function Lobby() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -167,11 +170,7 @@ export default function Lobby() {
               {canStart ? (
                 <PigButton name="Start Game" onPress={() => startGame(target)} />
               ) : (
-                <View style={[styles.startDisabled, { minHeight: ui.sp(44), borderRadius: ui.sp(8) }]}>
-                  <Text style={[styles.startDisabledText, { fontSize: ui.f(15) }]} maxFontSizeMultiplier={FONT_CAP}>
-                    Need {MIN_PLAYERS}+ players
-                  </Text>
-                </View>
+                <ButtonNote text={`Need ${MIN_PLAYERS}+ players`} />
               )}
             </>
           ) : (
@@ -240,7 +239,7 @@ export default function Lobby() {
     </View>
   );
 
-  return <Stage header={header} focus={focus} actions={actions} />;
+  return <Stage menu header={header} focus={focus} actions={actions} />;
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
@@ -288,14 +287,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   stepText: { color: t.link, fontFamily: font.bold },
   stepVal: { textAlign: 'center', fontFamily: font.bold, color: t.surfaceText },
 
-  // Disabled Start (not enough players yet) — same footprint as PigButton.
-  startDisabled: { backgroundColor: t.surfaceInset, alignItems: 'center', justifyContent: 'center' },
-  startDisabledText: {
-    color: t.textMuted,
-    fontFamily: font.medium,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
   waiting: { fontFamily: font.regular, color: t.surfaceText, textAlign: 'center' },
   controls: { justifyContent: 'center' },
 

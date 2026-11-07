@@ -41,6 +41,7 @@ export default function Create() {
 
   return (
     <Stage
+      menu
       focus={<Logo source={IMAGES.home} />}
       actions={
         <>
