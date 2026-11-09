@@ -35,6 +35,15 @@ export function navFor(here: string, path: string, force = false): Nav {
 // the waiting screen it reconnected to (GameContext connect).
 export const lobbyOnCatchUp = (was: Phase, here: string) => isGameOn(was) || here === '/waiting';
 
-// Whether Back (Android's button) is held: during a game, on its screens.
-// The game moves the player on by itself, and Leave game is the way out.
-export const holdsBack = (inRoom: boolean, phase: Phase, here: string) => inRoom && isGameOn(phase) && isRoomScreen(here);
+// Whether Back is held (src/lib/backGuard.ts): during a game, on its screens.
+// The game moves the player on by itself, so Back only ever means leaving, and
+// asks first. In the lobby and on the scoreboard it goes home, still in the room.
+// The waiting screen always counts: it's also where a phone back in a game waits
+// to catch up, its own phase still the lobby until the host answers.
+export const holdsBack = (inRoom: boolean, phase: Phase, here: string) =>
+  inRoom && isRoomScreen(here) && (isGameOn(phase) || here === '/waiting');
+
+// What leaving the room costs, for the question Leave game asks. Nobody can
+// join a game under way (rooms.sql join_room), a player who left included.
+export const leaveCost = (gameOn: boolean) =>
+  gameOn ? "You'll leave this game, and you can't rejoin until it's over." : "You'll leave this room.";

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { AppState, BackHandler } from 'react-native';
+import { AppState } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '../lib/supabase';
@@ -22,8 +22,10 @@ import {
 } from '../lib/rooms';
 import { registerForPush } from '../lib/push';
 import { CHUNK_GAP_MS, Joiner, chunkId, split } from '../lib/chunks';
-import { holdsBack, isRoomScreen, lobbyOnCatchUp, navFor } from './nav';
+import { holdsBack, isRoomScreen, leaveCost, lobbyOnCatchUp, navFor } from './nav';
 import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
+import { useBackGuard } from '../lib/backGuard';
+import { closeConfirm, confirmLeave } from '../lib/confirm';
 import { showToast } from '../components/Toast';
 import { cleanAvatar, useMyAvatar, wireAvatar, type Avatar } from '../avatar/avatar';
 import { NAME_MAX, ROOM_CODE_LENGTH, cleanName, cleanPhrase, cleanRoomCode, isRoomCode } from '../lib/text';
@@ -197,7 +199,7 @@ type Game = {
   enterRoom: (room: string | null, username: string, rejoin?: boolean) => Promise<EntryStatus>;
   // Back to the room's screen from elsewhere in the app (Home's Back to room).
   returnToRoom: () => void;
-  leaveRoom: () => void;
+  askToLeave: () => void; // Leave game: "Are you sure?", then out of the room
   startGame: (target: number) => void;
   addPrompt: (text: string) => void;
   readyView: (byHand?: boolean) => void;
@@ -358,9 +360,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // In the lobby or on the scoreboard, Back goes home and the player stays in
   // the room: they can play solo, dress their pig, and come back with Home's
   // Back to room (returnToRoom). When the game starts, or moves on, `go`
-  // brings them to its screen wherever they are. During a game Back does
-  // nothing (the hardware button here; the swipe is off on those screens in
-  // app/_layout.tsx): the only way out is Leave game.
+  // brings them to its screen wherever they are. During a game Back asks if
+  // they want to leave, the same as Leave game (askToLeave, below).
   const pathname = usePathname();
   const pathRef = useRef(pathname);
   // The room's screen as the game last put it (or the player left it), for
@@ -400,12 +401,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const goHome = () => {
     if (isRoomScreen(pathRef.current)) router.dismissTo('/');
   };
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () =>
-      holdsBack(!!roomRef.current, phaseRef.current, pathRef.current)
-    );
-    return () => sub.remove();
-  }, []);
 
   // ---- Who's here ----
   // Everyone still in the room (not left), oldest first: the round roster.
@@ -1495,6 +1490,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // Forget the room on this phone (the server is told separately, or already knows).
   const resetLocal = () => {
+    // "Leave?" has no room left to ask about. (Elsewhere, the question is a solo
+    // game's own, which carries on.)
+    if (isRoomScreen(pathRef.current)) closeConfirm();
     clearHostTimer();
     clearStartDelay();
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
@@ -1550,6 +1548,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     resetLocal();
     goHome();
   };
+  // Leave game, and Back during a game, ask first. The game carries on behind
+  // the question: it has other players waiting on it. What it costs goes by the
+  // server's phase too: a phone back in a game is in the lobby until it catches
+  // up, but the server won't let it rejoin.
+  const askToLeave = () => confirmLeave(leaveCost(isGameOn(phaseRef.current) || dbPhaseRef.current === 'playing'), leaveRoom);
+  useBackGuard(holdsBack(!!room, phase, pathname), askToLeave);
 
   // The room closed under us (idle too long): back to the home screen, from
   // the room's screens (a player looking around elsewhere stays there).
@@ -1795,7 +1799,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         turnEndsAt,
         enterRoom,
         returnToRoom,
-        leaveRoom,
+        askToLeave,
         startGame,
         addPrompt,
         readyView,

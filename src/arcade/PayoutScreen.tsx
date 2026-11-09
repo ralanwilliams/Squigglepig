@@ -5,6 +5,8 @@ import { Stage } from '../components/Stage';
 import { Heading } from '../components/Heading';
 import { Hint } from '../components/Hint';
 import { PigButton } from '../components/PigButton';
+import { useScreenBackGuard } from '../lib/backGuard';
+import { confirmLeave } from '../lib/confirm';
 import { RewardTile } from '../rewards/RewardTile';
 import { KINDS, homeOf, type Reward } from '../rewards/catalog';
 import { useInventory } from '../rewards/inventory';
@@ -33,6 +35,9 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
   useEffect(() => {
     playSound(SOUNDS.winner);
   }, []);
+
+  // Back before choosing gives the prize up, so it asks first.
+  useScreenBackGuard(!taken && list.length > 0, () => confirmLeave("You haven't chosen your prize yet, so it will be lost.", onDone));
 
   const take = (r: Reward) => {
     grant(r.id);

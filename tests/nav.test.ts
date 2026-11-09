@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holdsBack, isRoomScreen, navFor } from '../src/state/nav';
+import { holdsBack, isRoomScreen, leaveCost, navFor } from '../src/state/nav';
 
 // Bug: Back from the lobby showed "Reconnecting…" (the home screen that had
 // put the lobby over itself never stopped checking), and there was nothing
@@ -58,5 +58,20 @@ describe('Back', () => {
   });
   test('home and the rest of the app are not room screens', () => {
     for (const p of ['/', '/create', '/join', '/arcade', '/pig', '/rewards', '/licenses']) assert.ok(!isRoomScreen(p), p);
+  });
+});
+
+describe('Are you sure?', () => {
+  test('during a game, says there is no coming back into it', () => {
+    assert.match(leaveCost(true), /can't rejoin/);
+  });
+  test('in the lobby, only that it leaves the room', () => {
+    assert.doesNotMatch(leaveCost(false), /rejoin/);
+  });
+  // Bug: a phone back in a game waits here with its own phase still the lobby
+  // until the host answers, and Back went home without asking.
+  test('Back is held on the waiting screen before the phone has caught up', () => {
+    assert.ok(holdsBack(true, 'lobby', '/waiting'));
+    assert.ok(!holdsBack(false, 'lobby', '/waiting'));
   });
 });

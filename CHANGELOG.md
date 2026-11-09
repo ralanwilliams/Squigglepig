@@ -10,7 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - While you wait in the lobby you can do other things in the app: Back goes to the home screen and you stay in the room. Play solo or dress up your pig, then tap Back to room on the home screen; when the host starts the game, Squigglepig takes you straight to it
 
 ### Changed
-- During a game, Back (Android's back button, or swiping back on iPhone and iPad) does nothing: the game moves you on by itself, and Leave game is the way out
+- Leaving a game asks "Are you sure?" first, with what you'd lose, so a stray tap doesn't take you out. Tapping Leave game or Leave asks, and so does going back during a game or a solo run (Android's back button, swiping back on iPhone and iPad, or a browser's Back). Stay keeps you in the game, whose clock keeps running while the question is up
 - The lobby says who you're waiting for ("Waiting for Alan to start…"), and its status line is one short line: "Connected · 4 players · 1 away"
 - Drawings are sent with only the points their lines need, so a detailed drawing arrives faster and looks the same
 - A room left 10 minutes without anyone doing anything in it is closed for everyone straight away
@@ -28,6 +28,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - On phones, the royal scroll's message now shows as the scroll unrolls, not only once it's all the way open
 - Two players tapping New game at the same moment no longer empties the trough, and no prompt is handed out twice in a game, even when the host changes
 - Back in a game after closing the app, the timers for filling the trough, reading your prompt and judging show the time that's actually left, as drawing and guessing now do, instead of starting over from the full time
+- On an iPhone held on its side, opening the menu or How to play no longer turns the screen to portrait
 
 ## [2.9.0]
 

@@ -1,19 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FitBox } from './FitBox';
 import { SOUNDS } from '../assets/assets';
 import { playSound } from '../lib/sound';
 import { font } from '../theme/tokens';
 import { useReducedMotion, useTheme } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
-import { useFieldColors } from './fieldColors';
 
 // The news at the end of a round, popping up as a card: at a new tier the
 // choice to keep going or bank it, and a lost round's news, with Play again
 // and Done. Every game draws the same card, in one of two looks: over
 // a full-screen game's art, the field's quiet dark panel and amber
-// (fieldColors.ts; FieldFrame.tsx); over a Stage round (RunShell's
-// RoundFrame), the theme's overlay panel and button colors, the app's own
-// modal, on a scrim.
+// (FieldFrame.tsx); over a Stage round (RunShell's RoundFrame), the theme's
+// overlay panel and button colors, the app's own modal, on a scrim. The app's
+// questions are the same card (ConfirmDialog.tsx).
 
 export type CardLook = {
   card: string; // the card's fill
@@ -26,11 +26,6 @@ export type CardLook = {
   main: string; // the first button's fill
   mainText: string; // its label
 };
-
-export function useFieldCardLook(): CardLook {
-  const fc = useFieldColors();
-  return { card: fc.card, border: fc.line, edge: 1, line: fc.line, text: fc.text, muted: fc.muted, main: fc.amber, mainText: fc.amberText };
-}
 
 // The theme's overlay (the how-to modal's panel) is a dark panel in every
 // palette, its text light, so an outlined button's edge is that text, faint;
@@ -129,6 +124,46 @@ export function RoundCard({
   );
 }
 
+// The card over a Stage screen, in the theme's look, on its scrim, which takes
+// the taps under it: a lost or banked round (RunShell's RoundFrame) and the
+// app's questions (src/components/ConfirmDialog.tsx).
+export function ScrimCard({
+  delay,
+  title,
+  lines,
+  actions,
+}: {
+  delay: number;
+  title?: string;
+  lines: string[];
+  actions: { name: string; onPress: () => void }[];
+}) {
+  const ui = useUi();
+  const t = useTheme();
+  const look = useStageCardLook();
+  const p = useCardIn(delay);
+  return (
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          paddingTop: ui.insets.top + ui.pad,
+          paddingBottom: ui.insets.bottom + ui.pad,
+          paddingLeft: ui.insets.left + ui.pad,
+          paddingRight: ui.insets.right + ui.pad,
+        },
+      ]}
+    >
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: t.scrim, opacity: p }]} />
+      <FitBox style={styles.fill}>
+        <View style={styles.center}>
+          <RoundCard look={look} delay={delay} title={title} lines={lines} actions={actions} />
+        </View>
+      </FitBox>
+    </View>
+  );
+}
+
 // The card's buttons: the first filled, the rest outlined. Like PigButton
 // they grunt.
 function CardButton({ name, onPress, main, look }: { name: string; onPress: () => void; main: boolean; look: CardLook }) {
@@ -165,6 +200,8 @@ function CardButton({ name, onPress, main, look }: { name: string; onPress: () =
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  center: { alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start' },
   title: { fontFamily: font.bold, textAlign: 'center' },
   line: { fontFamily: font.regular, textAlign: 'center' },

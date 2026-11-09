@@ -14,6 +14,8 @@ import {
 import { GameProvider } from '../src/state/GameContext';
 import { InventoryProvider } from '../src/rewards/inventory';
 import { ThemeProvider, ThemeSnapshotTarget, ThemeTransition, useTheme } from '../src/theme/theme';
+import { BackSwipe } from '../src/components/BackSwipe';
+import { ConfirmOverlay } from '../src/components/ConfirmDialog';
 import { CornerControlsOverlay } from '../src/components/CornerControls';
 import { ToastOverlay } from '../src/components/Toast';
 import { WalkthroughOverlay } from '../src/components/Walkthrough';
@@ -29,10 +31,11 @@ import { useAppFrame } from '../src/theme/responsive';
 // everyone back into /prompts or /lobby it starts again from the top.
 const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/rewards', '/pig', '/arcade', '/join', '/create', '/lobby', '/prompts', '/waiting']);
 
-// A game's own screens, where swiping back (iOS) does nothing: the game moves
-// the player on by itself, and Leave game is the way out. (Android's back
-// button is held the same way in GameContext.) The lobby and the scoreboard
-// aren't here: Back from them goes home, still in the room.
+// A game's own screens, where the screen itself doesn't swipe back (iOS): the
+// game moves the player on by itself, so Back only ever means leaving, and asks
+// first (src/lib/backGuard.ts, held from GameContext; BackSwipe takes the swipe).
+// The lobby and the scoreboard aren't here: Back from them goes home, still in
+// the room.
 const GAME_SCREENS = ['prompts', 'view', 'drawing', 'guessing', 'waiting', 'reveal'];
 
 // Home is always at the bottom of the stack, even when the app opens on a
@@ -89,8 +92,9 @@ export default function RootLayout() {
 // the old screen away when the theme flips, seasonal props falling into the
 // trough from the top of the screen, and the sound and dark-mode switches
 // floating over every screen — in that order, so the toggle's glyph keeps morphing on top
-// while the wipe passes underneath it. Then the toasts, and the walkthrough
-// (a modal, over everything: first launch, and the menu's How to play).
+// while the wipe passes underneath it. Then the toasts, and the modals over
+// everything: the walkthrough (first launch, and the menu's How to play), and
+// "Are you sure?" (ConfirmDialog.tsx).
 //
 // On web all of it sits in a frame centred in the browser window, capped in
 // width so an ultrawide monitor doesn't pull the panes apart (useAppFrame);
@@ -122,23 +126,26 @@ function Shell() {
       <View style={[styles.frame, Platform.OS === 'web' && { maxWidth: frame.width }]}>
         <StatusBar style={theme.name === 'dark' ? 'light' : 'dark'} />
         <ThemeSnapshotTarget>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: 'fade',
-              contentStyle: { backgroundColor: theme.background },
-            }}
-          >
-            {GAME_SCREENS.map((name) => (
-              <Stack.Screen key={name} name={name} options={{ gestureEnabled: false }} />
-            ))}
-          </Stack>
+          <BackSwipe>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: 'fade',
+                contentStyle: { backgroundColor: theme.background },
+              }}
+            >
+              {GAME_SCREENS.map((name) => (
+                <Stack.Screen key={name} name={name} options={{ gestureEnabled: false }} />
+              ))}
+            </Stack>
+          </BackSwipe>
         </ThemeSnapshotTarget>
         <ThemeTransition />
         <TroughDropLayer />
         <CornerControlsOverlay />
         <ToastOverlay />
         <WalkthroughOverlay />
+        <ConfirmOverlay />
       </View>
       {STANDALONE ? (
         <>

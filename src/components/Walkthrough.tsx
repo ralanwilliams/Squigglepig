@@ -6,7 +6,7 @@ import { PigButton } from './PigButton';
 import { ChainScene, DrawScene, GatherScene, HostScene, PromptsScene, ScoreScene } from './WalkthroughScenes';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useThemedStyles } from '../theme/theme';
-import { FONT_CAP, useUi } from '../theme/responsive';
+import { ANY_WAY_UP, FONT_CAP, useUi } from '../theme/responsive';
 import { closeWalkthrough, markTutorialDone, useWalkthroughOpen } from '../lib/tutorial';
 
 // The first-run walkthrough: six steps, each a looping animation with one
@@ -105,6 +105,7 @@ function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void
       animationType="fade"
       statusBarTranslucent
       navigationBarTranslucent
+      supportedOrientations={ANY_WAY_UP}
       // Android back steps back through the walkthrough; it never dismisses it.
       onRequestClose={() => go(stepRef.current - 1)}
     >

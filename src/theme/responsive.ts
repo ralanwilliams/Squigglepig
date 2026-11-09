@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Platform, useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions, type ModalProps } from 'react-native';
 import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context';
 
 // ---------------------------------------------------------------------------
@@ -29,6 +29,11 @@ const MAX_SCALE = 1.5;
 // Cap on the OS accessibility font multiplier. Text still grows with the user's
 // setting, but not so far that FitBox has to shrink whole screens to fit it.
 export const FONT_CAP = 1.2;
+
+// For every Modal's supportedOrientations. On an iPhone a modal only takes the
+// portrait unless told otherwise, which would turn a phone held on its side the
+// moment one opened. They follow the phone, as the rest of the app does.
+export const ANY_WAY_UP: ModalProps['supportedOrientations'] = ['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right'];
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 

@@ -3,6 +3,7 @@ import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Countdown } from '../components/Countdown';
 import { CORNER_SLOTS, cornerSlot, useCornerInk } from '../components/CornerControls';
 import { FitBox } from '../components/FitBox';
+import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, type CardLook } from '../components/RoundCard';
 import { font } from '../theme/tokens';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { useFieldColors } from './fieldColors';
@@ -11,10 +12,15 @@ import { DifficultyMeter } from './DifficultyMeter';
 import { Padlock } from './Padlock';
 import { ChoiceRow, type Choice } from './ChoiceRow';
 import { Lives } from './Lives';
-import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, useFieldCardLook } from './RoundCard';
 import { RoundCountdown, useStarted } from './RoundCountdown';
 import { RoundCtx } from './RoundCtx';
 import type { Frame } from './games';
+
+// The round's card over the field: the quiet dark panel and amber.
+function useFieldCardLook(): CardLook {
+  const fc = useFieldColors();
+  return { card: fc.card, border: fc.line, edge: 1, line: fc.line, text: fc.text, muted: fc.muted, main: fc.amber, mainText: fc.amberText };
+}
 
 // What a full-screen game's round is drawn into (Game.fullScreen), in place
 // of RunShell's RoundFrame on Stage. The game's `focus` fills the whole
