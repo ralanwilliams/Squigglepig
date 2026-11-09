@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { font, type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
-import { FONT_CAP, useUi } from '../theme/responsive';
+import { ANY_WAY_UP, FONT_CAP, useUi } from '../theme/responsive';
 import { PigButton } from './PigButton';
 import { showToast } from './Toast';
 import { CV_URL } from '../lib/links';
@@ -55,7 +55,7 @@ export function SnoutSecret() {
     <>
       <Pressable accessible={false} onPress={onPress} style={[styles.snout, SNOUT]} />
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" supportedOrientations={ANY_WAY_UP} onRequestClose={() => setOpen(false)}>
         <View
           style={[
             styles.backdrop,

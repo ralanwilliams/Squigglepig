@@ -1,24 +1,25 @@
 import React, { useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Animated, BackHandler, Platform, StyleSheet, View } from 'react-native';
-import { router, useNavigation } from 'expo-router';
+import { Animated, Platform, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
 import { Stage } from '../components/Stage';
-import { FitBox } from '../components/FitBox';
 import { NoteCard } from '../components/NoteCard';
 import { PigButton } from '../components/PigButton';
 import { TextLink } from '../components/TextLink';
 import { Countdown, deadlineIn } from '../components/Countdown';
 import { showToast } from '../components/Toast';
 import { hideCornerControls } from '../components/CornerControls';
+import { LOST_CARD_DELAY_MS, ScrimCard, WON_CARD_DELAY_MS } from '../components/RoundCard';
+import { useScreenBackGuard } from '../lib/backGuard';
+import { confirmLeave } from '../lib/confirm';
 import { guidedAccessOn, pinScreen, unpinScreen } from '../lib/screenPin';
 import { useUi } from '../theme/responsive';
 import { useReducedMotion, useTheme } from '../theme/theme';
-import { LADDER, LIVES, ROUNDS, RULES, START, newTier, prizeFor, roundSeconds, runReducer } from './engine';
+import { LADDER, LIVES, ROUNDS, RULES, START, leaveCost, newTier, prizeFor, roundSeconds, runReducer, runUnderWay } from './engine';
 import { PotLadder } from './PotLadder';
 import { RewardPodium } from './RewardPodium';
 import { PayoutScreen } from './PayoutScreen';
 import { FieldFrame } from './FieldFrame';
 import { Lives } from './Lives';
-import { LOST_CARD_DELAY_MS, RoundCard, WON_CARD_DELAY_MS, useCardIn, useStageCardLook } from './RoundCard';
 import { COUNT_IN_MS, useStarted } from './RoundCountdown';
 import { RoundCtx, type Endless, type Settled } from './RoundCtx';
 import { DIFFICULTIES } from './DifficultyMeter';
@@ -56,9 +57,10 @@ import type { Game } from './games';
 // Go!), the field under a curtain and the clock waiting, so the deadline is
 // set that much later. Its cards come up on the field, in its own look.
 //
-// Nothing about a run is saved: leaving the screen mid-run (Leave, the back
-// button) ends it and loses the pot, and so does the clock running out while
-// the app is in the background — the timer goes by the wall clock.
+// Nothing about a run is saved: leaving the screen mid-run (Leave, Back) ends
+// it and loses the pot, so both ask first (ConfirmDialog.tsx; the clock runs on
+// behind the question). The clock running out while the app is in the
+// background loses it too: the timer goes by the wall clock.
 //
 // A game with an endless hunt of its own (Game.endless: Truffle Hunter) can
 // be switched to it from any round, with Change to Endless Hunt beside Leave
@@ -141,7 +143,6 @@ export function RunShell({ game }: { game: Game<any> }) {
     return difficulty === undefined ? null : { level: 1, difficulty, deal: 1, rested: Date.now(), restLocked: true, stillResting: true };
   });
   const [locked, setLocked] = useState(() => STILL_RESTING.has(game.id));
-  const navigation = useNavigation();
   const huntSpec = useMemo(
     () => (hunt && game.endless ? game.endless(hunt.level, hunt.difficulty) : null),
     [hunt?.level, hunt?.difficulty, hunt?.deal]
@@ -169,6 +170,7 @@ export function RunShell({ game }: { game: Game<any> }) {
     }
   };
   const done = () => (router.canGoBack() ? router.back() : router.replace('/arcade'));
+  const askToLeave = () => confirmLeave(hunt ? 'This hunt will end here.' : leaveCost(run), done);
   const again = () => dispatch({ type: 'restart' });
   const keepGoing = (won: number) => dispatch({ type: 'next', until: deadline(won + 1) });
 
@@ -232,21 +234,21 @@ export function RunShell({ game }: { game: Game<any> }) {
     setHunt((h) => (h?.rested && h.restLocked ? { level: 1, difficulty: h.difficulty, deal: h.deal + 1 } : h));
   };
 
-  // Locked: no sound or dark-mode switch, no back button or back swipe, and on
-  // Android the app pinned; all of it undone on unlocking or leaving.
+  // Locked: no sound or dark-mode switch, and on Android the app pinned; all of
+  // it undone on unlocking or leaving.
   useEffect(() => {
     if (!locked) return;
     hideCornerControls(true);
     pinScreen();
-    navigation.setOptions({ gestureEnabled: false });
-    const back = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => {
-      back.remove();
-      navigation.setOptions({ gestureEnabled: true });
       unpinScreen();
       hideCornerControls(false);
     };
   }, [locked]);
+  // Back during a run or the hunt asks first, like Leave. Locked, it does nothing.
+  useScreenBackGuard(locked || !!hunt || runUnderWay(run), () => {
+    if (!locked) askToLeave();
+  });
   const lock = () => {
     setLocked(true);
     if (Platform.OS !== 'ios' || guidedTipShown) return;
@@ -332,7 +334,7 @@ export function RunShell({ game }: { game: Game<any> }) {
           seconds: 0,
           until: 0,
           expire: () => {},
-          leave: done,
+          leave: askToLeave,
           settled: hunt.cleared ? { at: hunt.cleared, lost: false, lines: [], actions: [] } : undefined,
           endless,
         }}
@@ -422,7 +424,7 @@ export function RunShell({ game }: { game: Game<any> }) {
           until: run.until,
           startsAt,
           expire: () => dispatch({ type: 'result', won: false, timeout: true, at: Date.now() }),
-          leave: done,
+          leave: runUnderWay(run) ? askToLeave : done,
           settled,
           lives: { left: run.lives, of: LIVES },
           toEndless: game.endless && game.fullScreen ? toEndless(round) : undefined,
@@ -468,7 +470,7 @@ function lostNews(run: { won: number; timeout: boolean; detail?: string }) {
 // (RoundCard.tsx), in the theme's colors on a scrim, a beat later so the win
 // or the miss shows first. The rail doesn't change, so nothing in it moves.
 // No back arrow on any screen: Done and Leave are the way out, or the
-// system back.
+// system back (which, like Leave, asks first mid-run).
 function RoundFrame({
   focus,
   controls,
@@ -517,43 +519,19 @@ function RoundFrame({
           </>
         }
       />
-      {settled && (settled.lost || settled.actions.length) ? <Choice settled={settled} /> : null}
-    </View>
-  );
-}
-
-// The card over a Stage round, on the theme's scrim, which takes the taps
-// under it: the round is over, the card is the way on.
-function Choice({ settled }: { settled: Settled }) {
-  const ui = useUi();
-  const t = useTheme();
-  const look = useStageCardLook();
-  const delay = settled.lost ? LOST_CARD_DELAY_MS : WON_CARD_DELAY_MS;
-  const p = useCardIn(delay);
-  return (
-    <View
-      style={[
-        StyleSheet.absoluteFill,
-        {
-          paddingTop: ui.insets.top + ui.pad,
-          paddingBottom: ui.insets.bottom + ui.pad,
-          paddingLeft: ui.insets.left + ui.pad,
-          paddingRight: ui.insets.right + ui.pad,
-        },
-      ]}
-    >
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: t.scrim, opacity: p }]} />
-      <FitBox style={styles.fill}>
-        <View style={styles.center}>
-          <RoundCard look={look} delay={delay} title={settled.title} lines={settled.lines} actions={settled.actions} />
-        </View>
-      </FitBox>
+      {settled && (settled.lost || settled.actions.length) ? (
+        <ScrimCard
+          delay={settled.lost ? LOST_CARD_DELAY_MS : WON_CARD_DELAY_MS}
+          title={settled.title}
+          lines={settled.lines}
+          actions={settled.actions}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  center: { alignItems: 'center' },
   clockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 });

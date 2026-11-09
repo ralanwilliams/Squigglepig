@@ -13,7 +13,7 @@ import { pushSupported, setNotificationsOn, useNotificationsOn } from '../lib/pu
 import { showWalkthrough } from '../lib/tutorial';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemeMode, useThemedStyles } from '../theme/theme';
-import { FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
+import { ANY_WAY_UP, FONT_CAP, useAppFrame, useUi, type Ui } from '../theme/responsive';
 import { Backdrop } from './Backdrop';
 import {
   APP_STORE_REVIEW_URL,
@@ -251,7 +251,15 @@ function MenuDrawer({ open: visible, onClose }: { open: boolean; onClose: () => 
   const icon = ui.twoPane ? ui.sp(44) : ui.sp(60);
 
   return (
-    <Modal visible={mounted} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
+    <Modal
+      visible={mounted}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+      supportedOrientations={ANY_WAY_UP}
+      onRequestClose={onClose}
+    >
       <View style={styles.fill}>
         <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: p }]}>
           <Pressable style={styles.fill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />

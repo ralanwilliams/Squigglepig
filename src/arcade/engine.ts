@@ -115,3 +115,16 @@ export function runReducer(run: Run, action: RunAction): Run {
       return START;
   }
 }
+
+// Whether a run is under way: leaving now would end it and lose the pot, so
+// Leave and Back ask first (RunShell.tsx). Not on its intro, where nothing has
+// started, or once it's lost, with nothing left to lose. (The payout asks
+// for itself, until the prize is chosen: PayoutScreen.tsx.)
+export const runUnderWay = (run: Run) => run.phase === 'round' || run.phase === 'between' || run.phase === 'missed';
+
+// What leaving it costs, for that question.
+export function leaveCost(run: Run) {
+  const won = run.phase === 'between' ? run.won : run.phase === 'round' || run.phase === 'missed' ? run.round - 1 : 0;
+  const pot = LADDER.find((s) => s.prize === prizeFor(won));
+  return pot ? `The ${pot.label.toLowerCase()} prize in the pot will be lost.` : 'This run will end here.';
+}
