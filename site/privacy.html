@@ -17,7 +17,7 @@
     <header>
       <img class="logo" src="logo.png" alt="Squigglepig">
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: 5 November 2026</p>
+      <p class="updated">Last updated: 10 November 2026</p>
     </header>
 
     <p>Squigglepig is a drawing and guessing party game, played in the app or on the web at play.squigglepig.app. It has
@@ -37,13 +37,15 @@
       <li>the prompts and captions you write, the drawings you make, and your guesses</li>
       <li>how you've dressed your pig (its outfit and speech bubble), if you've changed it</li>
       <li>whether you have the app open right now, so the others can see who is away</li>
+      <li>which version of the game's scoring your app has, so every phone in a game keeps score the same way</li>
     </ul>
     <p>This game traffic is relayed in real time through Supabase, a hosting service, over an encrypted connection.</p>
 
     <h2>What the game server keeps, and for how long</h2>
     <p>So that you stay in your room when you close the app, the game server keeps a few things while a room is open:</p>
     <ul>
-      <li><b>Who is in the room:</b> your guest ID, your username and when you joined. Removed when you tap
+      <li><b>Who is in the room:</b> your guest ID, your username, when you joined, and when you last closed the app
+        while in it (so everyone in a game can be told when they're all away). Removed when you tap
         <b>Leave game</b> (if you leave during a game, when that game ends), or when the room closes.</li>
       <li><b>The game in progress:</b> its prompts, drawings, guesses and scores, so the game can carry on if everyone
         closes the app at once. Deleted when the game ends or the room closes.</li>
@@ -54,9 +56,12 @@
 
     <h2>Notifications</h2>
     <p>If you allow notifications, Squigglepig tells you about the room you're in while the app isn't open: when
-      someone enters or leaves the lobby, and, if you're away, that the game has started or that it's your turn. To
-      send them, the app gives the game server a push token for your device from Expo, the service that delivers them
-      (through Apple or Google). The token is used for nothing else.</p>
+      someone enters or leaves the lobby or leaves a game; if you're away, that the game has started, that it's your
+      turn, that your chain is up for judging, or that the game is over; when everyone's away and the game is paused;
+      and when the room closes. To send them, the app gives the game
+      server a push token for your device from Expo, the service that delivers them (through Apple or Google). The token
+      is used for nothing else. The game server also notes when it last sent you one, so it never sends them too often;
+      that's kept with who is in the room (above), and deleted with it.</p>
     <p>Turn notifications off in the app's menu (☰ › Settings › Room notifications) and the token is deleted from the server straight
       away. A token that hasn't been refreshed for 90 days is deleted too. You can also turn notifications off in your
       phone's settings. The web version doesn't send notifications.</p>

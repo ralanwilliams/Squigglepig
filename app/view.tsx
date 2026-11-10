@@ -1,8 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Logo } from '../src/components/Logo';
-import { Countdown, deadlineFor } from '../src/components/Countdown';
+import { Countdown, useDeadline } from '../src/components/Countdown';
 import { PigButton } from '../src/components/PigButton';
 import { ButtonNote } from '../src/components/ButtonNote';
 import { LeaveButton } from '../src/components/LeaveButton';
@@ -21,14 +21,16 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 export default function RoundOne() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { prev, readyView, viewReady, turnEndsAt } = useGame();
+  const { prev, readyView, viewReady, turnEndsAt, resuming } = useGame();
   const text = prev && 'text' in prev ? prev.text : '';
 
-  // Fixed once per screen: Stage rebuilds its panes (remounting the Countdown)
-  // when the layout flips between one and two panes, and the clock must not
-  // restart when the phone turns. The game's deadline (deadlineFor), so a
-  // phone back in the room mid-way shows only what's left.
-  const [until] = useState(() => deadlineFor(TIMERS.view, turnEndsAt));
+  // Kept here (useDeadline): Stage rebuilds its panes (remounting the
+  // Countdown) when the layout flips between one and two panes, and the clock
+  // must not restart when the phone turns. The game's deadline, so a phone
+  // back in the room mid-way shows only what's left, moved when the game's
+  // moves, and held while the phone catches up (`resuming`: a paused game
+  // picks up where it was).
+  const until = useDeadline(TIMERS.view, turnEndsAt);
   const expired = useRef(false);
   const expire = () => {
     if (expired.current) return;
@@ -40,7 +42,7 @@ export default function RoundOne() {
 
   const actions = (
     <>
-      <Countdown seconds={TIMERS.view} until={until} onExpire={expire} />
+      <Countdown seconds={TIMERS.view} until={until} onExpire={expire} hold={resuming} />
       <Text style={[styles.label, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
         YOUR CHAIN — YOU'LL JUDGE THIS ONE
       </Text>

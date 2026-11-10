@@ -8,9 +8,10 @@ import { setPushToken } from './rooms';
 
 // Push notifications for a room the player is in but doesn't have open: who
 // came and went in the lobby ("Sam has entered - 4 players in the room."),
-// and, once away, that the game has started or it's their turn. The server
-// sends them (supabase/rooms.sql) through Expo's push service to the token
-// this file registers.
+// who left a game, and, once away, that the game has started, it's their
+// turn, their chain is up for judging, or the game is over. The server sends
+// them (supabase/rooms.sql) through Expo's push service to the token this
+// file registers.
 //
 // Permission is asked the first time the player reaches a lobby, not at
 // launch, and the menu has an on/off switch (MenuDrawer). Off deletes the
@@ -33,6 +34,14 @@ if (pushSupported) {
       shouldSetBadge: false,
     }),
   });
+}
+
+// A room has one notification, each new one replacing the last on the phone
+// (the server gives them all the room's tag: public.push). Opening the app
+// clears it: the player can see the room for themselves.
+export function clearRoomNotifications() {
+  if (!pushSupported) return;
+  Notifications.dismissAllNotificationsAsync().catch(() => {});
 }
 
 // The player's own on/off choice, saved like the sound switch (src/lib/sound.ts).

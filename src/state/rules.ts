@@ -1,4 +1,5 @@
 import { isBlankDrawing } from '../lib/drawing';
+import { HOST_GRACE } from '../lib/timers';
 import type { Member } from '../lib/rooms';
 
 // The game's rules, apart from React, the router and the network, so they
@@ -14,12 +15,16 @@ import type { Member } from '../lib/rooms';
 //
 // `skip` marks the turn of a player who tapped Leave game while 3 or more
 // others carried on: they're out of the rotation, so their turn is passed
-// over (not shown at the reveal, no penalty). Every other missed turn is
-// filled in empty, under the name of the player who owed it.
+// over (not shown at the reveal, no penalty). `left` marks one filled in
+// empty for a player who left when fewer would have carried on: shown at the
+// reveal as theirs ("left the game"), and, under the per-round rule, no
+// penalty. Every other missed turn is filled in empty, under the name of the
+// player who owed it. (2.9.0 reads neither `left` nor the per-round rule:
+// gameRules keeps a game with it in on 2.9.0's scoring.)
 export type Cell =
   | { kind: 'prompt'; text: string; author: string }
-  | { kind: 'drawing'; data: string; author: string; skip?: true }
-  | { kind: 'caption'; text: string; author: string; skip?: true };
+  | { kind: 'drawing'; data: string; author: string; skip?: true; left?: true }
+  | { kind: 'caption'; text: string; author: string; skip?: true; left?: true };
 export type Chain = { cells: Cell[] };
 
 // What the local player must respond to this stage (the previous cell of their
@@ -96,6 +101,13 @@ export const isEmptyTurn = (c: Cell | undefined) =>
 
 export const isSkipped = (c: Cell | undefined) => !!c && c.kind !== 'prompt' && !!c.skip;
 
+// A turn the player owed and didn't hand in while they were still in the
+// game: a blank drawing or an empty guess, whether the canvas was handed in
+// empty, the clock ran out, or they were away. Not a turn they were taken out
+// of, or one filled in after they left.
+export const isMissedTurn = (c: Cell | undefined) =>
+  !!c && c.kind !== 'prompt' && !c.skip && !c.left && isEmptyTurn(c);
+
 // ---- Two copies of the same turn ----
 // The one this phone has and one arriving (the host's next-stage message, the
 // reveal's chains, the host's answer when catching up, or the player handing
@@ -143,6 +155,16 @@ export const chainForStage = (pos: number, s: number, n: number) => (((pos - s) 
 export const playerForChain = (roster: string[], c: number, s: number) =>
   roster.length ? roster[(c + s) % roster.length] : undefined;
 
+// Who in the round still owes stage s's turn (still drawing, or still
+// guessing), in roster order: the chain they're on has nothing for the stage
+// yet. Not anyone out of the rotation (`skip`), nor `me`. Nobody left means
+// the stage is settled (the keeper moves on); the waiting screen lists them.
+export function stillToGo(roster: string[], chains: Chain[], s: number, skip: Set<string>, me = ''): string[] {
+  return roster.filter(
+    (name, pos) => name !== me && !skip.has(name) && !chains[chainForStage(pos, s, roster.length)]?.cells[s]
+  );
+}
+
 // Production runs stages 1..(n-1): each of the n-1 players who don't OWN a chain
 // adds exactly one cell to it, so by the end everyone has touched every chain
 // (the owner via the Round 1 view). Scoring judges every cell against the
@@ -177,7 +199,9 @@ export function nextShown(chain: Chain | undefined, from: number) {
 // Who is out of this round's rotation: roster players who tapped Leave game,
 // taken in the order they left, while 3 or more of the roster were still in
 // after them. Worked out from the server's list on every phone alike, so a
-// host handover agrees on it.
+// keeper handover agrees on it. (One that would leave fewer ends the game:
+// the server closes the room. Only a server still on 2.9.0's rooms.sql lets
+// the round play on without them.)
 export function computeSkips(phase: Phase, roster: string[], members: Member[]): Set<string> {
   const skip = new Set<string>();
   if (!isTurnPhase(phase)) return skip;
@@ -191,33 +215,72 @@ export function computeSkips(phase: Phase, roster: string[], members: Member[]):
   return skip;
 }
 
+// ---- Scoring ----
+// Two sets of rules, because phones on 2.9.0 still play in the same rooms:
+//   1 — 2.9.0's: every blank drawing costs its artist a point.
+//   2 — a point a round: anyone who missed anything in a round (a blank
+//       drawing, an empty guess, or not being there to judge their own
+//       chain) loses one point for that round, however much they missed.
+// Every phone scores the game itself, as the reveal goes, so a game is only
+// played to rules 2 if every player in it has an app that knows them; each
+// phone says which rules it knows in its presence (PROTOCOL; 2.9.0 says
+// nothing). Whoever starts the game decides, and it travels with the game.
+export const PROTOCOL = 2;
+export type Rules = 1 | 2;
+export function gameRules(members: Member[], versions: Map<string, number>): Rules {
+  const all = activeMembers(members);
+  return all.length > 0 && all.every((m) => (versions.get(m.id) ?? 1) >= 2) ? 2 : 1;
+}
+// Rules a game message names, kept to ones this app knows (none: 2.9.0's).
+export const asRules = (n: number | null): Rules => (n !== null && n >= 2 ? 2 : 1);
+
+// Under rules 2, who has already lost this round's point, and where (which
+// turn, `chain:cell`, or `chain:judge` for a chain they missed judging), so
+// the reveal shows the −1 there and nowhere else.
+export type Docks = { docked: Set<string>; at: Record<string, string>; chain: number };
+
+// Take this round's point off `name`, unless it's gone already. Says whether it went.
+export function dock(docks: Docks, scores: Record<string, number>, name: string, where: string): boolean {
+  if (!name || docks.docked.has(name)) return false;
+  docks.docked.add(name);
+  docks.at[name] = where;
+  scores[name] = (scores[name] ?? 0) - 1;
+  return true;
+}
+
 // Score rulings as they land: every drawing or guess the judge marked as
 // matching the ORIGINAL PROMPT earns that cell's author +1, the moment the
 // judge rules it. (So both correct guesses and the drawings that faithfully
-// carried the prompt score.) Every blank drawing costs its author 1, when
-// the reveal reaches it or, at the latest, when its chain is committed
-// (`final`). Each cell is counted once — `tallied` remembers which of the
-// current chain's cells are already in the totals — so the ✓ beat, the
-// chain's final commit and the host's timeout fallback all pass through
-// here without double-counting. Changes `tallied` and `scores` in place, and
-// says whether any score moved.
+// carried the prompt score.) A turn that costs a point — a blank drawing
+// (rules 1), or any missed turn (rules 2: `docks`, at most once a round)
+// costs it when the reveal reaches it or, at the latest, when its chain is
+// committed (`final`). Each cell is counted once — `tallied` remembers which
+// of the current chain's cells are already in the totals — so the ✓ beat, the
+// chain's final commit and the keeper's timeout fallback all pass through
+// here without double-counting. Changes `tallied`, `scores` and `docks` in
+// place, and says whether any score moved.
 export function tallyRulings(
   chain: Chain,
   ruled: Record<number, boolean>,
   tallied: Record<number, boolean>,
   scores: Record<string, number>,
-  final = false
+  final = false,
+  docks?: Docks
 ): boolean {
   let moved = false;
   chain.cells.forEach((c, i) => {
     if (!c || c.kind === 'prompt' || tallied[i] !== undefined) return;
-    const blank = isBlankCell(c);
-    if (ruled[i] === undefined && !(final && blank)) return;
+    const costs = docks ? isMissedTurn(c) : isBlankCell(c);
+    if (ruled[i] === undefined && !(final && costs)) return;
     tallied[i] = ruled[i] ?? false;
     if (!c.author) return;
-    if (blank) {
-      scores[c.author] = (scores[c.author] ?? 0) - 1;
-      moved = true;
+    if (costs) {
+      if (!docks) {
+        scores[c.author] = (scores[c.author] ?? 0) - 1;
+        moved = true;
+      } else if (dock(docks, scores, c.author, `${docks.chain}:${i}`)) {
+        moved = true;
+      }
     } else if (ruled[i] && !c.skip) {
       scores[c.author] = (scores[c.author] ?? 0) + 1;
       moved = true;
@@ -225,6 +288,20 @@ export function tallyRulings(
   });
   return moved;
 }
+
+// Whether a chain's owner missed judging it (rules 2), as whoever commits the
+// chain sees it, and says in their message so every phone docks the same:
+// they did unless they judged all of it themselves — nobody stood in for
+// them (`stoodIn`, `by`), and it didn't run out of time — or they've left.
+export function judgingMissed(owner: string, by: string, stoodIn: boolean, timedOut: boolean, stillIn: boolean): string[] {
+  return owner && stillIn && (timedOut || stoodIn || by !== owner) ? [owner] : [];
+}
+
+// ---- A turn handed in too late ----
+// One handed in this long after its time was up (past the keeper's grace for
+// last-second turns) comes from a screen that slept through its deadline:
+// the room may well have moved past it.
+export const isLate = (endsAt: number, now: number) => endsAt > 0 && now > endsAt + (HOST_GRACE + 1) * 1000;
 
 // ---- Messages that come late ----
 // The live channel delivers in order, but a phone that was off screen (another
@@ -237,9 +314,10 @@ export function tallyRulings(
 // from before this was added send none: null), and each phone holds it up
 // against where its own game is, and either applies it, ignores it as late
 // ('stale'), or, when it shows this phone has missed something, catches up
-// from the host ('resync', which is always safe: the host's answer is the
-// game as it stands). A message without a round that could be either late or
-// ahead is a resync.
+// from the room ('resync', which is always safe: the answer is the game as it
+// stands). A message without a round that could be either late or ahead is a
+// resync. It's also why two phones moving the game on at once (the keeper and
+// a phone standing in for it) is harmless: the second message is late.
 export type Position = {
   phase: Phase;
   round: number;
@@ -337,26 +415,54 @@ export function presentNames(members: Member[], presence: Presence[]): string[] 
     .map((m) => m.name);
 }
 
-// The host: the longest in among those here and caught up, or, if nobody
-// is, the longest in who's here (who then restores the game).
-export function electHost(members: Member[], presence: Presence[]): string {
+// The HOST: the player in the room longest, whether or not they have the app
+// open. It's the room's server-side list, so closing the app or losing signal
+// never moves it; tapping Leave game does, to whoever has been in longest
+// after them. (While the host is away, anyone here can start the game:
+// GameContext canStart.)
+export const roomHost = (members: Member[]) => activeMembers(members)[0]?.name ?? '';
+
+// The KEEPER of the game's clock, apart from the host: one phone that has to
+// be on screen to run the stage timers, move the game on and save it to the
+// server. The longest in among those here and caught up, or, if nobody is,
+// the longest in who's here (who then restores the game). Players never see
+// it. (2.9.0 elects its "host" the same way, so mixed rooms agree on it.)
+export function electKeeper(members: Member[], presence: Presence[]): string {
   const here = new Map(presence.map((p) => [p.id, p]));
   const present = activeMembers(members).filter((m) => here.has(m.id));
   const synced = present.filter((m) => here.get(m.id)!.synced);
   return (synced[0] ?? present[0])?.name ?? '';
 }
 
+// The phones that step in for the keeper when it goes quiet (moving the game
+// on, answering a phone that's catching up), in the order they do: everyone
+// here and caught up, longest in first, the keeper aside.
+export function clockLine(members: Member[], presence: Presence[], keeper: string): string[] {
+  const here = new Map(presence.map((p) => [p.id, p]));
+  return activeMembers(members)
+    .filter((m) => here.get(m.id)?.synced && m.name !== keeper)
+    .map((m) => m.name);
+}
+
 // The round leader judges the reveal, but if they don't have the app open
-// the role falls to the host (the earliest joiner here) so it never stalls.
+// the role falls to the first one here (the longest in) so it never stalls.
 export const effectiveLeader = (leader: string, names: string[]) =>
   leader && names.includes(leader) ? leader : (names[0] ?? '');
 
-// Judge = the chain's original prompt author, if they have the app open;
-// otherwise the round leader / host takes over so a chain never stalls on
-// someone who isn't there.
-export function judgeFor(chain: Chain | undefined, names: string[], leader: string): string {
+// Who owns a chain: the player whose prompt it starts from (they judge it).
+export function chainOwner(chain: Chain | undefined): string {
   const first = chain?.cells[0];
-  const author = first && first.kind === 'prompt' ? first.author : '';
-  if (author && names.includes(author)) return author;
+  return first && first.kind === 'prompt' ? first.author : '';
+}
+
+// Judge = the chain's owner, if they have the app open (`names`). If they're
+// away but still in the game, and the chain has only just come up, nobody
+// yet: the reveal waits for them (`waitFor`, everyone still in the room until
+// the wait is over). Otherwise the round leader, or the first one here, judges
+// in their place, so a chain never stalls on someone who isn't there.
+export function judgeFor(chain: Chain | undefined, names: string[], leader: string, waitFor: string[] = []): string {
+  const owner = chainOwner(chain);
+  if (owner && names.includes(owner)) return owner;
+  if (owner && waitFor.includes(owner)) return '';
   return effectiveLeader(leader, names);
 }

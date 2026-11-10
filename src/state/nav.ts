@@ -45,5 +45,11 @@ export const holdsBack = (inRoom: boolean, phase: Phase, here: string) =>
 
 // What leaving the room costs, for the question Leave game asks. Nobody can
 // join a game under way (rooms.sql join_room), a player who left included.
-export const leaveCost = (gameOn: boolean) =>
-  gameOn ? "You'll leave this game, and you can't rejoin until it's over." : "You'll leave this room.";
+// And if too few would be left to play on without them (`endsGame`), the
+// game ends there for everyone (rooms.sql leave_room_as).
+export const leaveCost = (gameOn: boolean, endsGame = false) =>
+  !gameOn
+    ? "You'll leave this room."
+    : endsGame
+      ? "There won't be enough players left without you, so the game will end for everyone."
+      : "You'll leave this game, and you can't rejoin until it's over.";

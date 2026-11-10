@@ -12,11 +12,15 @@ faithful saves both earn points.
 ## How to play
 
 1. One person taps **Create Game** to get a 4-letter room code; everyone else taps
-   **Join Game** and enters it. When the group is in the lobby, the host picks the
-   points-to-win and taps **Start**. Everyone stays in the room until they tap
-   **Leave game**: closing the app only marks them away (and sends them
-   notifications about the room). A room closes after 10 minutes with nobody
-   doing anything in it, and nobody new can join once a game has started.
+   **Join Game** and enters it. When the group is in the lobby, the host (whoever
+   has been in the room longest) picks the points-to-win and taps **Start**; while
+   the host is away, anyone in the lobby can. Everyone stays in the room until
+   they tap **Leave game**: closing the app only marks them away (and sends them
+   notifications about the room), and the host stays the host. If everyone in a
+   game is away, it pauses until someone's back. If leaving would drop a game
+   under 3 players, it ends for everyone and the room closes. A room closes
+   after 10 minutes with nobody doing anything in it, and nobody new can join
+   once a game has started.
 2. **Fill the pot** — everyone drops short, drawable prompts into a shared pool
    until it holds enough to seed every chain of every round. The game auto-starts
    the moment it fills.
@@ -26,9 +30,9 @@ faithful saves both earn points.
    thing to draw, and so on until everyone has touched every chain.
 4. **Reveal** — each chain is walked one step at a time, judged by the player who
    owns its prompt. Every drawing or guess that still matches the original prompt
-   earns its maker **+1**, and every blank drawing (an empty canvas, or the
-   timer running out) costs the player who owed it **−1**. First player to the
-   target score wins.
+   earns its maker **+1**. Missing anything in a round (a blank drawing, an empty
+   guess, or not being there to judge your own chain) costs **−1** for that
+   round, however much is missed. First player to the target score wins.
 
 Needs at least **3 players** (with 2, the last caption would always fall to the
 prompt's own author, so there's nothing to guess).
@@ -63,9 +67,11 @@ prompt's own author, so there's nothing to guess).
    screen), which is what room membership and push tokens hang off.
 5. Open **SQL Editor → New query**, paste in `supabase/rooms.sql` and click
    **Run**. It creates the rooms (who is in each one, whether a game is on, and
-   the host's snapshot of it), makes each room's Realtime channel private to its
-   members, schedules a job that closes rooms after 10 idle minutes (pg_cron),
-   and sends push notifications through Expo (pg_net). Safe to run again.
+   a snapshot of it), makes each room's Realtime channel private to its
+   members, schedules a job that closes rooms after 10 idle minutes and one
+   that tells everyone in a game when they're all away and it's paused (every
+   10 seconds on pg_cron 1.5 and later, every minute before that), and sends
+   push notifications through Expo (pg_net). Safe to run again.
 6. Open **SQL Editor → New query**, paste in `supabase/keepalive.sql` and click
    **Run**. It creates a one-row table for the keep-alive workflow
    (`.github/workflows/supabase-keepalive.yml`): free projects pause after 7 days
@@ -135,7 +141,8 @@ npm run typecheck   # TypeScript, the app and the tests
 ```
 No phone, emulator or Supabase project needed. The suite runs on Node's own
 test runner (through `tsx`) and covers the game's rules away from React
-(`src/state/rules.ts`: chains, scoring, who hosts and judges, and which
+(`src/state/rules.ts`: chains, scoring, who hosts, who keeps the game's clock
+and who judges, and which
 late or out-of-order messages a phone ignores), getting around between the
 room's screens (`src/state/nav.ts`), big messages sent in pieces
 (`src/lib/chunks.ts`), drawings thinned before they're sent

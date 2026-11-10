@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.10.0]
 
 ### Added
 - While you wait in the lobby you can do other things in the app: Back goes to the home screen and you stay in the room. Play solo or dress up your pig, then tap Back to room on the home screen; when the host starts the game, Squigglepig takes you straight to it
@@ -18,10 +18,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The menu (☰) is on more screens: Create Game, Join Game, the lobby, Play Solo, Your pig, Art supplies and Themes, as well as Home. From the lobby you're still in the room, Back brings you back to it, and if the game starts while you're on Your pig or Rewards, you're taken straight to it
 - Filling the trough gives 30 seconds for each prompt it needs, instead of 2 minutes however many it needs: 4:30 for 3 players playing to 5 points, 6:00 for 12. The game still starts the moment the trough is full
 - After reading your prompt, tapping Got it shows Player ready and keeps the prompt on screen, instead of going to the waiting screen. Once everyone is ready, the drawing starts for all at once
+- The host stays the host while their app is closed or their connection drops. Only tapping Leave game passes it on, to whoever has been in the room longest. While the host is away, anyone in the lobby can start the game, and the lobby shows the host as away
+- Missing anything in a round costs one point for that round, however much you miss: a blank drawing, an empty guess, or not being there to judge your own chain. Before, every blank drawing cost a point and an empty guess cost nothing. A game with anyone still on 2.9.0 in it keeps the old scoring for everyone
+- When your chain comes up for judging and you're away, the others wait 15 seconds for you before someone else judges it
+- Room notifications replace each other instead of piling up, so there's only ever one from your room, and opening the app clears it. If you're away you're told every turn, not just once, and also when your chain is up for judging and when the game is over; everyone in a game is told when someone leaves it
+- If everyone in a game is away, it pauses. After 15 seconds everyone gets a notification saying so, and what's waiting for them, and the first one back picks the game up where it left off, timers and all. Before, nobody heard anything until someone came back, and by then the stage under way had run out of time
+- If leaving drops a game under 3 players, at any point in it, the game ends for everyone: the room closes, and everyone still in it is sent home, told there aren't enough players to keep playing. Leaving asks first, and says so. Before, the game ran on to the final scores, with the trough's timer running down to a scoreboard of zeros
+- When a room closes, a notification says so, replacing whatever the room last told you
+- The waiting screen says who's still drawing or guessing (and which of them are away), and how much time they have left. Once everyone's in, it says the game is moving on
+- Coming back to a game after the app closed, with your turn already handed in, takes you to the waiting screen instead of handing you the same turn again on a blank canvas
+- The Privacy Policy, Terms of Service and Help & FAQ explain the new scoring, pausing, notifications and when a room closes
 
 ### Fixed
+- Coming back to a game after switching apps, locking your phone or losing signal could leave you stuck on the old screen or "Please wait", sometimes through a whole reveal, and could stop the game's clock for everyone. A phone that goes off screen now drops out of the room's live list at once, a phone coming back keeps asking until it's caught up (or picks the game up itself), its connection is checked and renewed as it wakes, and if the phone keeping the game's clock goes quiet, the next one carries the game on
+- A drawing or guess whose time ran out while you were away is no longer handed in late, and no longer sends you to "Please wait" on the way back: you go straight to the game as it is now
+- While your chain was being judged, being away (with the app still open behind another one) could stall the reveal for a minute
 - A drawing handed in could turn up at the reveal as a blank canvas, and cost its artist a point. A very detailed drawing was too big to send, and a drawing that went missing on its way to the host was filled in blank, wiping out the copy everyone else had. Big messages now go in pieces, a drawing that doesn't arrive is sent again, a blank never replaces a real drawing, and whatever is on the canvas when a turn ends is always handed in
-- Coming back to the app (or to a browser tab) during a game could send the whole room back a step, starting the reveal over and scoring the same chains again. Every phone now ignores anything from a moment the game has moved past and catches up when it comes back, and a phone that goes off screen hands the host role to someone who's there, so the game doesn't wait on it
+- Coming back to the app (or to a browser tab) during a game could send the whole room back a step, starting the reveal over and scoring the same chains again. Every phone now ignores anything from a moment the game has moved past and catches up when it comes back, and a phone that goes off screen hands the game's clock to someone who's there, so the game doesn't wait on it
 - Going back from the lobby showed "Reconnecting…" and stayed there
 - After opening the app from a room link, Back from the Join screen or the lobby closed the app instead of going to the home screen
 - Trying to join a room that had closed from inactivity could say the room was full; it now says there's no such room
