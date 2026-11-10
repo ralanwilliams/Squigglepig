@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Countdown, deadlineFor } from './Countdown';
+import { Countdown, useDeadline } from './Countdown';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
 import { PeekPig, peekPigHeight } from './PeekPig';
@@ -40,6 +40,7 @@ export function WorkStage({
   timeLimit,
   until: endsAt,
   onExpire,
+  hold,
   top,
   primary,
   secondary,
@@ -52,6 +53,8 @@ export function WorkStage({
   // (or if it has already passed), timeLimit from now (Countdown deadlineFor).
   until?: number;
   onExpire?: () => void;
+  // Don't run out yet (Countdown `hold`): the game's deadline may be about to move.
+  hold?: boolean;
   top: React.ReactNode;
   primary: React.ReactNode;
   secondary?: React.ReactNode[];
@@ -60,11 +63,14 @@ export function WorkStage({
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
 
-  // The deadline is fixed here, once per screen: the rail below is rebuilt
-  // (and the Countdown remounted) whenever the layout flips between one and
-  // two panes, and the clock must not start over when the phone turns. The
-  // guard keeps a remount right at zero from firing `onExpire` twice.
-  const [until] = useState(() => (timeLimit ? deadlineFor(timeLimit, endsAt) : 0));
+  // The deadline is kept here (useDeadline): the rail below is rebuilt (and
+  // the Countdown remounted) whenever the layout flips between one and two
+  // panes, and the clock must not start over when the phone turns. A new
+  // deadline from the game (its clock put right after catching up, or a
+  // paused game picked up again) moves it. The guard keeps a remount right at
+  // zero from firing `onExpire` twice.
+  const deadline = useDeadline(timeLimit ?? 0, endsAt);
+  const until = timeLimit ? deadline : 0;
   const expired = useRef(false);
   const expire = () => {
     if (expired.current) return;
@@ -114,7 +120,7 @@ export function WorkStage({
           <PeekPig width={pigW} />
         </View>
         <View style={[styles.timer, { height: rowH }]}>
-          {timeLimit ? <Countdown seconds={timeLimit} until={until} onExpire={expire} size={32} /> : null}
+          {timeLimit ? <Countdown seconds={timeLimit} until={until} onExpire={expire} size={32} hold={hold} /> : null}
         </View>
       </View>
       <View style={{ height: slotH, zIndex: 1 }}>{top}</View>

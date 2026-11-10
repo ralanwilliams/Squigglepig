@@ -17,12 +17,14 @@ export function PigCanvas({
   onSubmit,
   timeLimit,
   until,
+  hold,
   header,
   footer,
 }: {
   onSubmit: (data: string, closing?: boolean) => void;
   timeLimit?: number;
   until?: number; // when the clock runs out (epoch ms), if not timeLimit from now
+  hold?: boolean; // don't run out yet (WorkStage)
   header?: React.ReactNode;
   footer?: React.ReactNode;
 }) {
@@ -53,6 +55,7 @@ export function PigCanvas({
       timeLimit={timeLimit}
       until={until}
       onExpire={submit}
+      hold={hold}
       top={header}
       primary={<PigButton name="Submit" onPress={submit} />}
       secondary={[

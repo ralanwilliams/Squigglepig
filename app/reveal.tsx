@@ -24,14 +24,32 @@ const EMPTY_CANVAS = JSON.stringify({ w: SPACE.w, h: SPACE.h, strokes: [] });
 // sit on the right. Everyone's screen mirrors the same cell + ✓/✗ animation.
 //
 // An empty turn — a blank drawing, or a guess nobody wrote — has nothing to
-// judge: it shows as it came in and the judge's phone marks it ✗ by itself, a
-// blank drawing costing its artist a point (GameContext). Players who left
-// mid-game keep their row in the scores, marked "left".
+// judge: it shows as it came in and the judge's phone marks it ✗ by itself.
+// It costs its player a point: once a round however many they miss, shown at
+// the first (or, in a game with a 2.9.0 phone in it, every blank drawing:
+// GameContext `rules`). A turn filled in for someone who left the game says
+// so, and costs nothing. Players who left mid-game keep their row in the
+// scores, marked "left". A chain whose owner is away waits for them a moment
+// before someone else judges it.
 export default function Reveal() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { chains, revealIndex, revealStep, rulings, judge, isJudge, scores, players, departed, vote, turnEndsAt } =
-    useGame();
+  const {
+    chains,
+    revealIndex,
+    revealStep,
+    rulings,
+    judge,
+    isJudge,
+    judgeWait,
+    rules,
+    dockedAt,
+    scores,
+    players,
+    departed,
+    vote,
+    turnEndsAt,
+  } = useGame();
 
   const chain = chains[revealIndex];
   const step = chain ? Math.min(revealStep, chain.cells.length - 1) : 0;
@@ -56,8 +74,15 @@ export default function Reveal() {
   const isDrawing = frontier?.kind === 'drawing';
   const empty = isEmptyTurn(frontier);
   const blankDrawing = isBlankCell(frontier);
+  const left = !!frontier && frontier.kind !== 'prompt' && !!frontier.left;
   const author = frontier?.author || 'someone';
   const caption = frontier?.kind === 'caption' ? (frontier.text ?? '') : '';
+  // Whether this turn cost its player a point: under the per-round rule, the
+  // one turn that took this round's point; otherwise, any blank drawing ✗.
+  const penalty =
+    rules >= 2
+      ? !!frontier?.author && dockedAt[frontier.author] === `${revealIndex}:${step}`
+      : blankDrawing && ruled === false;
 
   const board = [...players, ...departed].sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0));
   // Score rows the rail can show at full size under the prompt + vote buttons.
@@ -73,7 +98,16 @@ export default function Reveal() {
   const focus = (
     <View style={[styles.cellArea, { gap: ui.sp(4) }]}>
       <Text style={[styles.author, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
-        {author + (blankDrawing ? '’s canvas was blank' : isDrawing ? ' drew' : empty ? ' didn’t guess' : ' guessed')}
+        {author +
+          (left
+            ? ' left the game'
+            : blankDrawing
+              ? '’s canvas was blank'
+              : isDrawing
+                ? ' drew'
+                : empty
+                  ? ' didn’t guess'
+                  : ' guessed')}
       </Text>
       <View style={styles.overlayHost}>
         {isDrawing ? (
@@ -103,14 +137,14 @@ export default function Reveal() {
         {ruled !== undefined && <RuleBadge correct={ruled} size={badge} />}
       </View>
       <Text
-        style={[styles.awarded, { fontSize: ui.f(13) }, blankDrawing && styles.penalty]}
+        style={[styles.awarded, { fontSize: ui.f(13) }, penalty && styles.penalty]}
         maxFontSizeMultiplier={FONT_CAP}
         numberOfLines={1}
       >
         {ruled === true && frontier?.author
           ? `✓ +1 ${frontier.author}`
-          : blankDrawing && ruled === false && frontier?.author
-            ? `−1 ${frontier.author} (blank canvas)`
+          : penalty && frontier?.author
+            ? `−1 ${frontier.author} (${rules >= 2 ? 'missed a turn' : 'blank canvas'})`
             : ' '}
       </Text>
     </View>
@@ -140,7 +174,11 @@ export default function Reveal() {
         </Text>
       </View>
 
-      {isJudge ? (
+      {judgeWait ? (
+        <Heading size="h4" lines={2}>
+          Waiting for {judgeWait} to come back and judge…
+        </Heading>
+      ) : isJudge ? (
         !frontierRuled && frontier && !empty ? (
           <View style={[styles.votes, { gap: ui.sp(10) }]}>
             <View style={styles.flex}>

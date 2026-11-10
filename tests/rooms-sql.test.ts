@@ -139,14 +139,21 @@ describe('the sweep (close_idle_rooms)', () => {
   test('closes idle rooms, tells their phones, and leaves busy ones', async () => {
     const quiet = await room('Fay', ['Gus', 'Hal']);
     const busy = await room('Ike', ['Jo', 'Kim']);
+    await db.as(quiet.ids.Gus);
+    await db.rpc('set_push_token', ['ExponentPushToken[Gus]']);
     await idle(quiet.code);
     await db.exec('delete from realtime.sent');
+    await db.exec('delete from net.posts');
     await db.as(null);
     await db.rpc('close_idle_rooms');
     assert.equal(await exists(quiet.code), false);
     assert.equal(await exists(busy.code), true);
     const told = await db.one<{ n: number }>(`select count(*)::int as n from realtime.sent where event = 'room-closed' and topic = $1`, [`room:${quiet.code}`]);
     assert.equal(told?.n, 1);
+    // And by notification, replacing the room's last one ("come back", say).
+    const post = await db.one<{ body: any }>('select body from net.posts');
+    assert.equal(post?.body[0].body, 'The room closed after 10 minutes with nobody doing anything in it.');
+    assert.equal(post?.body[0].tag, `room-${quiet.code}`);
   });
 
   test("one room whose phones can't be told doesn't stop the others closing", async () => {
@@ -166,6 +173,209 @@ describe('the sweep (close_idle_rooms)', () => {
     await db.rpc('close_idle_rooms');
     assert.equal(await exists(a.code), false);
     assert.equal(await exists(b.code), false);
+  });
+});
+
+// Players away from a game are kept up with it: told it has started, every
+// turn, when their chain is up for judging, when it's over and when someone
+// leaves. Each notification replaces the last on the phone (one per room).
+describe('notifications', () => {
+  // A game under way in a room of `names`, every phone with a push token, the
+  // notifications sent so far forgotten.
+  async function game(names: string[]) {
+    const r = await room(names[0], names.slice(1));
+    for (const n of names) {
+      await db.as(r.ids[n]);
+      await db.rpc('set_push_token', [`ExponentPushToken[${n}]`]);
+    }
+    await db.as(r.ids[names[0]]);
+    assert.equal(await db.rpc('start_game', [r.code]), true);
+    await db.exec('delete from net.posts');
+    return r;
+  }
+  const sent = async () =>
+    ((await db.pg.query<{ body: any }>('select body from net.posts order by id')).rows ?? []).flatMap((r) => r.body);
+
+  test("each carries the room as its tag and collapse id, so it replaces the room's last one", async () => {
+    const { code, ids } = await game(['Ama', 'Ben', 'Cat']);
+    await db.rpc('nudge', [code, 'draw', [ids.Ben]]);
+    const [msg] = await sent();
+    assert.equal(msg.to, 'ExponentPushToken[Ben]');
+    assert.equal(msg.body, "It's your turn to draw!");
+    assert.equal(msg.tag, `room-${code}`);
+    assert.equal(msg.collapseId, `room-${code}`);
+  });
+
+  test('every turn, not once per absence, but never more than one every 5 seconds', async () => {
+    const { code, ids } = await game(['Dot', 'Eve', 'Fox']);
+    await db.rpc('nudge', [code, 'draw', [ids.Eve]]);
+    await db.rpc('nudge', [code, 'guess', [ids.Eve]]); // a moment later: thinned out
+    assert.equal((await sent()).length, 1);
+    await db.exec(`update public.room_members set nudged_at = now() - interval '6 seconds' where user_id = $1`, [ids.Eve]);
+    await db.rpc('nudge', [code, 'guess', [ids.Eve]]);
+    assert.deepEqual((await sent()).map((m) => m.body), ["It's your turn to draw!", "It's your turn to guess!"]);
+  });
+
+  test('a chain up for judging, and the game over', async () => {
+    const { code, ids } = await game(['Gus', 'Hal', 'Ida']);
+    await db.rpc('nudge', [code, 'judge', [ids.Hal]]);
+    await db.rpc('nudge', [code, 'over', [ids.Ida]]);
+    assert.deepEqual((await sent()).map((m) => m.body), [
+      'Your chain is up! Come back and judge it.',
+      'The game is over! Come back to see who won.',
+    ]);
+  });
+
+  test('nobody is told by their own phone, or once they have left', async () => {
+    const { code, ids } = await game(['Jan', 'Kit', 'Lou', 'Max']);
+    await db.as(ids.Max);
+    await db.rpc('leave_room', [code]);
+    await db.exec('delete from net.posts');
+    await db.as(ids.Jan);
+    await db.rpc('nudge', [code, 'draw', [ids.Jan, ids.Max]]);
+    assert.equal((await sent()).length, 0);
+  });
+
+  test('someone leaving during a game tells the others how many are still playing', async () => {
+    const { code, ids } = await game(['Ned', 'Oli', 'Pat', 'Quy']);
+    await db.as(ids.Quy);
+    await db.rpc('leave_room', [code]);
+    const msgs = await sent();
+    assert.deepEqual(msgs.map((m) => m.to).sort(), ['ExponentPushToken[Ned]', 'ExponentPushToken[Oli]', 'ExponentPushToken[Pat]']);
+    assert.ok(msgs.every((m) => m.body === 'Quy left the game - 3 players still playing.' && m.tag === `room-${code}`));
+  });
+
+  // Bug: with every player away (the app closed on every phone), no phone was
+  // keeping the game's clock, so nothing told anyone anything until someone
+  // came back. Now the server notices, and tells them all the game is paused.
+  describe('everyone away', () => {
+    const awayFor = (code: string, seconds: number) =>
+      db.exec(`update public.room_members set away_at = now() - make_interval(secs => $2) where room = $1 and away_at is not null`, [
+        code,
+        seconds,
+      ]);
+    const allAway = async (code: string, ids: Record<string, string>) => {
+      for (const id of Object.values(ids)) {
+        await db.as(id);
+        await db.rpc('step_away', [code]);
+      }
+      await db.as(null);
+    };
+
+    test('after 15 seconds, everyone is told the game is paused, and what waits for them, once', async () => {
+      const { code, ids } = await game(['Rae', 'Sol', 'Tam']);
+      await db.rpc('save_snapshot', [code, { phase: 'draw', stage: 1 }]);
+      await allAway(code, ids);
+      await db.rpc('tell_paused_rooms');
+      assert.equal((await sent()).length, 0, 'not straight away: someone may be switching apps');
+      await awayFor(code, 20);
+      await db.rpc('tell_paused_rooms');
+      const msgs = await sent();
+      assert.equal(msgs.length, 3);
+      assert.ok(msgs.every((m) => m.body === "Everyone's away, so the game is paused. Come back to draw!" && m.tag === `room-${code}`));
+      await db.rpc('tell_paused_rooms');
+      assert.equal((await sent()).length, 3, 'once');
+    });
+
+    test('told again the next time they are all away, not while anyone is back', async () => {
+      const { code, ids } = await game(['Uli', 'Vic', 'Wim']);
+      await allAway(code, ids);
+      await awayFor(code, 20);
+      await db.rpc('tell_paused_rooms');
+      assert.equal((await sent()).length, 3);
+      // A couple of minutes on…
+      await db.exec(`update public.rooms set paused_told_at = now() - interval '2 minutes' where code = $1`, [code]);
+      await db.as(ids.Vic);
+      await db.rpc('touch_room', [code]); // Vic is back
+      await awayFor(code, 60);
+      await db.as(null);
+      await db.rpc('tell_paused_rooms');
+      assert.equal((await sent()).length, 3, 'Vic is here');
+      await db.as(ids.Vic);
+      await db.rpc('step_away', [code]);
+      await awayFor(code, 20);
+      await db.as(null);
+      await db.rpc('tell_paused_rooms');
+      assert.equal((await sent()).length, 6);
+    });
+
+    test('never in the lobby, or with a player who has never said they are away (2.9.0)', async () => {
+      const lobby = await room('Xyz', ['Yul', 'Zoe']);
+      await allAway(lobby.code, lobby.ids);
+      await awayFor(lobby.code, 20);
+      const { code, ids } = await game(['Ada', 'Bea', 'Cid']);
+      for (const n of ['Ada', 'Bea']) {
+        await db.as(ids[n]);
+        await db.rpc('step_away', [code]);
+      }
+      await awayFor(code, 20);
+      await db.as(null);
+      await db.rpc('tell_paused_rooms');
+      assert.equal((await sent()).length, 0);
+    });
+
+    test('coming back (or reopening the app into the room) says so', async () => {
+      const { code, ids } = await game(['Dex', 'Eli', 'Fen']);
+      await db.as(ids.Eli);
+      await db.rpc('step_away', [code]);
+      assert.ok((await db.one(`select away_at from public.room_members where user_id = $1`, [ids.Eli])).away_at);
+      await db.rpc('join_room', [code, 'Eli', true]);
+      assert.equal((await db.one(`select away_at from public.room_members where user_id = $1`, [ids.Eli])).away_at, null);
+    });
+  });
+});
+
+// A game needs 3 players: one that drops under 3 when someone taps Leave game
+// can't go on, at whatever point it's reached. Before, the trough's timer ran
+// down to the final scores (every one 0); a later round played on with blank
+// turns. Now it ends for everyone at once, and the room closes, saying why.
+describe('too few players left to play on', () => {
+  test('the room closes, everyone still in it is told why, and a phone coming back is told too', async () => {
+    const { code, ids } = await room('Gia', ['Hux', 'Ivo']);
+    for (const n of ['Gia', 'Hux', 'Ivo']) {
+      await db.as(ids[n]);
+      await db.rpc('set_push_token', [`ExponentPushToken[${n}]`]);
+    }
+    await db.as(ids.Gia);
+    await db.rpc('start_game', [code]);
+    await db.exec('delete from net.posts');
+    await db.exec('delete from realtime.sent');
+    await db.as(ids.Ivo);
+    await db.rpc('leave_room', [code]);
+    assert.equal(await exists(code), false, 'closed');
+    const told = await db.one<{ payload: { reason: string } }>(
+      `select payload from realtime.sent where event = 'room-closed' and topic = $1`,
+      [`room:${code}`]
+    );
+    assert.equal(told?.payload.reason, 'players');
+    const msgs = ((await db.pg.query<{ body: any }>('select body from net.posts')).rows ?? []).flatMap((r) => r.body);
+    assert.deepEqual(msgs.map((m) => m.to).sort(), ['ExponentPushToken[Gia]', 'ExponentPushToken[Hux]']);
+    assert.ok(msgs.every((m) => m.body.startsWith("There aren't enough players left to keep playing.")));
+    await db.as(ids.Hux);
+    assert.deepEqual(await db.rpc('room_state', [code, false]), { status: 'closed', reason: 'players' });
+    assert.equal((await db.rpc('join_room', [code, 'Hux', true])).status, 'not_found');
+  });
+
+  test('3 or more carrying on play on, and in the lobby anyone can go', async () => {
+    const four = await room('Jon', ['Kai', 'Lea', 'Mia']);
+    await db.as(four.ids.Jon);
+    await db.rpc('start_game', [four.code]);
+    await db.as(four.ids.Mia);
+    await db.rpc('leave_room', [four.code]);
+    assert.equal(await exists(four.code), true);
+    const lobby = await room('Nat', ['Oz2', 'Pip']);
+    await db.as(lobby.ids.Pip);
+    await db.rpc('leave_room', [lobby.code]);
+    await db.as(lobby.ids.Oz2);
+    await db.rpc('leave_room', [lobby.code]);
+    assert.equal(await exists(lobby.code), true, 'Nat is still waiting for players');
+  });
+
+  test('why it closed is forgotten after 15 minutes', async () => {
+    await db.exec(`insert into public.closed_rooms (code, reason, closed_at) values ('QQQQ', 'players', now() - interval '16 minutes')`);
+    await db.as(null);
+    await db.rpc('close_idle_rooms');
+    assert.equal(await db.one(`select 1 as x from public.closed_rooms where code = 'QQQQ'`), undefined);
   });
 });
 

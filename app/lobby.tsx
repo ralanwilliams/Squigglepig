@@ -45,16 +45,18 @@ const COPY_LINK =
 // Lobby: the pig fills the left of the stage; on the right a single card groups
 // everything the host touches — room code, the points-to-win stepper, Start, and
 // the roster: everyone in the room, oldest first. A player without the app open
-// is dimmed and tagged AWAY (they're still in, until they tap Leave game); the
-// host is the longest-in player who has it open. Nothing scrolls: the roster
-// shows as many rows as the pane has room for and collapses the rest to "+N
-// more", and Stage's FitBox shrinks the card if it is still too tall. The
-// menu's pages open over it (the player is still in the room, and Back comes
-// back here); if the game starts meanwhile, the player is taken to it.
+// is dimmed and tagged AWAY (they're still in, until they tap Leave game). The
+// host is the longest-in player, and stays host while they're away (their
+// HOST tag goes quiet like an AWAY one); meanwhile anyone here can start the
+// game. Nothing scrolls: the roster shows as many rows as the pane has room
+// for and collapses the rest to "+N more", and Stage's FitBox shrinks the card
+// if it is still too tall. The menu's pages open over it (the player is still
+// in the room, and Back comes back here); if the game starts meanwhile, the
+// player is taken to it.
 export default function Lobby() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { room, players, away, host, username, isHost, startGame, status, statusDetail } = useGame();
+  const { room, players, away, host, username, canStart, startGame, status, statusDetail } = useGame();
   const [target, setTarget] = useState(5);
 
   const bump = (delta: number) => setTarget((t) => Math.min(20, Math.max(1, t + delta)));
@@ -75,7 +77,7 @@ export default function Lobby() {
     Share.share({ message: `Join my Squigglepig game! ${link} (room code ${room})` }).catch(() => {});
   };
 
-  const canStart = players.length >= MIN_PLAYERS;
+  const enough = players.length >= MIN_PLAYERS;
   const connected = status === 'connected';
 
   // One short line, whatever it says (shrunk to fit if it must be), so the
@@ -115,7 +117,7 @@ export default function Lobby() {
   const avatar = ui.sp(26);
   // The host's controls (the points-to-win row, then Start) and everyone
   // else's "waiting" share one slot of this height, so the card doesn't grow
-  // or shrink when this phone turns out to be the host (or stops being it).
+  // or shrink when this phone can start the game (or stops being able to).
   const controlsH = step + ui.sp(3) * 2 + ui.sp(10) + ui.sp(44);
 
   const actions = (
@@ -136,7 +138,7 @@ export default function Lobby() {
         </View>
 
         <View style={[styles.controls, { minHeight: controlsH, gap: ui.sp(10) }]}>
-          {isHost ? (
+          {canStart ? (
             <>
               <View style={styles.settingRow}>
                 <Text style={[styles.settingLabel, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP}>
@@ -167,7 +169,7 @@ export default function Lobby() {
                   </Pressable>
                 </View>
               </View>
-              {canStart ? (
+              {enough ? (
                 <PigButton name="Start Game" onPress={() => startGame(target)} />
               ) : (
                 <ButtonNote text={`Need ${MIN_PLAYERS}+ players`} />
@@ -210,8 +212,12 @@ export default function Lobby() {
               </Text>
               {p === host ? (
                 <Text
-                  style={[styles.hostBadge, { fontSize: ui.f(10), paddingHorizontal: ui.sp(7), paddingVertical: ui.sp(2) }]}
+                  style={[
+                    away.includes(p) ? styles.awayBadge : styles.hostBadge,
+                    { fontSize: ui.f(10), paddingHorizontal: ui.sp(7), paddingVertical: ui.sp(2) },
+                  ]}
                   maxFontSizeMultiplier={FONT_CAP}
+                  accessibilityLabel={away.includes(p) ? 'Host, away' : 'Host'}
                 >
                   HOST
                 </Text>

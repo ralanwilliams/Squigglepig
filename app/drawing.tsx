@@ -12,11 +12,12 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 // the first pass, or the previous player's caption after that) they were handed.
 // The screen keeps the turn it opened on, so the drawing goes to that turn
 // whenever it's handed in (GameContext submitCell), and its clock is the
-// game's (turnEndsAt).
+// game's (turnEndsAt), held while the phone catches up after a trip out of
+// the app (`resuming`).
 export default function Drawing() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { submitCell, prev, turn, turnEndsAt } = useGame();
+  const { submitCell, prev, turn, turnEndsAt, resuming } = useGame();
   const [myTurn] = useState(turn);
   const text = prev && 'text' in prev ? prev.text : '';
 
@@ -48,6 +49,7 @@ export default function Drawing() {
       onSubmit={(data, closing) => submitCell(data, myTurn, closing)}
       timeLimit={TIMERS.draw}
       until={turnEndsAt}
+      hold={resuming}
       header={header}
       footer={<LeaveButton />}
     />

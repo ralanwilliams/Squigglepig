@@ -22,7 +22,7 @@ import { TIMERS } from '../src/lib/timers';
 // screen it keeps the turn it opened on, and a guess typed but not handed in
 // when the game moves on is handed in as the screen closes.
 export default function Guessing() {
-  const { submitCell, passTurn, prev, turn, turnEndsAt } = useGame();
+  const { submitCell, passTurn, prev, turn, turnEndsAt, resuming } = useGame();
   const [myTurn] = useState(turn);
   const [guess, setGuess] = useState('');
   const drawing = prev && prev.kind === 'drawing' ? prev.data : '';
@@ -74,6 +74,7 @@ export default function Guessing() {
       timeLimit={TIMERS.caption}
       until={turnEndsAt}
       onExpire={onExpire}
+      hold={resuming}
       top={
         <PigInput
           style={styles.fill}

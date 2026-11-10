@@ -67,6 +67,10 @@ describe('Are you sure?', () => {
   });
   test('in the lobby, only that it leaves the room', () => {
     assert.doesNotMatch(leaveCost(false), /rejoin/);
+    assert.equal(leaveCost(false, true), leaveCost(false));
+  });
+  test('when too few would be left without them, that the game ends for everyone', () => {
+    assert.match(leaveCost(true, true), /end for everyone/);
   });
   // Bug: a phone back in a game waits here with its own phase still the lobby
   // until the host answers, and Back went home without asking.

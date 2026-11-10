@@ -22,9 +22,13 @@ export type Entry =
   | { status: 'ok'; room: string; name: string; userId: string }
   | { status: 'not_found' | 'in_progress' | 'room_full' | 'name_taken' | 'bad_name' | 'offline' };
 
+// Why a room closed: nobody did anything in it for IDLE_MINUTES, or too few
+// players were left in its game to play on (supabase/rooms.sql close_room).
+export type ClosedReason = 'idle' | 'players';
+
 export type RoomState =
   | { status: 'ok'; phase: RoomPhase; members: Member[]; snapshot: any }
-  | { status: 'closed' }
+  | { status: 'closed'; reason: ClosedReason }
   | { status: 'offline' };
 
 // Calls one of the room functions as the signed-in guest. Null when it can't
@@ -79,7 +83,7 @@ export async function leaveRoomOnServer(code: string): Promise<boolean> {
 export async function roomState(code: string, withSnapshot = false): Promise<RoomState> {
   const res = await call<any>('room_state', { p_code: code, p_snapshot: withSnapshot });
   if (!res) return { status: 'offline' };
-  if (res.data?.status !== 'ok') return { status: 'closed' };
+  if (res.data?.status !== 'ok') return { status: 'closed', reason: asClosedReason(res.data?.reason) };
   return {
     status: 'ok',
     phase: res.data.phase === 'playing' ? 'playing' : 'lobby',
@@ -93,9 +97,18 @@ export async function roomState(code: string, withSnapshot = false): Promise<Roo
   };
 }
 
-// Something a person did in the room: it isn't idle. Bursts are thinned to
-// one call a minute per room (the server only needs to know it's well inside
-// IDLE_MINUTES); `now` skips the wait, for coming back to the app.
+export const asClosedReason = (v: unknown): ClosedReason => (v === 'players' ? 'players' : 'idle');
+
+// The app went off screen: the player is away until they're back (touchRoom).
+// When everyone in a game is, the server tells them it's paused.
+export function stepAway(code: string): Promise<unknown> {
+  return code ? call('step_away', { p_code: code }) : Promise.resolve();
+}
+
+// Something a person did in the room (or coming back to it): it isn't idle,
+// and they're not away. Bursts are thinned to one call a minute per room (the
+// server only needs to know it's well inside IDLE_MINUTES); `now` skips the
+// wait, for coming back to the app.
 const lastTouch: Record<string, number> = {};
 export function touchRoom(code: string, now = false) {
   if (!code) return;
@@ -118,8 +131,11 @@ export function saveSnapshot(code: string, state: unknown) {
   call('save_snapshot', { p_code: code, p_state: state });
 }
 
-// Notify away players (by user id) that the game started or it's their turn.
-export type Nudge = 'start' | 'draw' | 'guess';
+// Notify away players (by user id) that the game started, it's their turn,
+// their chain is up for judging, or the game is over. (A server that hasn't
+// had rooms.sql run again since 2.9.0 knows only the first three, and ignores
+// the others.)
+export type Nudge = 'start' | 'draw' | 'guess' | 'judge' | 'over';
 export function nudge(code: string, kind: Nudge, users: string[]) {
   if (users.length) call('nudge', { p_code: code, p_kind: kind, p_users: users });
 }

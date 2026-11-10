@@ -23,6 +23,13 @@ import { URGENT_AT } from '../lib/timers';
 //
 // `colors` replaces the theme's text and urgent colors, for a clock over a
 // game's own art (FieldFrame.tsx).
+//
+// `hold` keeps it from running out: it still counts down, but `onExpire`
+// waits until it's let go, and comes at once then if the time is up by
+// `until` as it is then. A game screen holds its clock while its phone
+// catches up after a trip out of the app: the deadline it slept through may
+// be about to move (a game everyone was away from is paused, and picks up
+// where it was).
 const secondsLeft = (deadline: number, now = Date.now()) => Math.max(0, Math.ceil((deadline - now) / 1000));
 
 export function Countdown({
@@ -32,6 +39,7 @@ export function Countdown({
   size = 20,
   stoppedAt,
   colors,
+  hold = false,
 }: {
   seconds: number;
   until?: number;
@@ -39,6 +47,7 @@ export function Countdown({
   size?: number; // base font size, scaled by the UI scale
   stoppedAt?: number;
   colors?: { text: string; urgent: string };
+  hold?: boolean;
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -57,7 +66,7 @@ export function Countdown({
     const tick = () => {
       const left = secondsLeft(deadline);
       setRemaining(left);
-      if (left <= 0 && !fired.current) {
+      if (left <= 0 && !fired.current && !hold) {
         fired.current = true;
         clearInterval(id);
         onExpireRef.current?.();
@@ -66,7 +75,7 @@ export function Countdown({
     const id = setInterval(tick, 250);
     tick();
     return () => clearInterval(id);
-  }, [seconds, until, stoppedAt]);
+  }, [seconds, until, stoppedAt, hold]);
 
   const mm = Math.floor(remaining / 60);
   const ss = remaining % 60;
@@ -100,7 +109,22 @@ export const deadlineIn = (seconds: number) => Date.now() + seconds * 1000;
 // further off than the whole `seconds` (a clock out of step), the whole
 // `seconds` from now instead: the host's clock moves the game on either way.
 export const deadlineFor = (seconds: number, endsAt?: number) =>
-  endsAt && endsAt > Date.now() && endsAt <= deadlineIn(seconds) ? endsAt : deadlineIn(seconds);
+  isComing(seconds, endsAt) ? endsAt! : deadlineIn(seconds);
+const isComing = (seconds: number, endsAt?: number) => !!endsAt && endsAt > Date.now() && endsAt <= deadlineIn(seconds);
+
+// A game screen's deadline (deadlineFor), set when the screen opens and kept
+// while the phone turns (its panes rebuild, remounting the Countdown). It
+// moves when the game's does, to a time still to come: the game's clock put
+// right after catching up, or a paused game picked up again. One already
+// past is no news (the game is about to move on), and the clock never jumps
+// back up to the whole time for it.
+export function useDeadline(seconds: number, endsAt?: number) {
+  const [until, setUntil] = useState(() => deadlineFor(seconds, endsAt));
+  useEffect(() => {
+    if (isComing(seconds, endsAt)) setUntil(endsAt!);
+  }, [seconds, endsAt]);
+  return until;
+}
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   text: {

@@ -25,23 +25,30 @@ create extension if not exists pg_net;
 
 -- One row per open room. `phase` is all the server needs to know about the
 -- game: 'lobby' (joinable) or 'playing' (closed to newcomers). The game itself
--- runs on the players' phones; the host saves a `snapshot` of it at every
--- step, so if everyone closes the app the first one back picks it up. The
--- snapshot (prompts, drawings, guesses, scores) is deleted when the game ends
--- or the room closes.
+-- runs on the players' phones; the one keeping its clock saves a `snapshot`
+-- of it at every step, so if everyone closes the app the first one back picks
+-- it up. The snapshot (prompts, drawings, guesses, scores) is deleted when the
+-- game ends or the room closes. `paused_told_at` is when everyone in its game
+-- was last told they're all away and it's paused (tell_paused_rooms).
 create table if not exists public.rooms (
   code text primary key check (code ~ '^[A-Z0-9]{4}$'),
   phase text not null default 'lobby' check (phase in ('lobby', 'playing')),
   created_at timestamptz not null default now(),
   last_active_at timestamptz not null default now(),
-  snapshot jsonb
+  snapshot jsonb,
+  paused_told_at timestamptz
 );
+alter table public.rooms add column if not exists paused_told_at timestamptz;
 
 -- Who is in each room. `left_at` is set when someone taps Leave game during a
 -- game: they stay listed (their score still shows) until the game ends. In the
--- lobby, leaving deletes the row. `nudged` is set when an away player has been
--- sent a "game started" or "your turn" notification, so they get one, not one
--- per turn; doing anything in the room clears it.
+-- lobby, leaving deletes the row. `nudged_at` is when an away player was last
+-- sent a notification about the game (nudge), so a burst of them is thinned
+-- out. (`nudged` is what 2.9.0's copy of these functions kept instead, once
+-- per absence; nothing reads it now, and it stays so that copy still runs.)
+-- `away_at` is when the player's app last went off screen (step_away), until
+-- they're back (touch_room): when everyone in a game is away, they're all told
+-- it's paused. (2.9.0 never says, so it never counts as away.)
 create table if not exists public.room_members (
   room text not null references public.rooms (code) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -49,10 +56,23 @@ create table if not exists public.room_members (
   joined_at timestamptz not null default clock_timestamp(),
   left_at timestamptz,
   nudged boolean not null default false,
+  nudged_at timestamptz,
+  away_at timestamptz,
   primary key (room, user_id)
 );
+alter table public.room_members add column if not exists nudged_at timestamptz;
+alter table public.room_members add column if not exists away_at timestamptz;
 create unique index if not exists room_members_name on public.room_members (room, lower(name));
 create index if not exists room_members_user on public.room_members (user_id);
+
+-- A room that closed because too few players were left in its game to play on
+-- (close_room 'players'), for 15 minutes: a phone coming back to it is told
+-- why (room_state), not that it went idle. Just the code and the reason.
+create table if not exists public.closed_rooms (
+  code text primary key,
+  reason text not null,
+  closed_at timestamptz not null default now()
+);
 
 -- The phone's Expo push token, while notifications are on. One per player
 -- (one phone per anonymous user). Refreshed every time the app opens; tokens
@@ -66,7 +86,8 @@ create table if not exists public.push_tokens (
 alter table public.rooms enable row level security;
 alter table public.room_members enable row level security;
 alter table public.push_tokens enable row level security;
-revoke all on public.rooms, public.room_members, public.push_tokens from anon, authenticated;
+alter table public.closed_rooms enable row level security;
+revoke all on public.rooms, public.room_members, public.push_tokens, public.closed_rooms from anon, authenticated;
 
 -- ---- Helpers (not callable from the app) -----------------------------------
 
@@ -115,6 +136,9 @@ end $$;
 -- Send one notification to each of `users` who has a push token, through
 -- Expo's push service (which hands it to Apple or Google). pg_net sends it
 -- after the transaction commits, so a rolled-back change never notifies.
+-- A room's notifications all carry the room as their tag (Android) and
+-- collapse id (iOS), so each new one replaces the last on the phone instead
+-- of piling up: one notification per room, always the latest news.
 create or replace function public.push(p_users uuid[], p_title text, p_body text, p_data jsonb)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
@@ -122,7 +146,10 @@ declare
 begin
   select jsonb_agg(jsonb_build_object(
     'to', t.token, 'title', p_title, 'body', p_body, 'data', p_data,
-    'sound', 'default', 'priority', 'high', 'channelId', 'rooms'))
+    'sound', 'default', 'priority', 'high', 'channelId', 'rooms')
+    || case when p_data ? 'room'
+         then jsonb_build_object('tag', 'room-' || (p_data ->> 'room'), 'collapseId', 'room-' || (p_data ->> 'room'))
+         else '{}'::jsonb end)
   into msgs
   from public.push_tokens t
   where t.user_id = any(p_users);
@@ -144,28 +171,49 @@ returns boolean language sql stable set search_path = '' as $$
   select p_last_active < now() - interval '10 minutes';
 $$;
 
--- Close a room: tell the phones still connected, then delete it (its members
--- and snapshot go too). Telling them is best effort: if the message can't go,
--- the room still closes (and the app notices next time it asks).
-create or replace function public.close_room(p_code text)
+-- Close a room: tell the phones still connected, and the players' phones by
+-- notification (replacing whatever the room last told them), then delete it
+-- (its members and snapshot go too). Why: 'idle' (10 minutes with nobody
+-- doing anything in it), or 'players' (too few left in its game to play on:
+-- leave_room_as), which closed_rooms keeps a while so a phone coming back
+-- can say so. Telling them is best effort: if the message can't go, the room
+-- still closes (and the app notices next time it asks).
+drop function if exists public.close_room(text);
+create or replace function public.close_room(p_code text, p_reason text default 'idle')
 returns void language plpgsql security definer set search_path = '' as $$
 begin
   begin
-    perform realtime.send(jsonb_build_object('reason', 'idle'), 'room-closed', 'room:' || p_code, true);
+    perform realtime.send(jsonb_build_object('reason', p_reason), 'room-closed', 'room:' || p_code, true);
   exception when others then
     raise warning 'room-closed for % not sent: %', p_code, sqlerrm;
   end;
+  perform public.push(
+    array(select user_id from public.room_members where room = p_code and left_at is null),
+    'Room ' || p_code,
+    case p_reason
+      when 'players' then 'There aren''t enough players left to keep playing. Create a new game to play again.'
+      else 'The room closed after 10 minutes with nobody doing anything in it.'
+    end,
+    jsonb_build_object('room', p_code, 'kind', 'closed')
+  );
+  if p_reason = 'players' then
+    insert into public.closed_rooms (code, reason) values (p_code, p_reason)
+    on conflict (code) do update set reason = excluded.reason, closed_at = now();
+  end if;
   delete from public.rooms where code = p_code;
 end $$;
 
 -- Take `who` out of a room: in the lobby they're gone; mid-game they're marked
--- as left (still on the scoreboard). The last one out closes the room; anyone
+-- as left (still on the scoreboard), and if that leaves fewer than 3 in the
+-- game it can't go on: it ends for everyone, and the room closes, telling
+-- them why (close_room 'players'). The last one out closes the room; anyone
 -- else leaving counts as something done in it, unless it has already closed
 -- for being idle.
 create or replace function public.leave_room_as(p_code text, p_user uuid)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
   r public.rooms;
+  v_left int;
 begin
   select * into r from public.rooms where code = p_code for update;
   if not found then return; end if;
@@ -174,6 +222,13 @@ begin
   else
     update public.room_members set left_at = now()
     where room = p_code and user_id = p_user and left_at is null;
+    if found then
+      select count(*) into v_left from public.room_members where room = p_code and left_at is null;
+      if v_left between 1 and 2 then -- under 3: MIN_PLAYERS in src/state/rules.ts
+        perform public.close_room(p_code, 'players');
+        return;
+      end if;
+    end if;
   end if;
   if not exists (select 1 from public.room_members where room = p_code and left_at is null) then
     delete from public.rooms where code = p_code;
@@ -209,6 +264,7 @@ begin
       -- That code is in use: roll another.
     end;
   end loop;
+  delete from public.closed_rooms where code = v_code; -- a room of the same name before
   insert into public.room_members (room, user_id, name) values (v_code, auth.uid(), v_name);
   return jsonb_build_object('status', 'ok', 'room', v_code, 'name', v_name);
 end $$;
@@ -245,7 +301,7 @@ begin
   end if;
   select * into m from public.room_members where room = v_code and user_id = auth.uid();
   if found and m.left_at is null then
-    update public.room_members set nudged = false where room = v_code and user_id = auth.uid();
+    update public.room_members set away_at = null where room = v_code and user_id = auth.uid() and away_at is not null;
     update public.rooms set last_active_at = now() where code = v_code;
     return jsonb_build_object('status', 'ok', 'room', v_code, 'name', m.name);
   end if;
@@ -279,9 +335,10 @@ begin
 end $$;
 
 -- The room as the caller's app needs it: its phase, everyone in it (oldest
--- first) and, when asked, the host's last snapshot of the game. 'closed' if
--- the room is gone (or idle long enough to be on its way) or the caller
--- isn't in it any more.
+-- first) and, when asked, the last snapshot of the game. 'closed' if the room
+-- is gone (or idle long enough to be on its way) or the caller isn't in it
+-- any more, with the reason if it closed because too few players were left
+-- to play on (closed_rooms).
 create or replace function public.room_state(p_code text, p_snapshot boolean default false)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare
@@ -290,7 +347,10 @@ declare
 begin
   select * into r from public.rooms where code = v_code;
   if not found or public.room_is_idle(r.last_active_at) or not public.is_room_member('room:' || v_code) then
-    return jsonb_build_object('status', 'closed');
+    return jsonb_build_object('status', 'closed') || coalesce(
+      (select jsonb_build_object('reason', c.reason) from public.closed_rooms c where c.code = v_code),
+      '{}'::jsonb
+    );
   end if;
   return jsonb_build_object(
     'status', 'ok',
@@ -309,17 +369,26 @@ begin
 end $$;
 
 -- Someone did something in the room (or opened the app into it): it isn't
--- idle, and they're back, so they can be nudged again later. A room already
--- idle 10 minutes is closed, and stays closed.
+-- idle, and they're not away (step_away). A room already idle 10 minutes is
+-- closed, and stays closed.
 create or replace function public.touch_room(p_code text)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
   v_code text := upper(btrim(p_code));
 begin
   if not public.is_room_member('room:' || v_code) then return; end if;
+  update public.room_members set away_at = null where room = v_code and user_id = auth.uid() and away_at is not null;
   update public.rooms set last_active_at = now() where code = v_code and not public.room_is_idle(last_active_at);
-  if not found then return; end if;
-  update public.room_members set nudged = false where room = v_code and user_id = auth.uid() and nudged;
+end $$;
+
+-- The caller's app went off screen (another app, a locked phone): they're
+-- away until they're back (touch_room). Not activity. When everyone in a game
+-- is, they're all told it's paused (tell_paused_rooms).
+create or replace function public.step_away(p_code text)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  update public.room_members set away_at = now()
+  where room = upper(btrim(p_code)) and user_id = auth.uid() and left_at is null;
 end $$;
 
 -- Start a game: the room closes to newcomers. Needs 3 players in the room
@@ -351,8 +420,8 @@ begin
   update public.rooms set phase = 'lobby', snapshot = null where code = v_code;
 end $$;
 
--- The host's copy of the game so far. Not activity: the host's clock moving
--- the game on by itself doesn't keep a room open.
+-- The copy of the game so far, from the phone keeping its clock. Not
+-- activity: the clock moving the game on by itself doesn't keep a room open.
 create or replace function public.save_snapshot(p_code text, p_state jsonb)
 returns void language plpgsql security definer set search_path = '' as $$
 declare
@@ -363,9 +432,12 @@ begin
   update public.rooms set snapshot = p_state where code = v_code and phase = 'playing';
 end $$;
 
--- Tell away players the game has started, or that it's their turn. The host
--- names who is away (it can see who has the app open); each is told once,
--- until they're back.
+-- Tell away players how the game is going: it has started, it's their turn,
+-- their chain is up for judging, or it's over. Whoever moves the game on
+-- names who is away (it can see who has the app open). Every one replaces the
+-- last on the phone (push), so they're told each time; a player can't be
+-- sent more than one every 5 seconds, so no phone in the room can flood
+-- another with them.
 create or replace function public.nudge(p_code text, p_kind text, p_users uuid[])
 returns void language plpgsql security definer set search_path = '' as $$
 declare
@@ -377,12 +449,15 @@ begin
     when 'start' then 'The game has started! Come back to add your prompts.'
     when 'draw' then 'It''s your turn to draw!'
     when 'guess' then 'It''s your turn to guess!'
+    when 'judge' then 'Your chain is up! Come back and judge it.'
+    when 'over' then 'The game is over! Come back to see who won.'
   end;
   if v_body is null or not public.is_room_member('room:' || v_code) then return; end if;
   with picked as (
-    update public.room_members set nudged = true
+    update public.room_members set nudged_at = now()
     where room = v_code and user_id = any(p_users) and user_id <> auth.uid()
-      and left_at is null and not nudged
+      and left_at is null
+      and (nudged_at is null or nudged_at < now() - interval '5 seconds')
     returning user_id
   )
   select array_agg(user_id) into v_to from picked;
@@ -408,8 +483,10 @@ end $$;
 -- Whenever the room's list changes, every phone in it is told to fetch the
 -- list again. In the lobby, everyone else also gets a notification (the app
 -- hides it if it's open on the screen): "Sam has entered - 4 players in the
--- room." A room being closed takes its members with it; nobody is told about
--- those.
+-- room." So do the others when someone taps Leave game during a game and at
+-- least 3 carry on: "Sam left the game - 3 players still playing." (With
+-- fewer, the room closes, and that's what they're told: leave_room_as.) A
+-- room being closed takes its members with it; nobody is told about those.
 create or replace function public.room_members_changed()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare
@@ -422,7 +499,20 @@ begin
   select phase into v_phase from public.rooms where code = v_code;
   if not found then return null; end if;
   perform realtime.send('{}'::jsonb, 'members', 'room:' || v_code, true);
-  if v_phase <> 'lobby' or tg_op = 'UPDATE' then return null; end if;
+  if tg_op = 'UPDATE' then
+    if v_phase = 'playing' and old.left_at is null and new.left_at is not null then
+      select count(*) into v_count from public.room_members where room = v_code and left_at is null;
+      if v_count < 3 then return null; end if;
+      perform public.push(
+        array(select user_id from public.room_members where room = v_code and left_at is null),
+        'Room ' || v_code,
+        format('%s left the game - %s %s still playing.', new.name, v_count, case when v_count = 1 then 'player' else 'players' end),
+        jsonb_build_object('room', v_code, 'kind', 'left')
+      );
+    end if;
+    return null;
+  end if;
+  if v_phase <> 'lobby' then return null; end if;
   if tg_op = 'INSERT' then
     v_who := new.name;
     v_verb := 'entered';
@@ -450,7 +540,8 @@ create trigger room_members_changed
 
 -- Close every room nobody has done anything in for 10 minutes (close_room:
 -- tell the phones still connected, then delete it). One that can't be told
--- doesn't hold up the rest.
+-- doesn't hold up the rest. Rooms closed for too few players are forgotten
+-- after 15 minutes.
 create or replace function public.close_idle_rooms()
 returns void language plpgsql security definer set search_path = '' as $$
 declare
@@ -458,6 +549,46 @@ declare
 begin
   for v_code in select code from public.rooms where public.room_is_idle(last_active_at) loop
     perform public.close_room(v_code);
+  end loop;
+  delete from public.closed_rooms where closed_at < now() - interval '15 minutes';
+end $$;
+
+-- A game whose players have all been away for 15 seconds (step_away) is
+-- paused: no phone is keeping its clock (it picks up where it was when
+-- someone's back). Each of them is told what's waiting for them, from the
+-- game's snapshot, once each time it happens. The 15 seconds let a player
+-- going from one app to another, or switching phones, pass without a word. (A
+-- player on 2.9.0 never says they're away, so a game with one in it isn't
+-- told.)
+create or replace function public.tell_paused_rooms()
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  g record;
+begin
+  for g in
+    select r.code, r.snapshot ->> 'phase' as phase
+    from public.rooms r
+    join public.room_members m on m.room = r.code and m.left_at is null
+    where r.phase = 'playing' and not public.room_is_idle(r.last_active_at)
+    group by r.code
+    having count(*) filter (where m.away_at is null) = 0
+      and max(m.away_at) < now() - interval '15 seconds'
+      and (r.paused_told_at is null or r.paused_told_at < max(m.away_at))
+  loop
+    update public.rooms set paused_told_at = now() where code = g.code;
+    perform public.push(
+      array(select user_id from public.room_members where room = g.code and left_at is null),
+      'Room ' || g.code,
+      'Everyone''s away, so the game is paused. ' || case g.phase
+        when 'prompts' then 'Come back to fill the trough!'
+        when 'view' then 'Come back to see your prompt!'
+        when 'draw' then 'Come back to draw!'
+        when 'caption' then 'Come back to guess!'
+        when 'reveal' then 'Come back for the reveal!'
+        else 'Come back to play!'
+      end,
+      jsonb_build_object('room', g.code, 'kind', 'paused')
+    );
   end loop;
 end $$;
 
@@ -478,6 +609,13 @@ end $$;
 
 select cron.schedule('squigglepig-close-idle-rooms', '* * * * *', 'select public.close_idle_rooms()');
 select cron.schedule('squigglepig-tidy-guests', '17 4 * * *', 'select public.tidy_guests()');
+-- Every 10 seconds where pg_cron can (1.5 on), every minute where it can't.
+do $$
+begin
+  perform cron.schedule('squigglepig-tell-paused-rooms', '10 seconds', 'select public.tell_paused_rooms()');
+exception when others then
+  perform cron.schedule('squigglepig-tell-paused-rooms', '* * * * *', 'select public.tell_paused_rooms()');
+end $$;
 
 -- ---- Who may call what -----------------------------------------------------
 
@@ -486,13 +624,14 @@ revoke execute on function
   public.is_room_member(text),
   public.push(uuid[], text, text, jsonb),
   public.room_is_idle(timestamptz),
-  public.close_room(text),
+  public.close_room(text, text),
   public.leave_room_as(text, uuid),
   public.create_room(text),
   public.join_room(text, text, boolean),
   public.leave_room(text),
   public.room_state(text, boolean),
   public.touch_room(text),
+  public.step_away(text),
   public.start_game(text),
   public.end_game(text),
   public.save_snapshot(text, jsonb),
@@ -500,6 +639,7 @@ revoke execute on function
   public.set_push_token(text),
   public.room_members_changed(),
   public.close_idle_rooms(),
+  public.tell_paused_rooms(),
   public.tidy_guests()
 from public, anon, authenticated;
 
@@ -511,6 +651,7 @@ grant execute on function
   public.leave_room(text),
   public.room_state(text, boolean),
   public.touch_room(text),
+  public.step_away(text),
   public.start_game(text),
   public.end_game(text),
   public.save_snapshot(text, jsonb),
