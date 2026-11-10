@@ -1567,7 +1567,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // A Leave game the server never heard about is sent now.
   useEffect(() => {
     takePendingLeave().then((code) => {
-      if (code) leaveRoomOnServer(code).then((ok) => !ok && savePendingLeave(code));
+      if (code) {
+        leaveRoomOnServer(code).then((ok) => {
+          if (!ok) savePendingLeave(code);
+        });
+      }
     });
     registerForPush(false); // keeps the server's copy of the token fresh
   }, []);

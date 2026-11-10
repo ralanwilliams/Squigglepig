@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { AccessibilityInfo, Animated, AppState, Easing, Platform, StyleSheet, View, useColorScheme, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Easing, Platform, StyleSheet, View, useColorScheme, useWindowDimensions, type LayoutChangeEvent, type ViewInstance } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -154,7 +154,7 @@ function parsePause(raw: string | null): Pause | null {
 
 const Ctx = createContext<ThemeCtx | null>(null);
 const WipeCtx = createContext<{
-  shotRef: React.RefObject<View | null>;
+  shotRef: React.RefObject<ViewInstance | null>;
   // The photographed view's real size. Not the window's: on Android that
   // leaves out the system navigation bar, and a full-height photo squeezed
   // into a shorter box shifts the whole screen up by that much mid-wipe.
@@ -328,7 +328,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // gets photographed (the screens, not the toggle floating above them).
   // With reduced motion there is no wipe: the palette simply flips. Choosing
   // a theme plays the same sweep (`sweep`).
-  const shotRef = useRef<View | null>(null);
+  const shotRef = useRef<ViewInstance | null>(null);
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
   const [pending, setPending] = useState<ThemeName | null>(null);
   const [wipe, setWipe] = useState<Wipe | null>(null);

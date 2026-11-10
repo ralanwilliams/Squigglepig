@@ -26,10 +26,6 @@ const paths = npmLs('--parseable')
   .split(/\r?\n/)
   .filter((p) => p.includes('node_modules'));
 
-// @expo/ngrok is the dev-server tunnel (`expo start --tunnel`): its binaries
-// are proprietary, carry no license field and never ship in the app.
-const SKIP = /^@expo\/ngrok/;
-
 function licenseOf(pkg) {
   if (typeof pkg.license === 'string') return pkg.license;
   if (pkg.license && pkg.license.type) return pkg.license.type;
@@ -46,7 +42,6 @@ for (const dir of paths) {
     continue;
   }
   if (!pkg.name || !pkg.version) continue;
-  if (SKIP.test(pkg.name)) continue;
   const key = `${pkg.name}@${pkg.version}`;
   if (!seen.has(key)) seen.set(key, { name: pkg.name, version: pkg.version, license: licenseOf(pkg) });
 }

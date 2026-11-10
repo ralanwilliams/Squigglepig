@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useReducer, useRef, useState } from 'react';
-import { Animated, LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import Svg, { G, Path, Rect } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Stickers, Strokes } from './DrawingArt';
@@ -424,7 +424,7 @@ export const DrawingBoard = forwardRef<DrawingBoardHandle, { store?: DrawingStor
   // pinch, which browsers report as one) is left alone to zoom the page.
   // Registered by hand because React's onWheel is passive and can't stop the
   // page from scrolling.
-  const frameRef = useRef<View>(null);
+  const frameRef = useRef<ViewInstance>(null);
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const el = frameRef.current as unknown as HTMLElement | null;
