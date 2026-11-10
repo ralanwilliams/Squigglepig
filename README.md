@@ -188,7 +188,12 @@ npm install -g eas-cli
 eas login
 eas build -p android   # signed .aab for Google Play
 eas build -p ios       # .ipa for the App Store (requires an Apple Developer account)
+eas build --profile preview --platform all   # installable test builds, no store needed
 ```
+`.env` isn't uploaded to EAS, so the Supabase values live in EAS's **production**
+environment (`eas env:list --environment production`). The `preview` profile
+reads that same environment (`"environment": "production"` in `eas.json`);
+without it a test build has no keys and can't create or join a game.
 
 ## Accounts you'll eventually need
 | Service | Needed for | Cost |
