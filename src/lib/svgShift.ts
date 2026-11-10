@@ -16,5 +16,6 @@ const FAR = 100000; // any range wider than a move will ever be; it extends beyo
 export function svgShift(axis: 'x' | 'y', by: Motion) {
   if (Platform.OS !== 'web') return axis === 'x' ? { translateX: by } : { translateY: by };
   const at = (n: number) => (axis === 'x' ? `translate(${n} 0)` : `translate(0 ${n})`);
-  return { transform: by.interpolate({ inputRange: [-FAR, FAR], outputRange: [at(-FAR), at(FAR)] }) };
+  // Either kind of Motion has this method; TypeScript just can't call it on the union of the two.
+  return { transform: (by as Animated.Value).interpolate({ inputRange: [-FAR, FAR], outputRange: [at(-FAR), at(FAR)] }) };
 }

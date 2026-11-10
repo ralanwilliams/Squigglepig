@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, StyleSheet, View, type ViewInstance } from 'react-native';
 import Svg, { ClipPath, Defs, G, Path } from 'react-native-svg';
 import { PROPS, type Prop, type PropName } from '../theme/skins/props';
 import { TROUGH_ITEM, troughScale, troughShaft, type TroughSlot } from '../theme/skins/trough';
@@ -47,7 +47,7 @@ export function TroughDropLayer() {
   const [, setTick] = useState(0);
   // The layer's own place in the window (on web the app sits in a centred frame).
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewInstance>(null);
   useEffect(() => {
     redraw = () => setTick((n) => n + 1);
     return () => {

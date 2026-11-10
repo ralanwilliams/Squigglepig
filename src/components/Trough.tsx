@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { font, type Theme } from '../theme/tokens';
 import { useReducedMotion, useSkin, useThemedStyles } from '../theme/theme';
@@ -78,7 +78,7 @@ export function Trough({
   const floods = useRef(TROUGH_FLOOD.map(() => new Animated.Value(0))).current;
   const landed = useRef(0); // how many are in already
   const id = useId();
-  const box = useRef<View>(null); // the drawing, measured to hand falls to the drop layer
+  const box = useRef<ViewInstance>(null); // the drawing, measured to hand falls to the drop layer
   const fromScreen = fallFrom === 'screen' && !reduced;
 
   // New props drop one after another; ones no longer counted (a new round) go.

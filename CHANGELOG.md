@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 - Leaving a game asks "Are you sure?" first, with what you'd lose, so a stray tap doesn't take you out. Tapping Leave game or Leave asks, and so does going back during a game or a solo run (Android's back button, swiping back on iPhone and iPad, or a browser's Back). Stay keeps you in the game, whose clock keeps running while the question is up
+- Updated to Expo SDK 58 and React Native 0.88
 - The lobby says who you're waiting for ("Waiting for Alan to start…"), and its status line is one short line: "Connected · 4 players · 1 away"
 - Drawings are sent with only the points their lines need, so a detailed drawing arrives faster and looks the same
 - A room left 10 minutes without anyone doing anything in it is closed for everyone straight away

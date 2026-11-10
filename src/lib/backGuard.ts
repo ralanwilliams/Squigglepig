@@ -28,7 +28,8 @@ export const useBackHeld = () => guard.useValue() !== null;
 export const pressBack = () => guard.get()?.();
 
 // As this file loads, ahead of the router, which only starts listening once the
-// app has rendered.
+// app has rendered. (The web build is one bundle, so nothing here loads late:
+// asyncRoutes in app.json.)
 if (Platform.OS === 'web' && typeof window !== 'undefined') holdBrowserBack(window, guard.get);
 
 // While `on`, Back calls `onBack`. There's one guard at a time; the screens that

@@ -35,9 +35,9 @@ prompt's own author, so there's nothing to guess).
 
 ## Built With
 
-- **Expo 57** — React Native framework for iOS, Android and web
+- **Expo 58** — React Native framework for iOS, Android and web
 - **react-native-web** — The same screens rendered in the browser
-- **React Native 0.86** — Cross-platform mobile UI
+- **React Native 0.88** — Cross-platform mobile UI
 - **TypeScript** — Type safety
 - **Supabase** — Realtime Broadcast and Presence for multiplayer sync, anonymous guest sign-in, and Postgres (with pg_cron and pg_net) for rooms that outlast a closed app (free tier)
 - **expo-notifications** — Push notifications about your room, sent through Expo's push service
@@ -171,6 +171,12 @@ The game project needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`
 set as environment variables in its Pages settings, since `.env` isn't committed.
 Node comes from `.node-version`.
 
+The web build is one bundle (`asyncRoutes.web: false` in `app.json`) rather than
+SDK 58's default of loading each screen as it's reached. A deploy replaces the old
+files, so a player mid-game would otherwise find their next screen gone, and the
+game moves everyone between screens by itself. Holding a browser's Back also has
+to load ahead of the router (`src/lib/browserBack.ts`).
+
 Room links always use `https://squigglepig.app/join?room=…` (see
 `src/lib/links.ts`): the app opens them where it's installed, and everywhere else
 the invite page offers the app, the store, or the same room on play.squigglepig.app.
@@ -182,7 +188,12 @@ npm install -g eas-cli
 eas login
 eas build -p android   # signed .aab for Google Play
 eas build -p ios       # .ipa for the App Store (requires an Apple Developer account)
+eas build --profile preview --platform all   # installable test builds, no store needed
 ```
+`.env` isn't uploaded to EAS, so the Supabase values live in EAS's **production**
+environment (`eas env:list --environment production`). The `preview` profile
+reads that same environment (`"environment": "production"` in `eas.json`);
+without it a test build has no keys and can't create or join a game.
 
 ## Accounts you'll eventually need
 | Service | Needed for | Cost |
