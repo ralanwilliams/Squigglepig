@@ -3,15 +3,18 @@ import { StyleSheet, TextInput, type TextInputProps } from 'react-native';
 import { font, type Theme } from '../theme/tokens';
 import { useTheme, useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
+import { useKeyboardTarget } from './KeyboardLift';
 
 // Reproduces the bootstrap `.form-control` inputs: white, rounded, subtle border.
-// Nothing scrolls when the keyboard opens: the window resizes (Android `resize`
-// mode / iOS KeyboardAvoidingView) and the surrounding FitBox re-fits the pane,
-// so the field simply stays where it is, above the keyboard.
+// Nothing scrolls when the keyboard opens. Every box marks itself as a field
+// (useKeyboardTarget), so on a screen held upright the KeyboardLift that Stage
+// and WorkStage wrap it in slides the screen up until all of its boxes sit just
+// above the keyboard (KeyboardLift.tsx).
 export function PigInput(props: TextInputProps) {
   const ui = useUi();
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const target = useKeyboardTarget('field');
   return (
     <TextInput
       placeholderTextColor={theme.placeholder}
@@ -19,6 +22,7 @@ export function PigInput(props: TextInputProps) {
       autoCorrect={false}
       maxFontSizeMultiplier={FONT_CAP}
       {...props}
+      ref={target}
       style={[
         styles.input,
         {

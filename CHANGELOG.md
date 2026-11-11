@@ -12,7 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 - Leaving a game asks "Are you sure?" first, with what you'd lose, so a stray tap doesn't take you out. Tapping Leave game or Leave asks, and so does going back during a game or a solo run (Android's back button, swiping back on iPhone and iPad, or a browser's Back). Stay keeps you in the game, whose clock keeps running while the question is up
 - Updated to Expo SDK 58 and React Native 0.88
-- The lobby says who you're waiting for ("Waiting for Alan to start…"), and its status line is one short line: "Connected · 4 players · 1 away"
+- The lobby says who you're waiting for ("Waiting for Alan to start…"). The line above the pig shows only while connecting or reconnecting, since the players list already says who's in and who's away; when the list is too long to show everyone, "+3 more · 1 away" counts the away players it leaves out
 - Drawings are sent with only the points their lines need, so a detailed drawing arrives faster and looks the same
 - A room left 10 minutes without anyone doing anything in it is closed for everyone straight away
 - The menu (☰) is on more screens: Create Game, Join Game, the lobby, Play Solo, Your pig, Art supplies and Themes, as well as Home. From the lobby you're still in the room, Back brings you back to it, and if the game starts while you're on Your pig or Rewards, you're taken straight to it
@@ -28,8 +28,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The waiting screen says who's still drawing or guessing (and which of them are away), and how much time they have left. Once everyone's in, it says the game is moving on
 - Coming back to a game after the app closed, with your turn already handed in, takes you to the waiting screen instead of handing you the same turn again on a blank canvas
 - The Privacy Policy, Terms of Service and Help & FAQ explain the new scoring, pausing, notifications and when a room closes
+- With your phone upright, the screen slides up with the keyboard so you can see what you're typing. On Join Game you can see both the room code and your name, with Lobby underneath; Create Game and Your pig's speech bubble work the same way
 
 ### Fixed
+- Messages at the bottom of the screen show above the keyboard while it's up. Before, when Join Game couldn't find the room (or Create Game couldn't make one), the message saying so was hidden behind the keyboard that was still open from typing
 - Coming back to a game after switching apps, locking your phone or losing signal could leave you stuck on the old screen or "Please wait", sometimes through a whole reveal, and could stop the game's clock for everyone. A phone that goes off screen now drops out of the room's live list at once, a phone coming back keeps asking until it's caught up (or picks the game up itself), its connection is checked and renewed as it wakes, and if the phone keeping the game's clock goes quiet, the next one carries the game on
 - A drawing or guess whose time ran out while you were away is no longer handed in late, and no longer sends you to "Please wait" on the way back: you go straight to the game as it is now
 - While your chain was being judged, being away (with the app still open behind another one) could stall the reveal for a minute

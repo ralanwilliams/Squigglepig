@@ -3,8 +3,11 @@ import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, Text, View }
 import { font, type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
+import { useKeyboardInset } from './KeyboardLift';
 
-// A transient message pinned to the bottom of the screen, above the safe area.
+// A transient message pinned to the bottom of the screen, above the safe area,
+// or above the keyboard while one is up (so Join's "no such room" isn't hidden
+// behind the keyboard that's still open after tapping Lobby).
 // `showToast` from anywhere; ToastOverlay (mounted once, in the root layout
 // beside CornerControlsOverlay) shows it. A new message replaces the old one at
 // once — unlike Android's system toasts, which queue and each hang around for
@@ -36,6 +39,7 @@ const NATIVE = Platform.OS !== 'web';
 export function ToastOverlay() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const keyboard = useKeyboardInset();
   // `shown` stays on the last message while it fades out.
   const [shown, setShown] = useState<string | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
@@ -66,7 +70,7 @@ export function ToastOverlay() {
       style={[
         styles.overlay,
         {
-          bottom: ui.insets.bottom + ui.pad,
+          bottom: Math.max(ui.insets.bottom, keyboard) + ui.pad,
           left: ui.insets.left + ui.pad,
           right: ui.insets.right + ui.pad,
         },
