@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Countdown, useDeadline } from './Countdown';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
+import { KeyboardLift } from './KeyboardLift';
 import { PeekPig, peekPigHeight } from './PeekPig';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
@@ -137,27 +138,31 @@ export function WorkStage({
     return (
       <View style={[styles.safe, frame]}>
         <Backdrop />
-        <View style={[styles.row, { padding: ui.pad, gap: ui.gap }]}>
-          <View style={styles.focus}>{focus}</View>
-          <FitBox align="top" minContentH={fixedH} style={{ width: railW }}>
-            <View style={{ gap, paddingTop: railTop }}>
-              {head}
-              {primary}
-              {secondaryRow.length ? (
-                <View style={[styles.buttons, { gap: ui.sp(10) }]}>{secondaryRow}</View>
-              ) : null}
-              {footer}
-            </View>
-          </FitBox>
-        </View>
+        <KeyboardLift enabled={!ui.landscape} gap={gap}>
+          <View style={[styles.row, { padding: ui.pad, gap: ui.gap }]}>
+            <View style={styles.focus}>{focus}</View>
+            <FitBox align="top" minContentH={fixedH} style={{ width: railW }}>
+              <View style={{ gap, paddingTop: railTop }}>
+                {head}
+                {primary}
+                {secondaryRow.length ? (
+                  <View style={[styles.buttons, { gap: ui.sp(10) }]}>{secondaryRow}</View>
+                ) : null}
+                {footer}
+              </View>
+            </FitBox>
+          </View>
+        </KeyboardLift>
       </View>
     );
   }
 
   // One column: the pad gets a fixed 4:3 box (full width) rather than all the
   // leftover height, the rows sit close together, and the whole group is
-  // centred as one block — a FitBox, so it shrinks as a unit when a keyboard
-  // opens instead of pushing anything off screen.
+  // centred as one block — a FitBox, so it shrinks as a unit on a short screen
+  // instead of pushing anything off it. The text box sits near the top, above
+  // where a keyboard comes up, so the column only slides up (KeyboardLift) on a
+  // screen too short to keep it clear.
   const gapP = ui.sp(24);
   const focusH = Math.round((railInner * 3) / 4);
   const fixedHP = rowH + slotH + gapP + focusH + gapP + ui.sp(44) + gapP + ui.sp(36);
@@ -165,17 +170,19 @@ export function WorkStage({
   return (
     <View style={[styles.safe, frame]}>
       <Backdrop />
-      <FitBox minContentH={fixedHP} style={[styles.flex, { margin: ui.pad }]}>
-        <View style={{ gap: gapP }}>
-          {head}
-          <View style={[styles.focusFixed, { height: focusH }]}>{focus}</View>
-          <View style={[styles.buttons, { gap: ui.sp(10) }]}>
-            <View style={styles.flex}>{primary}</View>
-            {secondaryRow}
+      <KeyboardLift enabled={!ui.landscape} gap={gapP}>
+        <FitBox minContentH={fixedHP} style={[styles.flex, { margin: ui.pad }]}>
+          <View style={{ gap: gapP }}>
+            {head}
+            <View style={[styles.focusFixed, { height: focusH }]}>{focus}</View>
+            <View style={[styles.buttons, { gap: ui.sp(10) }]}>
+              <View style={styles.flex}>{primary}</View>
+              {secondaryRow}
+            </View>
+            {footer}
           </View>
-          {footer}
-        </View>
-      </FitBox>
+        </FitBox>
+      </KeyboardLift>
     </View>
   );
 }

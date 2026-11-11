@@ -2,6 +2,7 @@ import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
+import { KeyboardLift, KeyboardTarget } from './KeyboardLift';
 import { cornerReserve } from './CornerControls';
 import { MenuButton } from './MenuDrawer';
 import { useUi } from '../theme/responsive';
@@ -28,9 +29,12 @@ import { useThemedStyles } from '../theme/theme';
 // (MenuDrawer.tsx), across from the sound and dark-mode switches; the band
 // already keeps clear of both corners.
 //
-// When a keyboard opens the window shrinks (Android `resize` mode / iOS
-// KeyboardAvoidingView), the panes shrink with it and FitBox re-fits — so
-// inputs stay where they are, above the keyboard, without any scrolling.
+// When a keyboard opens, nothing scrolls. Held upright, the whole screen slides
+// up with the keyboard until the text boxes, and the controls under them when
+// there's room (Join's Lobby button, Create's Create), sit just above it
+// (KeyboardLift). On its side,
+// where there's no room to slide into, the panes shrink instead (iOS
+// KeyboardAvoidingView) and FitBox re-fits.
 export function Stage({
   header,
   focus,
@@ -88,22 +92,27 @@ export function Stage({
   // Remounting discards the cached basis.
   const actionsPane = actions ? (
     <FitBox key={twoPane ? 'rail' : 'pane'} align={actionsAlign} style={twoPane ? { width: ui.railW } : styles.pane}>
-      <View style={{ gap: ui.gap }}>{actions}</View>
+      <KeyboardTarget style={{ gap: ui.gap }}>{actions}</KeyboardTarget>
     </FitBox>
   ) : null;
 
   return (
     <View style={[styles.safe, frame]}>
       <Backdrop />
-      {band}
+      {/* Switched by `behavior`, not `enabled`: disabled with the keyboard up,
+          it would keep its shrunken height after the phone turned upright. */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'height' : undefined}
+        behavior={Platform.OS === 'ios' && ui.landscape ? 'height' : undefined}
       >
-        <View style={[styles.flex, twoPane && styles.row, { padding: ui.pad, gap: ui.gap }]}>
-          {focusPane}
-          {actionsPane}
-        </View>
+        {/* The keyboard sits below the controls by the gap between them. */}
+        <KeyboardLift enabled={!ui.landscape} gap={ui.gap}>
+          {band}
+          <View style={[styles.flex, twoPane && styles.row, { padding: ui.pad, gap: ui.gap }]}>
+            {focusPane}
+            {actionsPane}
+          </View>
+        </KeyboardLift>
       </KeyboardAvoidingView>
       {menu ? <MenuButton /> : null}
     </View>

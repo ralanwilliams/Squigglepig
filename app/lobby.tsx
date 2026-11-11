@@ -80,29 +80,33 @@ export default function Lobby() {
   const enough = players.length >= MIN_PLAYERS;
   const connected = status === 'connected';
 
-  // One short line, whatever it says (shrunk to fit if it must be), so the
-  // band keeps its height and the screen under it never moves. A lost
-  // connection comes back by itself (the channel rejoins), so it says so;
-  // what went wrong goes to the log, not the screen.
+  // The band says something only when this phone's connection is the problem:
+  // who's in and who's away is in the roster. It's one short line (shrunk to
+  // fit if it must be) inside the band's fixed height, so the screen under it
+  // never moves as it comes and goes. A lost connection comes back by itself
+  // (the channel rejoins), so it says so; what went wrong goes to the log,
+  // not the screen.
   const banner =
     status === 'connecting'
       ? 'Connecting to server…'
       : status === 'error'
         ? '⚠ Connection lost. Reconnecting…'
-        : `Connected · ${players.length} player${players.length === 1 ? '' : 's'}` +
-          (away.length ? ` · ${away.length} away` : '');
+        : null;
   useEffect(() => {
     if (status === 'error') console.warn('[lobby] connection lost:', statusDetail || 'unknown');
   }, [status, statusDetail]);
 
   // Roster rows the pane can hold at full size beneath the card's fixed chrome.
+  // The rest collapse to "+N more", which counts the away ones among them,
+  // since their AWAY tags aren't on screen.
   const visible = Math.max(4, Math.floor((ui.paneH - ui.sp(300)) / ui.sp(34)));
   const shown = players.slice(0, visible);
   const hidden = Math.max(0, players.length - visible);
+  const hiddenAway = players.slice(visible).filter((p) => away.includes(p)).length;
 
-  const header = (
+  const header = banner && (
     <Text
-      style={[styles.status, { fontSize: ui.f(13) }, connected ? styles.ok : styles.warn]}
+      style={[styles.status, { fontSize: ui.f(13) }]}
       maxFontSizeMultiplier={FONT_CAP}
       numberOfLines={1}
       adjustsFontSizeToFit
@@ -232,8 +236,14 @@ export default function Lobby() {
             </View>
           ))}
           {hidden > 0 && (
-            <Text style={[styles.morePlayers, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
-              +{hidden} more
+            <Text
+              style={[styles.morePlayers, { fontSize: ui.f(12) }]}
+              maxFontSizeMultiplier={FONT_CAP}
+              accessibilityLabel={
+                `${hidden} more player${hidden === 1 ? '' : 's'}` + (hiddenAway ? `, ${hiddenAway} of them away` : '')
+              }
+            >
+              +{hidden} more{hiddenAway ? ` · ${hiddenAway} away` : ''}
             </Text>
           )}
         </View>
@@ -249,11 +259,10 @@ export default function Lobby() {
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  // Header: the connection banner. It's in plain text colors (the pink is too
-  // light for small text on the teal); the banner's own ⚠ carries a warning.
-  status: { fontFamily: font.regular },
-  ok: { color: t.link },
-  warn: { color: t.text },
+  // Header: the connection banner, shown only while connecting or reconnecting.
+  // It's in the plain text color (the pink is too light for small text on the
+  // teal); the banner's own ⚠ carries a warning.
+  status: { fontFamily: font.regular, color: t.text },
 
   card: {
     backgroundColor: t.surface,
