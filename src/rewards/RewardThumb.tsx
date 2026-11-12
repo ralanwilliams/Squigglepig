@@ -10,7 +10,7 @@ import { PropArt } from '../components/SkinDecor';
 import { OUTFITS } from '../avatar/outfits';
 import { BUBBLES } from '../avatar/bubbles';
 import { STICKER_ART } from '../stickers/art';
-import { KINDS, isNone, type Kind, type Reward } from './catalog';
+import { BRUSH_SIZE, KINDS, isNone, type Kind, type Reward } from './catalog';
 
 // A small picture of a reward, `size` dp square. A kind without a drawing of
 // its own here, or a reward with no art (a default card, No outfit), shows
@@ -66,6 +66,17 @@ const THUMBS: { [K in Kind]?: Thumb<K> } = {
       </Svg>
     </View>
   ),
+  // Brush size: three lines on the drawing paper, thin to thick.
+  tool: (r, size) =>
+    r.id === BRUSH_SIZE ? (
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: canvas.fill, overflow: 'hidden' }}>
+        <Svg width={size} height={size} viewBox="0 0 40 40">
+          <Path d="M11 12.5h18" stroke={canvas.ink} strokeWidth={1.5} strokeLinecap="round" />
+          <Path d="M11 19.5h18" stroke={canvas.ink} strokeWidth={3.5} strokeLinecap="round" />
+          <Path d="M11 27.5h18" stroke={canvas.ink} strokeWidth={6} strokeLinecap="round" />
+        </Svg>
+      </View>
+    ) : null,
 };
 
 export function RewardThumb({ reward, size }: { reward: Reward; size: number }) {

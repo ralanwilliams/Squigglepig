@@ -47,13 +47,21 @@ const GLYPHS = {
   ),
   brush: <Path d="M19.5 4.5l-7.2 7.2M10.6 10.6l2.8 2.8M10.6 10.6c-2.4-.5-4.6 1.2-4.6 3.9 0 1.5-.9 2.7-2.5 3.4 3.4 1.8 7.9.7 9.2-2.4.5-1.3.4-2.5-.3-3.5" />,
   sticker: <Path d="M5 4h14v9l-7 7H5zM19 13h-5.5a1.5 1.5 0 0 0-1.5 1.5V20M9 9.5v.01M14 9.5v.01" />, // a sticker peeling at one corner
+  slider: (
+    <>
+      <Path d="M3 12h6.5M14.5 12H21" />
+      <Circle cx="12" cy="12" r="2.5" />
+    </>
+  ), // a slider's track and knob: tools
   hat: <Path d="M8 4.5h8V16H8zM4 16h16M8 12.5h8" />, // a top hat
   fence: <Path d="M5 20V8l1.5-2.5L8 8v12M10.5 20V8L12 5.5 13.5 8v12M16 20V8l1.5-2.5L19 8v12M3 11h18M3 16h18" />, // Pigpen
   truffle: <Path d="M7.5 8.5c.4-2.6 3.3-4.2 5.9-3.4 2.4-.6 4.9 1.2 5 3.7 1.7 1.4 1.8 4.1.2 5.6.2 2.6-2.2 4.6-4.7 4.1-1.8 1.5-4.6 1.3-6-.5-2.5-.2-4-2.9-3-5.2-.9-1.7-.2-3.8 1.6-4.3zM10 11v.01M14 10v.01M12.5 14v.01" />, // Truffle Hunter
   bubble: <Path d="M4 5h16v11H10.5L6 20v-4H4z" />, // the pig's speech bubble
-  // A sticker's controls on the canvas (StickerPicker.tsx), drawn in white.
+  // The drawing board's controls on the canvas (CanvasControls.tsx: the zoom,
+  // Clear · Undo, a sticker's controls), drawn in white.
   minus: <Path d="M5 12h14" />,
   plus: <Path d="M5 12h14M12 5v14" />,
+  undo: <Path d="M8 5L3 10l5 5M3 10h11a6 6 0 0 1 6 6v3" />, // a left arrow whose tail turns down (not turnLeft's U)
   turnLeft: <Path d="M9 4L5 8l4 4M5 8h8a6 6 0 0 1 0 12H9" />,
   turnRight: <Path d="M15 4l4 4-4 4M19 8h-8a6 6 0 0 0 0 12h4" />,
   trash: <Path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6" />,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { PigButton } from '../../../components/PigButton';
 import { Heading } from '../../../components/Heading';
 import { DrawingImage } from '../../../components/DrawingImage';
@@ -77,9 +77,29 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
     return () => clearTimeout(t);
   }, [spec]);
 
+  // The strokes drawn, kept in a ref too so Undo and Clear (and the score)
+  // always see the latest, and what each Clear cleared, latest last: Undo
+  // takes back the strokes since a Clear one at a time, then the Clear, as on
+  // the drawing board.
   const [strokes, setStrokes] = useState<string[]>([]);
   const strokesRef = useRef(strokes);
-  strokesRef.current = strokes;
+  const cleared = useRef<string[][]>([]);
+  const draw = (next: string[]) => {
+    strokesRef.current = next;
+    setStrokes(next);
+  };
+  const clear = () => {
+    if (!strokesRef.current.length) return;
+    cleared.current.push(strokesRef.current);
+    draw([]);
+  };
+  const undo = () => {
+    if (strokesRef.current.length) draw(strokesRef.current.slice(0, -1));
+    else {
+      const back = cleared.current.pop();
+      if (back) draw(back);
+    }
+  };
   const shown = useMemo(() => JSON.stringify({ ...SPACE, strokes: spec.strokes }), [spec]);
 
   // Scored on what's drawn, whether Done was pressed or the clock ran out;
@@ -127,31 +147,18 @@ function Round({ spec, onResult, Frame }: RoundProps<Spec>) {
       onExpire={done}
       focus={
         <PeekOver>
-          <DrawPad strokes={strokes} onStroke={(d) => setStrokes((s) => [...s, d])} />
+          <DrawPad strokes={strokes} onStroke={(d) => draw([...strokesRef.current, d])} onClear={clear} onUndo={undo} />
         </PeekOver>
       }
       controls={
         <View style={{ gap: ui.sp(10) }}>
           <Heading>Now draw it!</Heading>
-          <View style={[styles.row, { gap: ui.sp(10) }]}>
-            <View style={styles.flex}>
-              <PigButton name="Undo" onPress={() => setStrokes((s) => s.slice(0, -1))} silent />
-            </View>
-            <View style={styles.flex}>
-              <PigButton name="Clear" onPress={() => setStrokes([])} silent />
-            </View>
-          </View>
           <PigButton name="Done" onPress={done} />
         </View>
       }
     />
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row' },
-  flex: { flex: 1 },
-});
 
 export const memory: Game<Spec> = {
   id: 'memory',

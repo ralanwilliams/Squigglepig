@@ -1,31 +1,34 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { PigInput } from '../src/components/PigInput';
-import { TabPages, Tabs } from '../src/components/Tabs';
+import { FolderTabs } from '../src/components/FolderTabs';
+import { TierPages, type TierCard, type TierKey } from '../src/rewards/TierPages';
 import { WinnerPig } from '../src/avatar/WinnerPig';
 import { partSource, useMyAvatar, useThemeSkins } from '../src/avatar/avatar';
 import { DEFAULT_SAY } from '../src/avatar/bubbles';
 import { PLACES, partsOf, placeOf, type Place, type ThemePart } from '../src/avatar/themeParts';
 import { Card, RewardTile } from '../src/rewards/RewardTile';
 import { propThumb } from '../src/rewards/RewardThumb';
-import { BUBBLE_MAX, rewardsOf, slotOf, type Reward } from '../src/rewards/catalog';
+import { BUBBLE_MAX, rewardById, rewardsOf, slotOf, type Reward } from '../src/rewards/catalog';
 import { cleanBubbleText, useInventory } from '../src/rewards/inventory';
-import { useSkin, useTheme, useThemedStyles } from '../src/theme/theme';
-import type { Skin } from '../src/theme/skins';
+import { useSkin, useTheme } from '../src/theme/theme';
+import { UNLOCKABLE, type Skin } from '../src/theme/skins';
 import { useUi } from '../src/theme/responsive';
 
 // Your pig, from the menu's Rewards: how everyone in the room sees you when
 // you win (src/avatar). The pig on the left (above, held upright), dressed as
-// it is now; on the right a row of tabs, one per place on the pig, and under
-// it that place's cards: tapping one puts it on the pig, tapping it again
-// takes it off.
+// it is now; on the right folder tabs down the rail's left, one per place on
+// the pig, and the open one's card the rail's whole height (FolderTabs): that
+// place's cards, grouped by tier (TierPages). Tapping one puts it on the pig,
+// tapping it again takes it off.
 //
 // What's on offer: every outfit there is, won or not (src/rewards/catalog.ts),
 // and the parts of every theme the player can use (the birthday or holiday in
-// season, and the themes they've won: src/avatar/themeParts.ts). Each goes in
-// the tab for where it sits on the pig (themeParts.ts placeOf), named for
-// what's really in it so nothing there is a surprise:
+// season, and the themes they've won: src/avatar/themeParts.ts; never a theme
+// not won). An outfit's tier is its own, a won theme's part its theme's, and
+// the holiday's parts are In season. Each goes in the tab for where it sits on
+// the pig (themeParts.ts placeOf), named for what's really in it so nothing
+// there is a surprise:
 //
 //   Head     hats, and the mohawk, sweatband and bunny ears
 //   Face     sunglasses, shades, masks, brows
@@ -35,7 +38,8 @@ import { useUi } from '../src/theme/responsive';
 //   Sky      what floats about it: bats, clouds, birds, fireworks…
 //   Bubble   the speech bubbles, one at a time, and what the bubble says
 //
-// A tab with nothing in it isn't shown, and a dot marks each tab with
+// A tab with nothing in it isn't shown. Each counts how many of its cards are
+// the player's (out of all of them), and a dot marks each tab with
 // something from it on the pig, so it's easy to find what to take off. The
 // pig wears one thing in each place, so putting one on takes off what was
 // there (inventory.tsx wear, setPart). The theme showing dresses the pig in
@@ -56,9 +60,14 @@ const TAB_LABELS: Record<TabKey, string> = {
   bubble: 'Bubble',
 };
 
+// A theme's tier: a won one's own (catalog.ts), the holiday's In season.
+const tierOfSkin = (skin: Skin): TierKey => {
+  const id = Object.keys(UNLOCKABLE).find((k) => UNLOCKABLE[k] === skin);
+  return (id && rewardById(id)?.tier) || 'seasonal';
+};
+
 export default function Pig() {
   const ui = useUi();
-  const styles = useThemedStyles(makeStyles);
   const dark = useTheme().name === 'dark';
   const { owns, worn, wear, chosen, choose, setPart, showPart, bubbleText, setBubbleText } = useInventory();
   const showing = useSkin();
@@ -72,27 +81,33 @@ export default function Pig() {
   const avatar = useMemo(() => ({ ...mine, say: cleanBubbleText(draft) }), [mine, draft]);
   const bubble = chosen('bubble');
 
-  const tile = (r: Reward) => {
+  const tile = (r: Reward): TierCard => {
     const owned = owns(r.id);
     const on = r.kind === 'outfit' ? worn.includes(r.id) : bubble === r.id;
     const toggle = () => (r.kind === 'outfit' ? wear(r.id, !on) : choose('bubble', on ? null : r.id));
-    return (
-      <RewardTile
-        key={r.id}
-        reward={r}
-        owned={owned}
-        chosen={on}
-        compact
-        status={owned && !r.soon ? (on ? 'On your pig' : 'Tap to put on') : undefined}
-        onPress={owned && !r.soon ? toggle : undefined}
-      />
-    );
+    return {
+      key: r.id,
+      tier: r.tier,
+      owned,
+      render: (size) => (
+        <RewardTile
+          reward={r}
+          owned={owned}
+          chosen={on}
+          compact
+          inset
+          status={owned && !r.soon ? (on ? 'On your pig' : 'Tap to put on') : undefined}
+          onPress={owned && !r.soon ? toggle : undefined}
+          {...size}
+        />
+      ),
+    };
   };
 
   // On: the pig wears this theme's part now. Off: taken off, or another
   // theme's (or an outfit in that slot) is on instead.
   // A part that turns into another after dark (Lukas's) shows as it looks now.
-  const themeTile = (skin: Skin, part: ThemePart) => {
+  const themeTile = (skin: Skin, part: ThemePart): TierCard => {
     const looks = (dark && part.night) || part;
     const on = partSource(mine, showing, part.key) === skin.id;
     const toggle = () => {
@@ -103,18 +118,27 @@ export default function Pig() {
         if (!on && outfit) wear(outfit, false);
       }
     };
-    return (
-      <Card
-        key={`${skin.id}:${part.key}`}
-        picture={propThumb(looks.prop, ui.sp(32))}
-        name={looks.label}
-        status={on ? 'On your pig' : 'Tap to put on'}
-        owned
-        chosen={on}
-        onPress={toggle}
-        compact
-      />
-    );
+    const tier = tierOfSkin(skin);
+    return {
+      key: `${skin.id}:${part.key}`,
+      tier,
+      owned: true,
+      render: ({ width, scale }) => (
+        <Card
+          picture={propThumb(looks.prop, ui.sp(32) * scale)}
+          name={looks.label}
+          status={on ? 'On your pig' : 'Tap to put on'}
+          owned
+          mark={tier === 'rare' || tier === 'premium' ? tier : undefined}
+          chosen={on}
+          onPress={toggle}
+          compact
+          inset
+          width={width}
+          scale={scale}
+        />
+      ),
+    };
   };
 
   // Every card, with where it goes and whether it's on the pig now. Outfits
@@ -133,31 +157,38 @@ export default function Pig() {
   const [tab, setTab] = useState<TabKey>('head');
   const open = keys.includes(tab) ? tab : keys[0];
   const isOn = (k: TabKey) => (k === 'bubble' ? !!bubble : items.some((i) => i.place === k && i.on));
+  // A tab's cards: the speech bubbles, or what goes in that place. Its tab
+  // counts the ones the player has (a theme's parts are all theirs).
+  const cardsOf = (k: TabKey): TierCard[] => (k === 'bubble' ? rewardsOf('bubble').map(tile) : items.filter((i) => i.place === k).map((i) => i.card));
 
   return (
     <Stage
       menu
       focus={<WinnerPig avatar={avatar} />}
-      // The tabs stay put while the cards under them change.
-      actionsAlign="top"
+      actionsFill
       actions={
-        <>
-          <Tabs
-            layout="row"
-            tabs={keys.map((k) => ({ key: k, label: TAB_LABELS[k], marked: isOn(k) ? { spoken: 'on your pig' } : undefined }))}
-            selected={open}
-            onSelect={setTab}
-          />
-          {/* Every tab's cards are drawn, all one height (TabPages): the
-              tabs keep their size and place whichever is open. */}
-          <TabPages
-            open={keys.indexOf(open)}
-            pages={keys.map((k) => (
-              <View key={k} style={{ gap: ui.gap }}>
-                <View accessibilityLabel={TAB_LABELS[k]} style={[styles.grid, { gap: ui.sp(6) }]}>
-                  {k === 'bubble' ? rewardsOf('bubble').map(tile) : items.filter((i) => i.place === k).map((i) => i.card)}
-                </View>
-                {k === 'bubble' ? (
+        <FolderTabs
+          tabs={keys.map((k) => {
+            const cards = cardsOf(k);
+            const owned = cards.filter((c) => c.owned).length;
+            return {
+              key: k,
+              label: TAB_LABELS[k],
+              count: { text: `${owned} / ${cards.length}`, spoken: `${owned} of ${cards.length} unlocked` },
+              marked: isOn(k) ? { spoken: 'on your pig' } : undefined,
+            };
+          })}
+          selected={open}
+          onSelect={setTab}
+        >
+          <TierPages
+            open={open}
+            pages={keys.map((k) => ({
+              key: k,
+              label: TAB_LABELS[k],
+              cards: cardsOf(k),
+              foot:
+                k === 'bubble' ? (
                   <PigInput
                     placeholder={`What your pig says (${DEFAULT_SAY})`}
                     value={draft}
@@ -167,16 +198,11 @@ export default function Pig() {
                     autoCapitalize="sentences"
                     accessibilityLabel="What your pig says"
                   />
-                ) : null}
-              </View>
-            ))}
+                ) : undefined,
+            }))}
           />
-        </>
+        </FolderTabs>
       }
     />
   );
 }
-
-const makeStyles = () => StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-});

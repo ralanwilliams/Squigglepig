@@ -1,36 +1,58 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Stage } from '../components/Stage';
 import { Heading } from '../components/Heading';
 import { Hint } from '../components/Hint';
 import { PigButton } from '../components/PigButton';
+import { FolderTabs } from '../components/FolderTabs';
 import { useScreenBackGuard } from '../lib/backGuard';
 import { confirmLeave } from '../lib/confirm';
 import { RewardTile } from '../rewards/RewardTile';
-import { KINDS, homeOf, type Reward } from '../rewards/catalog';
+import { TierPages, type TierCount } from '../rewards/TierPages';
+import { KINDS, homeOf, type Kind, type Reward, type Tier } from '../rewards/catalog';
 import { useInventory } from '../rewards/inventory';
 import { useChoose } from '../rewards/useChoose';
-import { useUi } from '../theme/responsive';
+import { FONT_CAP, useUi } from '../theme/responsive';
+import { font, type Theme } from '../theme/tokens';
+import { useThemedStyles } from '../theme/theme';
 import { playSound } from '../lib/sound';
 import { SOUNDS } from '../assets/assets';
 import { LADDER, ROUNDS, type Prize } from './engine';
-import { offers } from './payout';
+import { prizes } from './payout';
 
-// The end of a banked run: choose a prize (payout.ts offers), then it's
-// yours. Every pot offers three of its tier to choose from. A won reward of a kind worn one at a time (a theme) can be put to use there
+// The end of a banked run: choose a prize, then it's yours. On offer is
+// every reward of the pot's tier not yet won (payout.ts prizes; the nearest
+// tier with something left, if that one has nothing, and the message says
+// so), laid out as on the Rewards screens: folder tabs, one per kind on
+// offer with how many there are, the open one's card those prizes under the
+// tier's heading (FolderTabs, TierPages). Tapping one picks it: it's ringed
+// and shown half as big again beside the folder, and Take gives it. Nothing
+// is picked to start.
+//
+// A won reward of a kind worn one at a time (a theme) can be put to use there
 // and then. A button opens the screen the prize is kept on (catalog.ts
 // homeOf), and a hint says where rewards are found later. An outfit or a
 // speech bubble is put on at Your pig, where it's seen on the pig, so there
 // Dress your pig stands in for Use it. With nothing left to give, it says so.
+
+// The tabs' names: the kinds', short enough for a tab (speech bubbles as Your pig has them).
+const TAB_LABELS: Partial<Record<Kind, string>> = { bubble: 'Bubbles' };
+const toChoose: TierCount = (_, total) => ({ text: `${total} to choose from`, spoken: `${total} to choose from` });
+
 export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain: () => void; onDone: () => void }) {
   const ui = useUi();
+  const styles = useThemedStyles(makeStyles);
   const { owned, grant, uses } = useInventory();
   const putToUse = useChoose();
-  // Drawn once: the offer doesn't reshuffle as the screen re-renders.
-  const [list] = useState(() => offers(prize, owned));
+  // Drawn once: what's on offer doesn't change as the screen re-renders, or
+  // when the prize taken joins what's owned.
+  const [{ tier, list }] = useState(() => prizes(prize, owned));
+  const [picked, setPicked] = useState<Reward | null>(null);
   const [taken, setTaken] = useState<Reward | null>(null);
-  const label = LADDER.find((s) => s.prize === prize)?.label.toLowerCase();
+  const kinds = (Object.keys(KINDS) as Kind[]).filter((k) => list.some((r) => r.kind === k));
+  const [tab, setTab] = useState<Kind | undefined>(kinds[0]);
+  const named = (t: Tier) => LADDER.find((s) => s.prize === t)?.label.toLowerCase();
 
   useEffect(() => {
     playSound(SOUNDS.winner);
@@ -85,29 +107,91 @@ export function PayoutScreen({ prize, onAgain, onDone }: { prize: Prize; onAgain
     );
   }
 
+  const message =
+    (prize === 'premium' ? `You won all ${ROUNDS} rounds! Choose a premium prize.` : `You banked a ${named(prize)} prize. Choose one.`) +
+    (tier !== prize ? ` There are no ${named(prize)} ones left, so choose a ${named(tier)} one.` : '');
+  const open = tab && kinds.includes(tab) ? tab : kinds[0];
+
   return (
-    <Screen fitFocus>
-      <View style={[styles.grid, { gap: ui.sp(10) }]}>
-        {list.map((r) => (
-          <RewardTile key={r.id} reward={r} owned status="Tap to take" onPress={() => take(r)} />
-        ))}
-      </View>
-      <>
-        <Heading>
-          {prize === 'premium' ? `You won all ${ROUNDS} rounds! Choose a premium prize.` : `You banked a ${label} prize. Choose one.`}
-        </Heading>
-      </>
-    </Screen>
+    <Stage
+      fitFocus
+      // Beside the folder: the message, the prize picked (half as big again), and Take.
+      focus={
+        <View style={[styles.pick, { gap: ui.sp(14), maxWidth: ui.sp(360) }]}>
+          <Heading>{message}</Heading>
+          {picked ? (
+            <View style={[styles.center, { minHeight: ui.sp(172) }]}>
+              <View style={{ transform: [{ scale: 1.5 }] }}>
+                <RewardTile reward={picked} owned status="Your pick" />
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.center, { minHeight: ui.sp(172) }]}>
+              <View style={[styles.empty, { width: ui.sp(126), height: ui.sp(150), borderRadius: ui.sp(18), padding: ui.sp(12) }]}>
+                <Text style={[styles.emptyText, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
+                  Tap a prize to select it
+                </Text>
+              </View>
+            </View>
+          )}
+          <PigButton name={picked ? `Take ${picked.label}` : 'Take it'} onPress={() => picked && take(picked)} disabled={!picked} />
+        </View>
+      }
+      actionsFill
+      actions={
+        <FolderTabs
+          tabs={kinds.map((k) => {
+            const n = list.filter((r) => r.kind === k).length;
+            return { key: k, label: TAB_LABELS[k] ?? KINDS[k].label, count: { text: `${n}`, spoken: `${n} to choose from` } };
+          })}
+          selected={open}
+          onSelect={setTab}
+        >
+          <TierPages
+            open={open}
+            count={toChoose}
+            pages={kinds.map((k) => ({
+              key: k,
+              label: KINDS[k].label,
+              cards: list
+                .filter((r) => r.kind === k)
+                .map((r) => {
+                  const on = picked?.id === r.id;
+                  return {
+                    key: r.id,
+                    tier: r.tier,
+                    owned: true,
+                    render: (size) => (
+                      <RewardTile reward={r} owned chosen={on} status={on ? 'Your pick' : 'Tap to pick'} onPress={() => setPicked(r)} compact inset {...size} />
+                    ),
+                  };
+                }),
+            }))}
+          />
+        </FolderTabs>
+      }
+    />
   );
 }
 
 // Stage, untitled and with no back arrow, like every screen, with the first
-// child as the focus and the second as the rail.
-function Screen({ children, fitFocus }: { children: [React.ReactNode, React.ReactNode]; fitFocus?: boolean }) {
-  return <Stage focus={children[0]} actions={children[1]} fitFocus={fitFocus} />;
+// child as the focus and the second as the rail (the prize taken, and
+// nothing left to win).
+function Screen({ children }: { children: [React.ReactNode, React.ReactNode] }) {
+  return <Stage focus={children[0]} actions={children[1]} />;
 }
 
-const styles = StyleSheet.create({
-  center: { alignItems: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  center: { alignItems: 'center', justifyContent: 'center' },
+  pick: { width: '100%', alignSelf: 'center', alignItems: 'stretch' },
+  // Where the prize goes once one is picked.
+  empty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.chip,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: t.chipBorder,
+  },
+  emptyText: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
 });

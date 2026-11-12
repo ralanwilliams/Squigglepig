@@ -22,8 +22,10 @@ import { useThemedStyles } from '../theme/theme';
 // its content is shorter than the pane it is centred and the slack becomes
 // breathing room; if it is taller it is scaled down as a unit until it fits.
 // A screen whose focus can also vary in height passes `fitFocus`. One whose
-// actions change height in place (tabs over cards: Your pig) passes
-// `actionsAlign="top"`, so what's at the top of the pane stays put.
+// actions change height in place passes `actionsAlign="top"`, so what's at
+// the top of the pane stays put. One whose actions fit themselves to the pane
+// (the Rewards screens and Your pig: FolderTabs, filling it top to bottom)
+// passes `actionsFill`: the pane is then theirs as it is, not a FitBox.
 //
 // `menu` puts the menu's ☰ in the header band's top-left corner
 // (MenuDrawer.tsx), across from the sound and dark-mode switches; the band
@@ -41,6 +43,7 @@ export function Stage({
   actions,
   fitFocus,
   actionsAlign = 'center',
+  actionsFill,
   menu,
 }: {
   header?: React.ReactNode;
@@ -48,6 +51,7 @@ export function Stage({
   actions?: React.ReactNode;
   fitFocus?: boolean;
   actionsAlign?: 'center' | 'top';
+  actionsFill?: boolean;
   menu?: boolean;
 }) {
   const ui = useUi();
@@ -90,11 +94,15 @@ export function Stage({
   // the actions pane stayed 320dp too tall and the pig's pane shrank to match
   // (ReactCommon/yoga/yoga/algorithm/CalculateLayout.cpp, computeFlexBasisForChild).
   // Remounting discards the cached basis.
-  const actionsPane = actions ? (
+  const actionsPane = !actions ? null : actionsFill ? (
+    <View key={twoPane ? 'rail' : 'pane'} style={twoPane ? { width: ui.railW } : styles.fill}>
+      <KeyboardTarget style={[styles.fill, { gap: ui.gap }]}>{actions}</KeyboardTarget>
+    </View>
+  ) : (
     <FitBox key={twoPane ? 'rail' : 'pane'} align={actionsAlign} style={twoPane ? { width: ui.railW } : styles.pane}>
       <KeyboardTarget style={{ gap: ui.gap }}>{actions}</KeyboardTarget>
     </FitBox>
-  ) : null;
+  );
 
   return (
     <View style={[styles.safe, frame]}>
@@ -125,4 +133,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   row: { flexDirection: 'row' },
   header: { justifyContent: 'center' },
   pane: { flex: 1, minHeight: 0, minWidth: 0, justifyContent: 'center' },
+  fill: { flex: 1, minHeight: 0, minWidth: 0 },
 });

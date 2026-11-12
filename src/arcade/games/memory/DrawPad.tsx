@@ -2,6 +2,7 @@ import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { ClearUndo, PILL_INSET } from '../../../components/CanvasControls';
 import { Strokes } from '../../../components/DrawingArt';
 import { SPACE, STROKE } from '../../../lib/drawing';
 import { useUi } from '../../../theme/responsive';
@@ -9,10 +10,11 @@ import { canvas as paper, layout } from '../../../theme/tokens';
 
 // The game's drawing surface: DrawingBoard (src/components/DrawingBoard.tsx) cut
 // down to one finger and black ink, no zoom, no brushes, no stickers, and
-// none of WorkStage's timer or buttons; the round has its own. Strokes are in
-// drawing units and built the same way, so score.ts reads them like the pack's.
-// The round keeps the finished strokes (for Undo, Clear and the score); the
-// pad only holds the one under the finger.
+// none of WorkStage's timer or buttons; the round has its own. Its Clear ·
+// Undo is the board's (CanvasControls.tsx), in the same corner. Strokes are
+// in drawing units and built the same way, so score.ts reads them like the
+// pack's. The round keeps the finished strokes (for Undo, Clear and the
+// score); the pad only holds the one under the finger.
 
 type Pt = { x: number; y: number };
 
@@ -36,7 +38,17 @@ export const fitAspect = (box: { w: number; h: number }) => {
 
 const px = (n: number) => n.toFixed(1);
 
-export function DrawPad({ strokes, onStroke }: { strokes: string[]; onStroke: (d: string) => void }) {
+export function DrawPad({
+  strokes,
+  onStroke,
+  onClear,
+  onUndo,
+}: {
+  strokes: string[];
+  onStroke: (d: string) => void;
+  onClear: () => void;
+  onUndo: () => void; // must bring a Clear back (ClearUndo)
+}) {
   const ui = useUi();
   const [host, setHost] = useState({ w: 0, h: 0 });
   const size = fitAspect(host);
@@ -112,6 +124,12 @@ export function DrawPad({ strokes, onStroke }: { strokes: string[]; onStroke: (d
             ) : null}
           </Svg>
         </GestureDetector>
+        <ClearUndo
+          onClear={onClear}
+          onUndo={onUndo}
+          ui={ui}
+          style={[styles.corner, { bottom: ui.sp(PILL_INSET), right: ui.sp(PILL_INSET) }]}
+        />
       </View>
     </View>
   );
@@ -120,4 +138,5 @@ export function DrawPad({ strokes, onStroke }: { strokes: string[]; onStroke: (d
 const styles = StyleSheet.create({
   host: { flex: 1, minHeight: 0, minWidth: 0, width: '100%', alignItems: 'center', justifyContent: 'center' },
   frame: { borderWidth: 1, borderColor: paper.border, overflow: 'hidden', backgroundColor: paper.fill },
+  corner: { position: 'absolute' },
 });
