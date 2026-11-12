@@ -36,12 +36,14 @@ export function DrawingSize({
   sent,
   raw,
   hidden,
+  top,
   ui,
 }: {
   changes: unknown[]; // the drawing's parts; a new one means it changed
   sent: () => string; // the drawing as it's handed in (DrawingBoard drawingData)
   raw: () => string; // the same, strokes not thinned
   hidden?: boolean;
+  top: number; // dp from the canvas top: under its top corners' controls
   ui: Ui;
 }) {
   const [size, setSize] = useState<{ sent: number; raw: number; pieces: number } | null>(null);
@@ -60,7 +62,7 @@ export function DrawingSize({
   const detail = `before thinning ${kb(size.raw)}` + (size.pieces > 1 ? ` · goes in ${size.pieces} pieces` : '');
 
   return (
-    <View pointerEvents="none" style={[styles.wrap, { top: ui.sp(8) }]}>
+    <View pointerEvents="none" style={[styles.wrap, { top }]}>
       <View style={[styles.pill, { borderRadius: ui.sp(8), paddingVertical: ui.sp(4), paddingHorizontal: ui.sp(8), gap: ui.sp(2) }]}>
         <Text style={[styles.text, { fontSize: ui.f(11) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1} adjustsFontSizeToFit>
           DEV · {kb(size.sent)} of {kb(PAYLOAD_LIMIT)} ({Math.round(share * 100)}%)

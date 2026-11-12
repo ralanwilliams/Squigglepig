@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Svg from 'react-native-svg';
-import { Glyph, type GlyphName } from './Glyph';
+import { type GlyphName } from './Glyph';
+import { CanvasPill, PillButton } from './CanvasControls';
 import { PropArt } from './SkinDecor';
 import { STICKER_ART } from '../stickers/art';
 import { PROPS, type Prop } from '../theme/skins/props';
@@ -9,7 +10,7 @@ import type { Ui } from '../theme/responsive';
 
 // Stickers on the drawing canvas (DrawingBoard), for a player who has won a
 // sticker pack (src/rewards): a button under the ink picker, dressed like it
-// (a dark pill on the paper), that opens a tray of their stickers, one pack to
+// (a dark pill on the paper, CanvasControls.tsx), that opens a tray of their stickers, one pack to
 // a row. A tapped sticker lands in the middle of the view, selected; while it
 // is, StickerControls (along the canvas's foot) resize, turn and remove it,
 // and Done goes back to drawing.
@@ -30,25 +31,32 @@ export function StickerPicker({
   onPick: (id: string) => void;
   ui: Ui;
 }) {
-  const box = [styles.pill, { padding: ui.sp(3), borderRadius: ui.sp(18), gap: ui.sp(2) }];
   if (!open) {
     return (
-      <View style={box}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Stickers"
-          accessibilityHint="Shows the stickers you can stamp on your drawing"
+      <CanvasPill ui={ui} pad={3} radius={18}>
+        <PillButton
+          glyph="sticker"
+          label="Stickers"
+          hint="Shows the stickers you can stamp on your drawing"
           onPress={onOpen}
-          hitSlop={ui.sp(6)}
-          style={[styles.center, { width: ui.sp(30), height: ui.sp(30) }]}
-        >
-          <Glyph name="sticker" size={ui.sp(22)} color="#ffffff" weight={1.8} />
-        </Pressable>
-      </View>
+          size={30}
+          glyphSize={22}
+          weight={1.8}
+          slop={6}
+          ui={ui}
+        />
+      </CanvasPill>
     );
   }
   return (
-    <View style={[box, styles.row, { maxWidth: ui.sp(CELL) * PER_ROW + ui.sp(2) * (PER_ROW - 1) + ui.sp(3) * 2 }]} accessibilityLabel="Stickers">
+    <CanvasPill
+      ui={ui}
+      pad={3}
+      radius={18}
+      wrap
+      style={{ maxWidth: ui.sp(CELL) * PER_ROW + ui.sp(2) * (PER_ROW - 1) + ui.sp(3) * 2 }}
+      accessibilityLabel="Stickers"
+    >
       {stickers.map((id) => (
         <Pressable
           key={id}
@@ -61,7 +69,7 @@ export function StickerPicker({
           <StickerIcon id={id} size={ui.sp(CELL - 6)} />
         </Pressable>
       ))}
-    </View>
+    </CanvasPill>
   );
 }
 
@@ -95,33 +103,29 @@ export type StickerAct = (typeof CONTROLS)[number]['act'];
 export function StickerControls({ onAct, ui }: { onAct: (act: StickerAct) => void; ui: Ui }) {
   return (
     <View pointerEvents="box-none" style={[styles.foot, { bottom: ui.sp(8) }]}>
-      <View style={[styles.pill, styles.row, { padding: ui.sp(3), borderRadius: ui.sp(22), gap: ui.sp(2) }]}>
+      <CanvasPill ui={ui} pad={3} radius={22} wrap style={styles.centred}>
         {CONTROLS.map((c) => (
-          <Pressable
+          <PillButton
             key={c.act}
-            accessibilityRole="button"
-            accessibilityLabel={c.label}
+            glyph={c.glyph}
+            label={c.label}
             onPress={() => onAct(c.act)}
-            hitSlop={ui.sp(2)}
-            style={({ pressed }) => [
-              styles.center,
-              c.act === 'done' && styles.done,
-              { width: ui.sp(38), height: ui.sp(38), borderRadius: ui.sp(19), opacity: pressed ? 0.6 : 1 },
-            ]}
-          >
-            <Glyph name={c.glyph} size={ui.sp(20)} color={c.act === 'done' ? '#000000' : '#ffffff'} weight={2.2} />
-          </Pressable>
+            lit={c.act === 'done'}
+            size={38}
+            glyphSize={20}
+            weight={2.2}
+            slop={2}
+            ui={ui}
+          />
         ))}
-      </View>
+      </CanvasPill>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pill: { alignSelf: 'flex-start', backgroundColor: 'rgba(0, 0, 0, 0.55)' },
-  row: { flexDirection: 'row', flexWrap: 'wrap' },
   center: { alignItems: 'center', justifyContent: 'center' },
   cell: { backgroundColor: 'rgba(255, 255, 255, 0.92)' },
   foot: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  done: { backgroundColor: '#ffffff' },
+  centred: { alignSelf: 'center' }, // a pill keeps to the start of its row otherwise
 });

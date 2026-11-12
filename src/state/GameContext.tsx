@@ -26,6 +26,7 @@ import {
 import { clearRoomNotifications, registerForPush } from '../lib/push';
 import { CHUNK_GAP_MS, Joiner, chunkId, split } from '../lib/chunks';
 import { holdsBack, isRoomScreen, leaveCost, lobbyOnCatchUp, navFor } from './nav';
+import { newGameBrush } from './brush';
 import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
 import { useBackGuard } from '../lib/backGuard';
 import { closeConfirm, confirmLeave } from '../lib/confirm';
@@ -2070,6 +2071,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (AppState.currentState === 'active') touchRoom(room);
     }, 2 * 60_000);
     return () => clearInterval(id);
+  }, [room, phase]);
+
+  // The brush (./brush) lasts the game: a new one, or another room, starts
+  // it again in black at the usual width. Every game passes through the lobby
+  // or the trough (prompts) before anyone draws.
+  useEffect(() => {
+    if (phase === 'lobby' || phase === 'prompts') newGameBrush();
   }, [room, phase]);
 
   // A change to the pig (an outfit, a bubble, a theme part) while in a room

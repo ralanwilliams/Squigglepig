@@ -24,8 +24,8 @@ export type Tier = 'common' | 'rare' | 'premium';
 //   one — the player chooses one to wear or show (a theme, an outfit), and the
 //         inventory remembers the choice; `none` names the default, what
 //         shows with nothing chosen;
-//   any — every one owned is available at once (brush colors, sticker packs),
-//         chosen in the moment.
+//   any — every one owned is available at once (brush colors, sticker packs,
+//         tools), chosen in the moment.
 // An outfit and a speech bubble dress the player's own pig: when they win a
 // game, everyone sees it on the scoreboard (a tie lines up every winner's
 // pig), saying what they wrote in the bubble (inventory.tsx bubbleText). No
@@ -34,6 +34,7 @@ export const KINDS = {
   theme: { label: 'Themes', glyph: 'palette', pick: 'one', none: 'Classic' },
   brush: { label: 'Brushes', glyph: 'brush', pick: 'any' },
   sticker: { label: 'Stickers', glyph: 'sticker', pick: 'any' },
+  tool: { label: 'Tools', glyph: 'slider', pick: 'any' },
   outfit: { label: 'Outfits', glyph: 'hat', pick: 'one', none: 'No outfit' },
   bubble: { label: 'Speech bubbles', glyph: 'bubble', pick: 'one', none: 'No bubble' },
 } as const satisfies Record<string, { label: string; glyph: GlyphName; pick: 'one' | 'any'; none?: string }>;
@@ -48,7 +49,7 @@ export type Kind = keyof typeof KINDS;
 // brushes and stickers won ('canvas'), or the home screen's pig, dressed as
 // it is now, to see a theme on the whole pig ('pig').
 export const GROUPS = {
-  art: { label: 'Art supplies', kinds: ['brush', 'sticker'], go: 'See art supplies', show: 'canvas' },
+  art: { label: 'Art supplies', kinds: ['brush', 'sticker', 'tool'], go: 'See art supplies', show: 'canvas' },
   theme: { label: 'Themes', kinds: ['theme'], go: 'See your themes', show: 'pig' },
 } as const satisfies Record<string, { label: string; kinds: readonly Kind[]; go: string; show: 'canvas' | 'pig' }>;
 
@@ -81,6 +82,7 @@ type Base = { id: string; label: string; tier: Tier; soon?: true };
 export type ThemeReward = Base & { kind: 'theme' };
 export type BrushReward = Base & { kind: 'brush'; color: string }; // ink on the white paper
 export type StickerReward = Base & { kind: 'sticker' };
+export type ToolReward = Base & { kind: 'tool' };
 // Where an outfit goes on the pig. It wears one in each slot at once (a hat,
 // sunglasses and a bow tie), not two hats (inventory.tsx wear).
 export const OUTFIT_SLOTS = ['head', 'eyes', 'neck'] as const;
@@ -88,7 +90,7 @@ export type OutfitSlot = (typeof OUTFIT_SLOTS)[number];
 
 export type OutfitReward = Base & { kind: 'outfit'; slot: OutfitSlot };
 export type BubbleReward = Base & { kind: 'bubble' };
-export type Reward = ThemeReward | BrushReward | StickerReward | OutfitReward | BubbleReward;
+export type Reward = ThemeReward | BrushReward | StickerReward | ToolReward | OutfitReward | BubbleReward;
 
 // The most a pig's speech bubble may say, in characters: about what fits on
 // one line of the bubble on the scoreboard (the same cap as a name on the
@@ -100,16 +102,16 @@ type Entry<R extends Reward> = Omit<R, 'kind'>;
 
 // Each one's art is a skin in src/theme/skins (index.ts UNLOCKABLE).
 const THEMES: Entry<ThemeReward>[] = [
-  { id: 'theme.railroad', label: 'Railroad', tier: 'rare' }, // src/theme/skins/railroad.ts
-  { id: 'theme.paul', label: 'Paul', tier: 'rare' }, // src/theme/skins/paul.ts
-  { id: 'theme.bobby', label: 'Bobby', tier: 'rare' }, // src/theme/skins/bobby.ts
-  { id: 'theme.lukas', label: 'Lukas', tier: 'rare' }, // src/theme/skins/lukas.ts
-  { id: 'theme.chris', label: 'Chris', tier: 'rare' }, // src/theme/skins/chris.ts
-  { id: 'theme.ash', label: 'Ash', tier: 'rare' }, // src/theme/skins/ash.ts
+  { id: 'theme.railroad', label: 'Railroad', tier: 'premium' }, // src/theme/skins/railroad.ts
+  { id: 'theme.paul', label: 'Paul', tier: 'premium' }, // src/theme/skins/paul.ts
+  { id: 'theme.bobby', label: 'Bobby', tier: 'premium' }, // src/theme/skins/bobby.ts
+  { id: 'theme.lukas', label: 'Lukas', tier: 'premium' }, // src/theme/skins/lukas.ts
+  { id: 'theme.chris', label: 'Chris', tier: 'premium' }, // src/theme/skins/chris.ts
+  { id: 'theme.ash', label: 'Ash', tier: 'premium' }, // src/theme/skins/ash.ts
 ];
 
 // Colors drawn on the canvas's white paper, which is never themed, so each is
-// dark enough to read as a line on white. Picked on the canvas (InkPicker);
+// dark enough to read as a line on white. Picked on the canvas (BrushPicker);
 // a drawing names the brush of each stroke (src/lib/drawing.ts `inks`).
 const BRUSHES: Entry<BrushReward>[] = [
   { id: 'brush.barnRed', label: 'Barn red', tier: 'common', color: '#C62828' },
@@ -126,17 +128,24 @@ const BRUSHES: Entry<BrushReward>[] = [
 // game, beside what they draw by hand. Owning a pack unlocks every sticker
 // in it. The stickers in each are listed in src/stickers/art.ts.
 const STICKERS: Entry<StickerReward>[] = [
-  { id: 'sticker.eyes', label: 'Eyes', tier: 'common' },
-  { id: 'sticker.mouths', label: 'Mouths', tier: 'common' },
-  { id: 'sticker.hats', label: 'Hats', tier: 'common' },
+  { id: 'sticker.eyes', label: 'Eyes', tier: 'rare' },
+  { id: 'sticker.mouths', label: 'Mouths', tier: 'rare' },
+  { id: 'sticker.hats', label: 'Hats', tier: 'rare' },
   { id: 'sticker.characters', label: 'Characters', tier: 'rare' },
 ];
+
+// What a player draws with beyond the ink: each changes how the canvas works
+// (DrawingBoard). Brush size puts a slider in the ink picker (BrushPicker)
+// that sets how wide the lines are; a drawing gives each stroke's width
+// (src/lib/drawing.ts `widths`).
+export const BRUSH_SIZE = 'tool.brushSize';
+const TOOLS: Entry<ToolReward>[] = [{ id: BRUSH_SIZE, label: 'Brush size', tier: 'premium' }];
 
 // Worn by the pig on the scoreboard when this player wins. The art is in
 // src/theme/skins/props.ts, placed by src/avatar/outfits.ts.
 const OUTFITS: Entry<OutfitReward>[] = [
-  { id: 'outfit.crown', label: 'Crown', tier: 'rare', slot: 'head' },
-  { id: 'outfit.topHat', label: 'Top hat', tier: 'rare', slot: 'head' },
+  { id: 'outfit.crown', label: 'Crown', tier: 'common', slot: 'head' },
+  { id: 'outfit.topHat', label: 'Top hat', tier: 'common', slot: 'head' },
   { id: 'outfit.cowboyHat', label: 'Cowboy hat', tier: 'common', slot: 'head' },
   { id: 'outfit.chefHat', label: "Chef's hat", tier: 'common', slot: 'head' },
   { id: 'outfit.shades', label: 'Sunglasses', tier: 'common', slot: 'eyes' },
@@ -146,9 +155,9 @@ const OUTFITS: Entry<OutfitReward>[] = [
 // The shape of the pig's speech bubble; the words in it are the player's own.
 // The art is in src/theme/skins/props.ts (src/avatar/bubbles.ts).
 const BUBBLES: Entry<BubbleReward>[] = [
-  { id: 'bubble.speech', label: 'Speech', tier: 'common' },
-  { id: 'bubble.thought', label: 'Thought cloud', tier: 'common' },
-  { id: 'bubble.shout', label: 'Shout', tier: 'common' },
+  { id: 'bubble.speech', label: 'Speech', tier: 'rare' },
+  { id: 'bubble.thought', label: 'Thought cloud', tier: 'rare' },
+  { id: 'bubble.shout', label: 'Shout', tier: 'rare' },
   { id: 'bubble.heart', label: 'Heart', tier: 'rare' },
   { id: 'bubble.scroll', label: 'Royal scroll', tier: 'rare' },
 ];
@@ -160,6 +169,7 @@ export const REWARDS: Reward[] = [
   ...tag<ThemeReward>('theme', THEMES),
   ...tag<BrushReward>('brush', BRUSHES),
   ...tag<StickerReward>('sticker', STICKERS),
+  ...tag<ToolReward>('tool', TOOLS),
   ...tag<OutfitReward>('outfit', OUTFITS),
   ...tag<BubbleReward>('bubble', BUBBLES),
 ];

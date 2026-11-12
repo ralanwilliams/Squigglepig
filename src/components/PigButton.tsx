@@ -9,14 +9,18 @@ import { SOUNDS } from '../assets/assets';
 // Reproduces the original `.btn.btn-outline-dark`: full-width flat teal button,
 // whitesmoke uppercase label, darker teal when pressed. Plays the pig grunt.
 // Sized from the UI scale so it stays a comfortable 44dp+ target everywhere.
+// `disabled` dims it and makes it do nothing until there's something for it
+// to do (the payout's Take, before a prize is picked).
 export function PigButton({
   name,
   onPress,
   silent,
+  disabled = false,
 }: {
   name: string;
   onPress?: () => void;
   silent?: boolean;
+  disabled?: boolean;
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -27,9 +31,12 @@ export function PigButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={disabled ? { disabled: true } : undefined}
+      disabled={disabled}
       onPress={handle}
       style={({ pressed }) => [
         styles.btn,
+        disabled && styles.disabled,
         {
           minHeight: ui.sp(44),
           paddingVertical: ui.sp(10),
@@ -59,6 +66,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
   },
   pressed: { backgroundColor: t.buttonPressed },
+  disabled: { opacity: 0.45 },
   label: {
     color: t.buttonText,
     fontFamily: font.medium,

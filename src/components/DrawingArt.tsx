@@ -3,22 +3,42 @@ import { G, Path } from 'react-native-svg';
 import { PropArt } from './SkinDecor';
 import { STICKER_ART } from '../stickers/art';
 import { PROPS, type Prop } from '../theme/skins/props';
-import { inkColor, type Sticker } from '../lib/drawing';
+import { inkColor, strokeWidth, type Sticker } from '../lib/drawing';
 
 // A drawing's parts (src/lib/drawing.ts), for any <Svg> whose viewBox is in
 // drawing units: the canvas while it's drawn on (DrawingBoard), and the finished
 // drawing wherever it's shown (DrawingImage).
 
-// The strokes, each in its own ink (black unless a brush says otherwise).
-// Memoized: on the canvas the live stroke re-renders every frame while the
-// finger moves, and it mustn't drag every earlier path through React with it
-// (that lag was the wobble in long drawings). The caller hands in a new array
-// exactly when there's something new to draw.
-export const Strokes = memo(function Strokes({ strokes, inks, width }: { strokes: string[]; inks?: (string | null)[]; width: number }) {
+// The strokes, each in its own ink (black unless a brush says otherwise) and
+// at its own width (`widths`; STROKE unless the drawing gives another).
+// `width` instead draws every stroke the same (the minimap's, the memory
+// game's). Memoized: on the canvas the live stroke re-renders every frame
+// while the finger moves, and it mustn't drag every earlier path through
+// React with it (that lag was the wobble in long drawings). The caller hands
+// in a new array exactly when there's something new to draw.
+export const Strokes = memo(function Strokes({
+  strokes,
+  inks,
+  widths,
+  width,
+}: {
+  strokes: string[];
+  inks?: (string | null)[];
+  widths?: (number | null)[];
+  width?: number;
+}) {
   return (
     <>
       {strokes.map((d, i) => (
-        <Path key={i} d={d} stroke={inkColor(inks, i)} strokeWidth={width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <Path
+          key={i}
+          d={d}
+          stroke={inkColor(inks, i)}
+          strokeWidth={width ?? strokeWidth(widths, i)}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       ))}
     </>
   );

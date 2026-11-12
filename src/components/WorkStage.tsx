@@ -14,13 +14,14 @@ import { useThemedStyles } from '../theme/theme';
 // the top, every slot has a fixed height, and both screens scale by the same
 // factor (see `fixedH`), so the pig, the timer, the top element and the primary
 // button sit on exactly the same pixels on both; only what comes after them
-// (Clear/Undo, Leave) differs.
+// (Leave) differs.
 //
 // Rail, top to bottom:
 //   [ pig ........ ][ timer ]   the pig peeks up from BEHIND the element below,
 //   [ top element — fixed  ]   hoof tips showing just above its top edge
 //   [ primary button       ]   Submit
-//   [ secondary (optional) ]   Clear · Undo
+//   [ secondary (optional) ]   a row of smaller buttons (no screen has one now:
+//                              the drawing board has its Clear · Undo on it)
 //   [ footer               ]   Leave game
 //
 // In one column the same header sits above the focus, and the secondary buttons

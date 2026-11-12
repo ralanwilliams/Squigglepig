@@ -3,7 +3,7 @@
 
 type Pt = { x: number; y: number };
 const px = (n: number) => n.toFixed(1);
-const MIN_STEP = 1; // DrawingBoard drops moves smaller than this
+const MIN_STEP = 1; // DrawingBoard drops moves smaller than this (at 1×)
 
 export function canvasStroke(points: Pt[]): string {
   let last = points[0];
