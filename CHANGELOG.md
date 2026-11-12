@@ -4,13 +4,30 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0]
+
+### Added
+- Pinch the canvas with two fingers to zoom in, up to 10 times, and slide them to move around. In a browser, pinching the trackpad (or holding Ctrl and scrolling) zooms the canvas
+- Undo brings back a drawing you cleared
+- Brush size, a premium prize for winning all 10 rounds of a solo game: tap the brush on the canvas and a slider under the colors makes your lines thinner or thicker. The brush button's dot grows with the size, and while you slide, the brush shows at its real size in the middle of the canvas. It's on Art supplies, under a new Tools tab. Everyone sees each line at the width it was drawn; players on an older version see every line at the usual width
+
+### Changed
+- The canvas's 1× / 2× switch is now − and + with the zoom between them, stepping through 1×, 1.5×, 2×, 3×, 5×, 7× and 10×. While you're zoomed in, the small map of your drawing sits under them
+- Clear and Undo are on the canvas, in its bottom-right corner, instead of under it, so the drawing screen has just Submit under the canvas. Art supplies and Draw from memory have them on their canvas too. While a sticker is selected, they and the zoom make way for the sticker's buttons
+- Your brush color (and size) stays the same from one drawing to the next for the whole game, instead of going back to black each time. A new game starts in black again. With Brush size, the brush stays open while you pick a color and a size, and closes when you start drawing
+- Premium prizes have two stars on their cards, as rare ones have one
+- Banking a prize in a solo game shows every prize of that tier you haven't won yet, instead of three at random, with a tab for each kind (Brushes, Outfits…) as on the rewards screens. Tap one to see it big beside the others, then Take it; nothing is taken until you do
+- Art supplies, Themes and Your pig have folder tabs down the left of their rewards, each with how many of its rewards you have, the open one joined to a card as tall as the screen allows. The card groups everything by tier (Free, In season, Common, Rare, Premium), each with how many of it you've won, and fills its width; when a tab has a lot in it, the cards get a little smaller rather than the whole column shrinking. Seasonal themes and what your pig says sit at the bottom of their cards
+- Prizes have moved between tiers: themes are premium (for winning all 10 rounds of a solo game), the Eyes, Mouths and Hats sticker packs and the Speech, Thought cloud and Shout bubbles are rare, and the Crown and Top hat are common. Anything you've already won stays yours
+- Help & FAQ explains zooming, brush size and getting back a drawing you cleared, and the Privacy Policy lists the drawing tip the app remembers having shown you
+
+### Fixed
+- A selected sticker's buttons sit in the middle of the bottom of the canvas, instead of at its left
+
 ## [2.10.0]
 
 ### Added
 - While you wait in the lobby you can do other things in the app: Back goes to the home screen and you stay in the room. Play solo or dress up your pig, then tap Back to room on the home screen; when the host starts the game, Squigglepig takes you straight to it
-- Pinch the canvas with two fingers to zoom in, up to 10 times, and slide them to move around. In a browser, pinching the trackpad (or holding Ctrl and scrolling) zooms the canvas
-- Undo brings back a drawing you cleared
-- Brush size, a premium prize for winning all 10 rounds of a solo game: tap the brush on the canvas and a slider under the colors makes your lines thinner or thicker. The brush button's dot grows with the size, and while you slide, the brush shows at its real size in the middle of the canvas. It's on Art supplies, under a new Tools tab. Everyone sees each line at the width it was drawn; players on an older version see every line at the usual width
 
 ### Changed
 - Leaving a game asks "Are you sure?" first, with what you'd lose, so a stray tap doesn't take you out. Tapping Leave game or Leave asks, and so does going back during a game or a solo run (Android's back button, swiping back on iPhone and iPad, or a browser's Back). Stay keeps you in the game, whose clock keeps running while the question is up
@@ -32,13 +49,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Coming back to a game after the app closed, with your turn already handed in, takes you to the waiting screen instead of handing you the same turn again on a blank canvas
 - The Privacy Policy, Terms of Service and Help & FAQ explain the new scoring, pausing, notifications and when a room closes
 - With your phone upright, the screen slides up with the keyboard so you can see what you're typing. On Join Game you can see both the room code and your name, with Lobby underneath; Create Game and Your pig's speech bubble work the same way
-- The canvas's 1× / 2× switch is now − and + with the zoom between them, stepping through 1×, 1.5×, 2×, 3×, 5×, 7× and 10×. While you're zoomed in, the small map of your drawing sits under them
-- Clear and Undo are on the canvas, in its bottom-right corner, instead of under it, so the drawing screen has just Submit under the canvas. Art supplies and Draw from memory have them on their canvas too. While a sticker is selected, they and the zoom make way for the sticker's buttons
-- Your brush color (and size) stays the same from one drawing to the next for the whole game, instead of going back to black each time. A new game starts in black again. With Brush size, the brush stays open while you pick a color and a size, and closes when you start drawing
-- Premium prizes have two stars on their cards, as rare ones have one
-- Banking a prize in a solo game shows every prize of that tier you haven't won yet, instead of three at random, with a tab for each kind (Brushes, Outfits…) as on the rewards screens. Tap one to see it big beside the others, then Take it; nothing is taken until you do
-- Art supplies, Themes and Your pig have folder tabs down the left of their rewards, each with how many of its rewards you have, the open one joined to a card as tall as the screen allows. The card groups everything by tier (Free, In season, Common, Rare, Premium), each with how many of it you've won, and fills its width; when a tab has a lot in it, the cards get a little smaller rather than the whole column shrinking. Seasonal themes and what your pig says sit at the bottom of their cards
-- Help & FAQ explains zooming, brush size and getting back a drawing you cleared
 
 ### Fixed
 - Messages at the bottom of the screen show above the keyboard while it's up. Before, when Join Game couldn't find the room (or Create Game couldn't make one), the message saying so was hidden behind the keyboard that was still open from typing
@@ -55,7 +65,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Two players tapping New game at the same moment no longer empties the trough, and no prompt is handed out twice in a game, even when the host changes
 - Back in a game after closing the app, the timers for filling the trough, reading your prompt and judging show the time that's actually left, as drawing and guessing now do, instead of starting over from the full time
 - On an iPhone held on its side, opening the menu or How to play no longer turns the screen to portrait
-- A selected sticker's buttons sit in the middle of the bottom of the canvas, instead of at its left
 
 ## [2.9.0]
 
