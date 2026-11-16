@@ -19,7 +19,7 @@ const MAX_TARGET = 99; // the points-to-win stepper
 // and counts as blank.
 const MAX_DRAWING = 1_000_000;
 
-const PHASES: Phase[] = ['lobby', 'prompts', 'draw', 'caption', 'reveal', 'gameover'];
+const PHASES: Phase[] = ['lobby', 'prompts', 'draw', 'caption', 'reveal', 'pigoff', 'gameover'];
 
 type Obj = Record<string, unknown>;
 export const asObj = (v: unknown): Obj => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : {});
@@ -102,6 +102,58 @@ function asScores(v: unknown): Record<string, number> {
 
 const asTime = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
 
+// ---- Pig Off (./rules) ----
+// A drawing from memory: its strokes, SVG paths in drawing units (as the
+// solo game's DrawPad makes them). Anything else, or past these, is dropped.
+const MAX_STROKES = 400;
+const MAX_PATH = 20_000;
+export const asStrokes = (v: unknown): string[] =>
+  list(v, MAX_STROKES).filter((d): d is string => typeof d === 'string' && d.length <= MAX_PATH && /^M[\d\s.MQLe+-]*$/.test(d));
+// Which of the pack's drawings it is (src/arcade/games/memory/pack.json).
+export const asPackIndex = (v: unknown) => asInt(v, 0, 10_000);
+export type PigOff = {
+  attempt: number;
+  players: string[];
+  entry: number;
+  drawings: Record<string, string[]>;
+  // Each one's match, 0–100, once the result is in (null until then), and
+  // who won (none: still tied).
+  matches: Record<string, number> | null;
+  winner: string;
+};
+export function asDrawings(v: unknown): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [k, d] of Object.entries(asObj(v)).slice(0, MAX_PLAYERS)) {
+    const name = cleanName(k);
+    if (name) out[name] = asStrokes(d);
+  }
+  return out;
+}
+export function asMatches(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, n] of Object.entries(asObj(v)).slice(0, MAX_PLAYERS)) {
+    const name = cleanName(k);
+    const m = asInt(n, 0, 100);
+    if (name && m !== null) out[name] = m;
+  }
+  return out;
+}
+export function asPigOff(v: unknown): PigOff | null {
+  const p = asObj(v);
+  const attempt = asInt(p.attempt, 1, 100);
+  const entry = asPackIndex(p.entry);
+  const players = asNames(p.players);
+  if (attempt === null || entry === null || players.length < 2) return null;
+  return {
+    attempt,
+    players,
+    entry,
+    drawings: asDrawings(p.drawings),
+    matches: p.matches && typeof p.matches === 'object' ? asMatches(p.matches) : null,
+    winner: cleanName(p.winner),
+  };
+}
+
 // Under the per-round scoring rule (./rules), who has lost this round's point
 // and at which turn (`chain:cell`, or `chain:judge`).
 function asDockedAt(v: unknown): Record<string, string> {
@@ -140,6 +192,8 @@ export function asState(v: unknown) {
     docked: asNames(st.docked),
     dockedAt: asDockedAt(st.dockedAt),
     stoodIn: st.stoodIn === true,
+    // The Pig Off on now, if any.
+    pigOff: asPigOff(st.pigOff),
     stageStartedAt: asTime(st.stageStartedAt),
     savedAt: asTime(st.savedAt),
     // When the clock stopped: the keeper went off screen, saving the game

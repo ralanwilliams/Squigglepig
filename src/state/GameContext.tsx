@@ -3,7 +3,9 @@ import { AppState } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '../lib/supabase';
-import { TIMERS, HOST_GRACE, JUDGE_WAIT, BACKUP_AFTER, BACKUP_STAGGER } from '../lib/timers';
+import { TIMERS, HOST_GRACE, JUDGE_WAIT, BACKUP_AFTER, BACKUP_STAGGER, PIG_OFF, pigOffTime } from '../lib/timers';
+import { PACK, pigOffEntry } from '../arcade/games/memory/pack';
+import { similarity } from '../arcade/games/memory/score';
 import { saveSession, clearSession, savePendingLeave, takePendingLeave } from '../lib/session';
 import {
   IDLE_MINUTES,
@@ -39,21 +41,29 @@ import {
   asIndex,
   asInt,
   asNames,
+  asDrawings,
+  asMatches,
   asObj,
+  asPackIndex,
   asRoster,
   asRound,
   asRulings,
   asStage,
   asState,
+  asStrokes,
   asTarget,
+  type PigOff,
   type GameState,
 } from './wire';
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
+  PIG_OFF_TRIES,
   PROTOCOL,
   ROUND_FLOW,
   outdatedPlayers,
+  pigOffOutcome,
+  tiedLeaders,
   activeMembers as activeOf,
   asRules,
   chainForStage,
@@ -85,6 +95,8 @@ import {
   verdictForCell,
   verdictForChainScored,
   verdictForGameOver,
+  verdictForPigOff,
+  verdictForPigOffTurn,
   verdictForRevealStep,
   verdictForRound,
   verdictForToReveal,
@@ -104,6 +116,7 @@ import {
 export { NAME_MAX, MAX_PLAYERS, MIN_PLAYERS };
 export { isBlankCell, isEmptyTurn, nextShown, prevFor } from './rules';
 export type { Cell, Chain, Phase, Prev, Rules } from './rules';
+export type { PigOff } from './wire';
 
 export type ConnStatus = 'connecting' | 'connected' | 'error';
 
@@ -257,6 +270,13 @@ type Game = {
   submitCell: (data: string, forTurn?: Turn | null, closing?: boolean) => void;
   passTurn: (forTurn?: Turn | null) => void;
   vote: (correct: boolean) => void;
+  // The Pig Off on now (./rules), or null; when its attempt started on this
+  // phone's clock (its screen works out from this where it is: the
+  // announcement, the drawing shown, the drawing time, the results); and
+  // handing in this player's drawing from memory.
+  pigOff: PigOff | null;
+  stageStart: number;
+  submitPigOff: (strokes: string[]) => void;
 };
 
 const GameCtx = createContext<Game | null>(null);
@@ -340,6 +360,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [rulings, setRulings] = useState<Record<number, boolean>>({});
   const [round, setRound] = useState(0);
   const [roster, setRoster] = useState<string[]>([]);
+  const [pigOff, setPigOff] = useState<PigOff | null>(null);
+  const [stageStart, setStageStart] = useState(0);
   // This player's turn this stage, and when its clock runs out (this phone's
   // time), for the drawing and guessing screens.
   const [turn, setTurn] = useState<Turn | null>(null);
@@ -424,6 +446,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const clockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageStartedAtRef = useRef(0);
+  // The Pig Off on now, as every phone has it; set with setPigOffBoth.
+  const pigOffRef = useRef<PigOff | null>(null);
+  const setPigOffBoth = (p: PigOff | null) => {
+    pigOffRef.current = p;
+    setPigOff(p ? { ...p, drawings: { ...p.drawings }, matches: p.matches && { ...p.matches } } : null);
+  };
+  // The pack's drawings used in this game's Pig Offs so far, so a replay gets a new one.
+  const pigOffUsedRef = useRef<number[]>([]);
 
   // ---- Getting around ----
   // In the lobby or on the scoreboard, Back goes home and the player stays in
@@ -715,11 +745,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           ? TIMERS.caption
           : p === 'reveal'
             ? TIMERS.reveal
-            : 0;
+            : p === 'pigoff'
+              ? pigOffRef.current?.matches
+                ? PIG_OFF.results
+                : pigOffTime(pigOffRef.current?.attempt ?? 1)
+              : 0;
 
   const forceFor = (p: Phase) => {
     if (isTurnPhase(p)) return forceAdvance;
     if (p === 'reveal') return forceRevealChain;
+    if (p === 'pigoff') return pigOffTimeUp;
     return () => {};
   };
 
@@ -736,6 +771,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     phaseRef.current = p;
     setPhase(p);
     stageStartedAtRef.current = Date.now();
+    setStageStart(stageStartedAtRef.current);
     setEndsAt(stageStartedAtRef.current + durationFor(p) * 1000);
     armForCurrentStage(true);
     armJudgeWait();
@@ -808,6 +844,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     docked: [...dockedRef.current],
     dockedAt: dockedAtRef.current,
     stoodIn: stoodInRef.current,
+    pigOff: pigOffRef.current,
     stageStartedAt: stageStartedAtRef.current,
     savedAt: lastChangeRef.current,
   });
@@ -962,12 +999,121 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   };
 
   // The round's last chain is scored: the game is over if anyone has reached
-  // the points to win, otherwise the next round.
+  // the points to win, otherwise the next round. Over with two or more of
+  // those still in sharing the top score, a Pig Off settles it first.
   const finishRound = () => {
     if (!actsForClock() || revealIndexRef.current < chainsRef.current.length) return;
     const won = Object.values(scoresRef.current).some((v) => v >= targetRef.current);
-    if (won) endGame(roundRef.current);
-    else nextRound();
+    if (!won) return nextRound();
+    const tied = tiedLeaders(scoresRef.current, orderedNames());
+    if (tied.length > 1) startPigOff(tied, 1);
+    else endGame(roundRef.current);
+  };
+
+  // ---- Pig Off (./rules) ----
+  // The keeper starts each attempt (the drawing for it, from the pack's easier
+  // part, not one this game has used), and the tied players who are away are
+  // told it's their turn to draw.
+  const startPigOff = (players: string[], attempt: number) => {
+    if (!actsForClock()) return;
+    const entry = pigOffEntry(pigOffUsedRef.current);
+    send('pigoff', { round: roundRef.current, attempt, players, entry });
+    nudge(roomRef.current, 'draw', awayIds(players));
+  };
+
+  // The tied players still in the room (one who taps Leave game drops out of it).
+  const pigOffPlayers = () => {
+    const names = orderedNames();
+    return (pigOffRef.current?.players ?? []).filter((n) => names.includes(n));
+  };
+
+  // Every phone, as an attempt starts.
+  const onPigOff = (attempt: number, players: string[], entry: number) => {
+    clearClock();
+    if (!pigOffUsedRef.current.includes(entry)) pigOffUsedRef.current.push(entry);
+    setPigOffBoth({ attempt, players, entry, drawings: {}, matches: null, winner: '' });
+    stageRef.current = attempt;
+    setStage(attempt);
+    setTurn(null);
+    go('/pigoff');
+    beginStage('pigoff');
+    changed();
+  };
+
+  // A tied player's drawing from memory, as every phone hears it. The keeper
+  // scores the attempt once every tied player still in has drawn.
+  const onPigOffDrawing = (name: string, strokes: string[]) => {
+    const po = pigOffRef.current;
+    if (!po || po.matches || !po.players.includes(name) || po.drawings[name]) return;
+    po.drawings[name] = strokes;
+    setPigOffBoth(po);
+    changed();
+    maybePigOffDone();
+  };
+  const pigOffAllIn = () => {
+    const po = pigOffRef.current;
+    return !!po && !po.matches && pigOffPlayers().every((n) => !!po.drawings[n]);
+  };
+  const maybePigOffDone = () => {
+    if (isKeeperRef.current && phaseRef.current === 'pigoff' && pigOffAllIn()) sendPigOffResult();
+  };
+
+  // The keeper scores every drawing against the one shown (the solo game's
+  // score.ts; one that never came is blank, 0) and says who won, if anyone
+  // did outright, so every phone shows and counts the same.
+  const sendPigOffResult = () => {
+    const po = pigOffRef.current;
+    if (!actsForClock() || !po || po.matches) return;
+    const shown = PACK[po.entry]?.strokes ?? [];
+    const players = pigOffPlayers();
+    const matches = Object.fromEntries(players.map((n) => [n, similarity(po.drawings[n] ?? [], shown)]));
+    const drawings = Object.fromEntries(players.map((n) => [n, po.drawings[n] ?? []]));
+    const { winner } = pigOffOutcome(matches, players);
+    send('pigoff-result', { round: roundRef.current, attempt: po.attempt, matches, drawings, winner });
+  };
+
+  // Every phone: the results. The winner takes a point, which settles the
+  // tie, and the results show (their own clock).
+  const onPigOffResult = (matches: Record<string, number>, drawings: Record<string, string[]>, winner: string) => {
+    const po = pigOffRef.current;
+    if (!po || po.matches) return;
+    po.matches = matches;
+    po.drawings = { ...po.drawings, ...drawings };
+    po.players = po.players.filter((n) => n in matches);
+    po.winner = winner && winner in matches ? winner : '';
+    if (po.winner) {
+      scoresRef.current = { ...scoresRef.current, [po.winner]: (scoresRef.current[po.winner] ?? 0) + 1 };
+      setScores({ ...scoresRef.current });
+    }
+    setPigOffBoth(po);
+    beginStage('pigoff');
+    changed();
+  };
+
+  // The keeper, when the results have had their time: the game is over if
+  // someone won (or it's been tied PIG_OFF_TRIES times: they share the win,
+  // or only one of them is left), else again with just the ones still tied.
+  const pigOffNext = () => {
+    const po = pigOffRef.current;
+    if (!actsForClock() || !po?.matches) return;
+    const names = orderedNames();
+    const tied = pigOffOutcome(po.matches, po.players).tied.filter((n) => names.includes(n));
+    if (po.winner || tied.length < 2 || po.attempt >= PIG_OFF_TRIES) endGame(roundRef.current);
+    else startPigOff(tied, po.attempt + 1);
+  };
+
+  // The keeper's clock ran out: the drawing time (score what's in), or the results.
+  const pigOffTimeUp = () => {
+    if (!pigOffRef.current?.matches) sendPigOffResult();
+    else pigOffNext();
+  };
+
+  // This player's drawing, handed in once (Done, or the clock running out).
+  const submitPigOff = (strokes: string[]) => {
+    const po = pigOffRef.current;
+    if (!po || po.matches || !po.players.includes(usernameRef.current) || po.drawings[usernameRef.current]) return;
+    send('pigoff-drawing', { round: roundRef.current, attempt: po.attempt, name: usernameRef.current, strokes });
+    touchRoom(roomRef.current);
   };
 
   // Who is responsible for chain c this stage (the inverse of chainForStage).
@@ -1062,6 +1208,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const job = (ready: boolean, act: () => void) =>
       ready ? { key: `${id}:ready`, at: null, act } : { key: id, at: timeUp, act };
     if (isTurnPhase(p)) return job(stageSettled(), forceAdvance);
+    if (p === 'pigoff') return pigOffRef.current?.matches ? job(false, pigOffNext) : job(pigOffAllIn(), sendPigOffResult);
     if (p === 'reveal') {
       return revealIndexRef.current >= chainsRef.current.length ? job(true, finishRound) : job(false, forceRevealChain);
     }
@@ -1112,6 +1259,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setScores({});
     chainsRef.current = [];
     setChains([]);
+    setPigOffBoth(null);
+    pigOffUsedRef.current = [];
     forgetTurns();
     gameNamesRef.current = new Set();
     setGameNames([]);
@@ -1366,6 +1515,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dockedAtRef.current = { ...st.dockedAt };
     setDockedAt(dockedAtRef.current);
     stoodInRef.current = st.stoodIn;
+    setPigOffBoth(st.pigOff);
+    if (st.pigOff && !pigOffUsedRef.current.includes(st.pigOff.entry)) pigOffUsedRef.current.push(st.pigOff.entry);
     advancedForRef.current = (st.stage ?? 0) - 1;
     if (p !== 'lobby' && p !== 'gameover') dbPhaseRef.current = 'playing';
 
@@ -1376,6 +1527,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } else if (p === 'reveal') {
       go('/reveal');
       beginStage('reveal');
+    } else if (p === 'pigoff') {
+      stageRef.current = st.stage ?? 1;
+      setStage(stageRef.current);
+      setTurn(null);
+      go('/pigoff');
+      beginStage('pigoff');
     } else if (p === 'gameover') {
       go('/scoreboard');
       beginStage('gameover');
@@ -1399,6 +1556,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           ? Math.max(0, st.pausedAt - st.stageStartedAt)
           : Date.now() - st.stageStartedAt;
       stageStartedAtRef.current = Date.now() - elapsed;
+      setStageStart(stageStartedAtRef.current);
       setEndsAt(stageStartedAtRef.current + durationFor(p) * 1000);
       if (isKeeperRef.current) armForCurrentStage(false);
       armJudgeWait(); // a chain at the reveal came up that long ago
@@ -1507,6 +1665,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       send('state', { to: '*', ...buildState(), sentAt: Date.now() });
       changed();
       maybeAdvanceStage();
+      maybePigOffDone();
       maybeAutoRule();
     }, force ? 0 : 1200);
   };
@@ -1538,8 +1697,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (became && isGameOn(phaseRef.current)) changed();
     // Someone leaving may be exactly what unblocks the current stage (a
     // skipped player is no longer waited for), so re-check completion now;
-    // and someone coming or going may be the judge the reveal waits for.
+    // and someone coming or going may be the judge the reveal waits for, or
+    // the last tied player the Pig Off waits on.
     maybeAdvanceStage();
+    maybePigOffDone();
     maybeAutoRule();
     updateJudgeWait();
   };
@@ -1719,6 +1880,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         onChainScored(chain, asRulings(p.rulings), asNames(p.missed));
       }
     });
+    on('pigoff', (p) => {
+      const attempt = asInt(p.attempt, 1, 100);
+      const players = asNames(p.players);
+      const entry = asPackIndex(p.entry);
+      if (attempt === null || entry === null || players.length < 2 || !PACK[entry]) return;
+      if (fits('pigoff', verdictForPigOff(position(), attempt, asRound(p.round)))) onPigOff(attempt, players, entry);
+    });
+    on('pigoff-drawing', (p) => {
+      const attempt = asInt(p.attempt, 1, 100);
+      const name = cleanName(p.name);
+      if (attempt === null || !name) return;
+      if (fits('pigoff-drawing', verdictForPigOffTurn(position(), attempt, asRound(p.round)))) onPigOffDrawing(name, asStrokes(p.strokes));
+    });
+    on('pigoff-result', (p) => {
+      const attempt = asInt(p.attempt, 1, 100);
+      if (attempt === null) return;
+      if (fits('pigoff-result', verdictForPigOffTurn(position(), attempt, asRound(p.round)))) {
+        onPigOffResult(asMatches(p.matches), asDrawings(p.drawings), cleanName(p.winner));
+      }
+    });
     on('game-over', (p) => {
       if (fits('game-over', verdictForGameOver(position(), asRound(p.round)))) onGameOver();
     });
@@ -1850,6 +2031,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setPrev(null);
     setTurn(null);
     setJudgeWait('');
+    setPigOffBoth(null);
+    pigOffUsedRef.current = [];
     setRules(1);
     setResuming(false);
   };
@@ -2177,6 +2360,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         submitCell,
         passTurn,
         vote,
+        pigOff,
+        stageStart,
+        submitPigOff,
       }}
     >
       {children}

@@ -36,7 +36,7 @@ const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/rewards', '/pig', '
 // first (src/lib/backGuard.ts, held from GameContext; BackSwipe takes the swipe).
 // The lobby and the scoreboard aren't here: Back from them goes home, still in
 // the room.
-const GAME_SCREENS = ['prompts', 'drawing', 'guessing', 'waiting', 'reveal'];
+const GAME_SCREENS = ['prompts', 'drawing', 'guessing', 'waiting', 'reveal', 'pigoff'];
 
 // Home is always at the bottom of the stack, even when the app opens on a
 // room link (Join): Back from Join, or from the lobby it leads to, comes home

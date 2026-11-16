@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0]
+
+### Added
+- A Pig Off settles a tie: if the top players are tied when the game ends, everyone sees "Pig Off!" and the tied players' pigs. The tied players are all shown the same drawing for a moment, then draw it from memory on a plain black-ink canvas, and the closest match wins and takes a point. The results drop in, count up and swap places into the order they finished, with a crown and a cheer for the winner. A tie on that too plays again with just the ones still tied. Everyone else in the room watches it all
+- At the reveal, swipe left or right on the drawing or guess (or tap the dots under it) to look back through the chain so far, each turn with its ✓ or ✗. You never see a turn before it's judged, and each new turn brings everyone back to it
+
+### Changed
+- Every round starts with each player writing one prompt, instead of filling the trough with prompts at the start of the game. Your prompt starts the chain you'll judge, and it always goes to someone else to draw. While the others write, the screen shows everyone's pig, dressed as they've dressed it, with a ✓ as each prompt comes in, and says who you're still waiting for. When everyone's prompt is in (or after 30 seconds), the drawing starts for everyone. A prompt nobody wrote in time is filled in for them
+- The "your chain" screen at the start of the game is gone: you see your chain's prompt when you write it
+- The reveal shows just the drawing or guess being judged, with the original prompt beside it
+- A row of players' pigs fits its space however many there are: when there are too many, they scroll sideways. A tie on the scoreboard shows every winner's pig, not just the first four
+- Away players are told when a new round needs their prompt
+- Everyone in a room needs Squigglepig 2.12 to play together. The lobby says who needs to update before the game can start
+- How to play, and Help & FAQ, describe writing a prompt each round, looking back through a chain at the reveal, and the Pig Off
+
+### Fixed
+- In How to play, going back a step now slides in from the left, as going forward slides in from the right
+
 ## [2.11.0]
 
 ### Added
