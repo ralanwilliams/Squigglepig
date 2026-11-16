@@ -405,7 +405,7 @@ function NumberShapes({ digits, x, y, size, fill, stroke }: { digits: string; x:
 // One prop's drawing, on its own grid, for any <Svg> to place: the dark-mode
 // rim under it when `rim` is given (its width beyond the outline, in grid
 // units), the shapes with a `line`-wide outline, and `text` in its text slot.
-// SkinDecor draws the props round the pig with it; the trough fills with it.
+// SkinDecor draws the props round the pig with it.
 export function PropArt({ prop, line, rim, text }: { prop: Prop; line: number; rim?: number; text?: string }) {
   // Words in the prop's text slot (a name on a cake, what a pig says), shrunk
   // to fit its width by what the widest line really measures in Roboto Bold

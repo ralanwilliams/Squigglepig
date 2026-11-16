@@ -30,8 +30,6 @@ export type Shape = { d: string; fill: string; line?: boolean; roll?: 'top' | 'b
 export type TextSlot = { x: number; y: number; size: number; maxW: number; fill: string; shade?: string; shine?: string; lines?: 2 };
 // `behind` draws a prop under the artwork instead of over it, so the pig hides
 // part of it (something peeking out from behind the pig).
-// `pile` scales a prop in the trough (trough.ts troughScale): the daisies,
-// a single flower each, are drawn bigger than the rest.
 // `rim: false` leaves a prop out of the dark-mode sticker rim: the hooves
 // below are redrawn over things the pig holds, inside its outline, where the
 // art has no rim.
@@ -57,7 +55,6 @@ export type Prop = {
   anchor?: [number, number];
   text?: TextSlot;
   behind?: true;
-  pile?: number;
   rim?: false;
   head?: true;
   eyes?: true;
@@ -326,7 +323,6 @@ function daisy(petals: string): Prop {
   return {
     w: 100,
     h: 100,
-    pile: 1.25,
     shapes: [
       { d: star(50, 50, 48, 30, 6), fill: petals, line: true },
       { d: circle(50, 50, 18), fill: '#FFD23F', line: true },

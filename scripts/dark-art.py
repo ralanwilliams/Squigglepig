@@ -23,7 +23,7 @@ import numpy as np
 from PIL import Image, ImageSequence
 
 DIR = Path(__file__).resolve().parent.parent / 'src' / 'assets' / 'images'
-PNGS = ['squigglepig_clear', 'squigglepig_join_game_clear', 'squigglepig_lobby_clear', 'squigglepig_cell', 'canvas_pig']
+PNGS = ['squigglepig_clear', 'squigglepig_bare', 'squigglepig_join_game_clear', 'squigglepig_lobby_clear', 'squigglepig_cell', 'canvas_pig']
 GIFS = ['squigglepig_winner', 'squigglepig']
 RADIUS = 5  # px at the source resolution (medium)
 PAD = 12  # transparent margin on every side (PNGs; the half-size GIFs get half), enough for RADIUS up to 10

@@ -56,7 +56,7 @@ const COPY_LINK =
 export default function Lobby() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { room, players, away, host, username, canStart, startGame, status, statusDetail } = useGame();
+  const { room, players, away, host, username, canStart, outdated, startGame, status, statusDetail } = useGame();
   const [target, setTarget] = useState(5);
 
   const bump = (delta: number) => setTarget((t) => Math.min(20, Math.max(1, t + delta)));
@@ -173,10 +173,13 @@ export default function Lobby() {
                   </Pressable>
                 </View>
               </View>
-              {enough ? (
-                <PigButton name="Start Game" onPress={() => startGame(target)} />
-              ) : (
+              {!enough ? (
                 <ButtonNote text={`Need ${MIN_PLAYERS}+ players`} />
+              ) : outdated.length ? (
+                // A phone on an older app plays the game another way (GameContext outdated).
+                <ButtonNote text={outdated.length === 1 ? `${outdated[0]} must update the app` : `${outdated.length} players must update`} />
+              ) : (
+                <PigButton name="Start Game" onPress={() => startGame(target)} />
               )}
             </>
           ) : (

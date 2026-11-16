@@ -131,11 +131,10 @@ export function saveSnapshot(code: string, state: unknown) {
   call('save_snapshot', { p_code: code, p_state: state });
 }
 
-// Notify away players (by user id) that the game started, it's their turn,
-// their chain is up for judging, or the game is over. (A server that hasn't
-// had rooms.sql run again since 2.9.0 knows only the first three, and ignores
-// the others.)
-export type Nudge = 'start' | 'draw' | 'guess' | 'judge' | 'over';
+// Notify away players (by user id) that the game started, a new round wants
+// their prompt, it's their turn, their chain is up for judging, or the game
+// is over. (A server whose rooms.sql is older than a kind ignores it.)
+export type Nudge = 'start' | 'prompt' | 'draw' | 'guess' | 'judge' | 'over';
 export function nudge(code: string, kind: Nudge, users: string[]) {
   if (users.length) call('nudge', { p_code: code, p_kind: kind, p_users: users });
 }

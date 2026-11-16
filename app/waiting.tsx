@@ -26,8 +26,8 @@ const PIG_AND_CLOUD: ImageWindow = { x: 20 / 480, y: 45 / 442, w: 460 / 480, h: 
 const NAMES = 6;
 
 // Where a player lands after handing in their turn (or when spectating a round
-// they aren't part of). While a drawing or guessing turn is under way, it says
-// who's still at it (and who of them is away), and how long they have left:
+// they aren't part of). While a round's prompts, or a drawing or guessing
+// turn, are under way, it says who's still at it (and who of them is away), and how long they have left:
 // the game's own clock for the stage, which the keeper moves the game on by.
 // Once everyone's in, that the game's moving on. Uses the shared two-pane
 // Stage so the pig stays in the same spot as every other screen; the message
@@ -35,7 +35,9 @@ const NAMES = 6;
 export default function Waiting() {
   const ui = useUi();
   const { phase, stillWorking, away, turnEndsAt } = useGame();
-  const turn = phase === 'draw' || phase === 'caption';
+  const turn = phase === 'prompts' || phase === 'draw' || phase === 'caption';
+  const seconds = phase === 'prompts' ? TIMERS.prompt : phase === 'draw' ? TIMERS.draw : TIMERS.caption;
+  const label = phase === 'prompts' ? 'Still writing' : phase === 'draw' ? 'Still drawing' : 'Still guessing';
   const names = stillWorking.slice(0, NAMES).map((name) => (away.includes(name) ? `${name} (away)` : name));
   const more = stillWorking.length - names.length;
   return (
@@ -47,9 +49,9 @@ export default function Waiting() {
           {turn && stillWorking.length > 0 ? (
             <>
               {turnEndsAt > 0 ? (
-                <Countdown seconds={phase === 'draw' ? TIMERS.draw : TIMERS.caption} until={turnEndsAt} />
+                <Countdown seconds={seconds} until={turnEndsAt} />
               ) : null}
-              <NoteCard label={phase === 'draw' ? 'Still drawing' : 'Still guessing'}>
+              <NoteCard label={label}>
                 {names.join(', ') + (more > 0 ? ` and ${more} more` : '')}
               </NoteCard>
             </>

@@ -19,16 +19,16 @@ import { ConfirmOverlay } from '../src/components/ConfirmDialog';
 import { CornerControlsOverlay } from '../src/components/CornerControls';
 import { ToastOverlay } from '../src/components/Toast';
 import { WalkthroughOverlay } from '../src/components/Walkthrough';
-import { TroughDropLayer } from '../src/components/TroughDrops';
 import { playMusic, preloadSounds, stopMusic } from '../src/lib/sound';
 import { useAppFrame } from '../src/theme/responsive';
 
 // Screens with the theme playing: everything from launch up to the moment the
 // round starts (plus /licenses and /rewards, which open from the menu, the
-// solo game list, /arcade, and Your pig, /pig). It stops on /view (the "your
-// prompt" screen) and stays off through drawing, guessing, reveal and the
-// scoreboard, and through a solo run (/arcade/<game>); if a new game drops
-// everyone back into /prompts or /lobby it starts again from the top.
+// solo game list, /arcade, and Your pig, /pig). It plays on while each round's
+// prompts are written, stops when the drawing starts, and stays off through
+// drawing, guessing, reveal and the scoreboard, and through a solo run
+// (/arcade/<game>); the next round's prompts, or a new game's lobby, start it
+// again from the top.
 const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/rewards', '/pig', '/arcade', '/join', '/create', '/lobby', '/prompts', '/waiting']);
 
 // A game's own screens, where the screen itself doesn't swipe back (iOS): the
@@ -36,7 +36,7 @@ const MUSIC_SCREENS = new Set(['/', '/index', '/licenses', '/rewards', '/pig', '
 // first (src/lib/backGuard.ts, held from GameContext; BackSwipe takes the swipe).
 // The lobby and the scoreboard aren't here: Back from them goes home, still in
 // the room.
-const GAME_SCREENS = ['prompts', 'view', 'drawing', 'guessing', 'waiting', 'reveal'];
+const GAME_SCREENS = ['prompts', 'drawing', 'guessing', 'waiting', 'reveal'];
 
 // Home is always at the bottom of the stack, even when the app opens on a
 // room link (Join): Back from Join, or from the lobby it leads to, comes home
@@ -89,9 +89,8 @@ export default function RootLayout() {
 
 // Everything that needs the resolved theme: the status bar, the navigator
 // (wrapped so the theme transition can photograph it), the wipe that sweeps
-// the old screen away when the theme flips, seasonal props falling into the
-// trough from the top of the screen, and the sound and dark-mode switches
-// floating over every screen — in that order, so the toggle's glyph keeps morphing on top
+// the old screen away when the theme flips, and the sound and dark-mode
+// switches floating over every screen — in that order, so the toggle's glyph keeps morphing on top
 // while the wipe passes underneath it. Then the toasts, and the modals over
 // everything: the walkthrough (first launch, and the menu's How to play), and
 // "Are you sure?" (ConfirmDialog.tsx).
@@ -141,7 +140,6 @@ function Shell() {
           </BackSwipe>
         </ThemeSnapshotTarget>
         <ThemeTransition />
-        <TroughDropLayer />
         <CornerControlsOverlay />
         <ToastOverlay />
         <WalkthroughOverlay />

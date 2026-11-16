@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseReady } from '../lib/supabase';
-import { TIMERS, HOST_GRACE, JUDGE_WAIT, BACKUP_AFTER, BACKUP_STAGGER, promptsTime } from '../lib/timers';
+import { TIMERS, HOST_GRACE, JUDGE_WAIT, BACKUP_AFTER, BACKUP_STAGGER } from '../lib/timers';
 import { saveSession, clearSession, savePendingLeave, takePendingLeave } from '../lib/session';
 import {
   IDLE_MINUTES,
@@ -27,7 +27,6 @@ import { clearRoomNotifications, registerForPush } from '../lib/push';
 import { CHUNK_GAP_MS, Joiner, chunkId, split } from '../lib/chunks';
 import { holdsBack, isRoomScreen, leaveCost, lobbyOnCatchUp, navFor } from './nav';
 import { newGameBrush } from './brush';
-import { stopMusic, MUSIC_FADE_MS } from '../lib/sound';
 import { useBackGuard } from '../lib/backGuard';
 import { closeConfirm, confirmLeave } from '../lib/confirm';
 import { showToast } from '../components/Toast';
@@ -41,11 +40,9 @@ import {
   asInt,
   asNames,
   asObj,
-  asPrompt,
   asRoster,
   asRound,
   asRulings,
-  asSeeds,
   asStage,
   asState,
   asTarget,
@@ -55,14 +52,14 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   PROTOCOL,
+  ROUND_FLOW,
+  outdatedPlayers,
   activeMembers as activeOf,
   asRules,
   chainForStage,
   chainOwner,
   clockLine,
   dock,
-  drawSeeds as drawSeedsFrom,
-  promptKey,
   computeSkips as skipsFor,
   electKeeper as electKeeperOf,
   effectiveLeader as leaderOf,
@@ -81,7 +78,6 @@ import {
   playerForChain,
   presentNames as presentOf,
   prevFor,
-  promptsNeededFor,
   roomHost,
   stillToGo,
   tallyRulings as tally,
@@ -92,7 +88,6 @@ import {
   verdictForRevealStep,
   verdictForRound,
   verdictForToReveal,
-  verdictForViewAck,
   type Cell,
   type Chain,
   type Docks,
@@ -100,15 +95,14 @@ import {
   type Position,
   type Presence,
   type Prev,
-  type Prompt,
   type Rules,
   type Verdict,
 } from './rules';
 
 // The game's rules live in ./rules (tested on their own); the screens take
 // what they need of them from here, as they always have.
-export { NAME_MAX, MAX_PLAYERS, MIN_PLAYERS, promptsNeededFor };
-export { isBlankCell, isEmptyTurn } from './rules';
+export { NAME_MAX, MAX_PLAYERS, MIN_PLAYERS };
+export { isBlankCell, isEmptyTurn, nextShown, prevFor } from './rules';
 export type { Cell, Chain, Phase, Prev, Rules } from './rules';
 
 export type ConnStatus = 'connecting' | 'connected' | 'error';
@@ -139,7 +133,8 @@ const ANSWER_STAGGER_MS = 700;
 // before the connection counts as dead.
 const PROBE_MS = 3000;
 
-// Used to seed chains when nobody entered prompts (keeps a game from stalling).
+// Stand-ins for a prompt nobody wrote (its owner was away, or the clock ran
+// out on them), so a chain never stalls for want of one.
 const FALLBACK_PROMPTS = [
   'a cat riding a skateboard',
   'the world’s angriest banana',
@@ -201,9 +196,15 @@ type Game = {
   // Whether this player can start the game from the lobby: the host, or,
   // while the host is away, anyone here.
   canStart: boolean;
+  // Players whose app is too old to play this one's game (./rules
+  // outdatedPlayers): while there are any, no game can start.
+  outdated: string[];
   // Everyone in the room, oldest first, whether or not they have the app
   // open (players[0] is the longest in). `away` is the ones who don't.
   players: string[];
+  // This round's players, in turn order: roster[c] owns chain c (writes its
+  // prompt, judges it). Fixed at the round's start.
+  roster: string[];
   away: string[];
   // Played in this game but tapped Leave game: still on the scoreboard.
   departed: string[];
@@ -233,13 +234,13 @@ type Game = {
   // lost this round's point and at which turn (`chain:cell`), for the reveal.
   rules: Rules;
   dockedAt: Record<string, string>;
-  promptCount: number; // prompts in the shared pool so far
-  promptsNeeded: number; // pool size that auto-starts the game
+  // The round number, from 0.
+  round: number;
   // This player's turn this stage (null between turns, or watching), and when
   // its clock runs out (epoch ms, this phone's time).
   turn: Turn | null;
   turnEndsAt: number;
-  // Who in the round is still drawing or guessing this stage, oldest first,
+  // Who in the round is still writing, drawing or guessing this stage, oldest first,
   // this player aside (./rules stillToGo): the waiting screen lists them,
   // with the time they have left (turnEndsAt).
   stillWorking: string[];
@@ -253,9 +254,6 @@ type Game = {
   returnToRoom: () => void;
   askToLeave: () => void; // Leave game: "Are you sure?", then out of the room
   startGame: (target: number) => void;
-  addPrompt: (text: string) => void;
-  readyView: (byHand?: boolean) => void;
-  viewReady: boolean; // this player has tapped through Round 1 (or its clock ran out)
   submitCell: (data: string, forTurn?: Turn | null, closing?: boolean) => void;
   passTurn: (forTurn?: Turn | null) => void;
   vote: (correct: boolean) => void;
@@ -340,7 +338,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [revealIndex, setRevealIndex] = useState(0);
   const [revealStep, setRevealStep] = useState(0);
   const [rulings, setRulings] = useState<Record<number, boolean>>({});
-  const [promptCount, setPromptCount] = useState(0);
+  const [round, setRound] = useState(0);
+  const [roster, setRoster] = useState<string[]>([]);
   // This player's turn this stage, and when its clock runs out (this phone's
   // time), for the drawing and guessing screens.
   const [turn, setTurn] = useState<Turn | null>(null);
@@ -419,30 +418,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const deadlinesRef = useRef(new Map<string, number>());
   const heldRef = useRef<{ turn: Turn; data: string; closing: boolean } | null>(null);
 
-  // Prompt pool (all clients accumulate, for keeper-handover safety).
-  const allPromptsRef = useRef<{ text: string; author: string }[]>([]);
-  const poolRef = useRef<{ text: string; author: string }[]>([]);
-  // Prompts already handed out this game (every phone notes each round's), so
-  // a keeper taking over doesn't hand one out again (drawSeeds).
-  const usedRef = useRef<Map<string, Prompt>>(new Map());
-  // When this phone last started a game's prompts (a second start right
-  // after is the same tap twice, from two phones: to-prompts).
+  // When this phone last started a game (a second start right after is the
+  // same tap twice, from two phones: to-prompts).
   const promptsAtRef = useRef(0);
-  const viewAcksRef = useRef<Set<string>>(new Set()); // who has tapped through Round 1
-  // Whether this player is among them: Round 1 shows Player ready in place of
-  // its button (app/view.tsx).
-  const [viewReady, setViewReady] = useState(false);
 
   const clockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Keeper: the pause between the prompt pool filling and the first round going
-  // out, so the theme music can fade on every device before the screen changes.
-  const startDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearStartDelay = () => {
-    if (startDelayRef.current) {
-      clearTimeout(startDelayRef.current);
-      startDelayRef.current = null;
-    }
-  };
   const stageStartedAtRef = useRef(0);
 
   // ---- Getting around ----
@@ -637,7 +617,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       saveSnapshot(roomRef.current, { ...buildState(), pausedAt: Date.now() });
     }
     clearClock();
-    clearStartDelay();
     isKeeperRef.current = false;
     keeperRef.current = ''; // so keeping it again later arms a fresh clock (updateKeeper)
     syncedRef.current = false;
@@ -726,25 +705,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!isKeeperRef.current) return;
     clockTimerRef.current = setTimeout(fn, Math.max(1, seconds) * 1000);
   };
-  // How long each stage lasts. The trough's time follows its size: 30 s for
-  // each prompt it needs (the players in the room and the points to win).
+  // How long each stage lasts.
   const durationFor = (p: Phase) =>
     p === 'prompts'
-      ? promptsTime(promptsNeededFor(orderedNames().length, targetRef.current))
-      : p === 'view'
-        ? TIMERS.view
-        : p === 'draw'
-          ? TIMERS.draw
-          : p === 'caption'
-            ? TIMERS.caption
-            : p === 'reveal'
-              ? TIMERS.reveal
-              : 0;
+      ? TIMERS.prompt
+      : p === 'draw'
+        ? TIMERS.draw
+        : p === 'caption'
+          ? TIMERS.caption
+          : p === 'reveal'
+            ? TIMERS.reveal
+            : 0;
 
   const forceFor = (p: Phase) => {
-    if (p === 'prompts') return startFirstRound;
-    if (p === 'view') return doAdvance; // Round 1 timed out — start drawing anyway
-    if (p === 'draw' || p === 'caption') return forceAdvance;
+    if (isTurnPhase(p)) return forceAdvance;
     if (p === 'reveal') return forceRevealChain;
     return () => {};
   };
@@ -830,11 +804,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     revealIndex: revealIndexRef.current,
     revealStep: revealStepRef.current,
     rulings: rulingsRef.current,
-    promptCount: allPromptsRef.current.length,
-    prompts: allPromptsRef.current,
-    pool: poolRef.current,
-    used: [...usedRef.current.values()],
-    viewAcks: [...viewAcksRef.current],
     rules: rulesRef.current,
     docked: [...dockedRef.current],
     dockedAt: dockedAtRef.current,
@@ -861,7 +830,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setStage(s);
     const roster = rosterRef.current;
     const n = roster.length;
-    // Stage 0 = Round 1 "view": read the prompt for the chain you own + judge.
+    // Stage 0 = the round's prompts: write the one the chain you own starts from.
     const p = phaseForStage(s);
     const myPos = roster.indexOf(usernameRef.current);
     if (myPos < 0 || n === 0) {
@@ -873,16 +842,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       beginStage(p);
       return;
     }
-    // chainForStage(pos, 0) === pos, so at the view stage you're handed the very
-    // chain you own — the one you'll judge at the end.
+    // chainForStage(pos, 0) === pos, so the prompt you write starts the very
+    // chain you own — the one you'll judge at the end. The prompts screen stays
+    // up once it's in (it says Player ready) until everyone's is.
     const c = chainForStage(myPos, s, n);
     myChainRef.current = c;
     setTurn({ round: roundRef.current, stage: s, chain: c });
     if (s === 0) {
-      const seed = chainsRef.current[c]?.cells[0];
-      setPrev(seed && seed.kind !== 'drawing' ? { kind: seed.kind, text: seed.text } : null);
-      go('/view');
-      beginStage('view');
+      setPrev(null);
+      go('/prompts');
+      beginStage('prompts');
       return;
     }
     setPrev(prevFor(chainsRef.current[c], s));
@@ -963,16 +932,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     skipRef.current = skipsFor(phaseRef.current, rosterRef.current, membersRef.current);
   };
 
-  // ---- Prompt pool (./rules drawSeeds) ----
-  const drawSeeds = (n: number): Prompt[] => {
-    const drawn = drawSeedsFrom(poolRef.current, allPromptsRef.current, new Set(usedRef.current.keys()), n, shuffle, FALLBACK_PROMPTS);
-    poolRef.current = drawn.pool;
-    return drawn.seeds;
-  };
-  const noteUsed = (prompts: Prompt[]) => {
-    for (const p of prompts) usedRef.current.set(promptKey(p), p);
-  };
-
   // ---- Round lifecycle (the keeper emits, everyone reacts) ----
   // What the keeper does to move the game on, a phone standing in for it can
   // do too (the clock's backup: watchClock sets `acting` while it does).
@@ -989,30 +948,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // The roster is rebuilt from the room's players at the start of every round
   // (away ones included), so anyone who has left the room is naturally dropped
-  // from the rotation (their already-pooled prompts simply stay unused). If too
-  // few remain, end the game.
-  const startFirstRound = () => {
-    if (!actsForClock()) return;
-    clearClock();
-    roundRef.current = 0;
-    const roster = orderedNames();
-    if (roster.length < MIN_PLAYERS) return endGame(0);
-    send('round', { round: 0, roster, seeds: drawSeeds(roster.length), leader: roster[0] });
-  };
-
-  // The round number moves on when the 'round' message comes back (onRound),
-  // on every phone alike, the keeper's included.
+  // from the rotation. If too few remain, end the game. The round number moves
+  // on when the 'round' message comes back (onRound), on every phone alike,
+  // the keeper's included. Anyone away is told to come back and write their
+  // prompt (a server whose rooms.sql predates 'prompt' ignores it).
   const nextRound = () => {
     if (!actsForClock()) return;
     const next = roundRef.current + 1;
     const roster = orderedNames();
     if (roster.length < MIN_PLAYERS) return endGame(roundRef.current);
-    send('round', {
-      round: next,
-      roster,
-      seeds: drawSeeds(roster.length),
-      leader: roster[next % roster.length],
-    });
+    send('round', { round: next, roster, leader: roster[next % roster.length] });
+    nudge(roomRef.current, 'prompt', awayIds(roster));
   };
 
   // The round's last chain is scored: the game is over if anyone has reached
@@ -1033,12 +979,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const s = stageRef.current;
     const n = rosterRef.current.length;
     // Fill any missing cells so the chains stay well-formed, under the name of
-    // the player who owed each one: an empty drawing or guess, a skipped turn
-    // for someone out of the rotation, or one marked `left` for someone who
-    // left when too few would have carried on to take them out of it.
+    // the player who owed each one: a stand-in prompt (FALLBACK_PROMPTS, none
+    // used twice in a round), an empty drawing or guess, a skipped turn for
+    // someone out of the rotation, or one marked `left` for someone who left
+    // when too few would have carried on to take them out of it.
+    const taken = new Set(chainsRef.current.map((ch) => (ch.cells[0]?.kind === 'prompt' ? ch.cells[0].text : '')));
+    const spare = shuffle(FALLBACK_PROMPTS.filter((text) => !taken.has(text)));
     chainsRef.current.forEach((ch, c) => {
       if (ch.cells[s]) return;
       const who = n ? (assignedPlayer(c, s) ?? '') : '';
+      if (s === 0) {
+        ch.cells[0] = { kind: 'prompt', text: spare.shift() ?? FALLBACK_PROMPTS[c % FALLBACK_PROMPTS.length], author: who };
+        return;
+      }
       const mark = skipRef.current.has(who) ? { skip: true as const } : hasLeft(who) ? { left: true as const } : {};
       ch.cells[s] =
         s % 2 === 1
@@ -1048,8 +1001,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     doAdvance();
   };
 
-  // Production runs stages 1..finalStage(n) (./rules). A new turn: everyone
-  // in the rotation who's away is told it's their turn.
+  // The prompts (stage 0), then production runs stages 1..finalStage(n)
+  // (./rules). A new turn: everyone in the rotation who's away is told it's
+  // their turn.
   const doAdvance = () => {
     if (!actsForClock()) return;
     const s = stageRef.current;
@@ -1071,12 +1025,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     rosterRef.current.length > 0 &&
     stillToGo(rosterRef.current, chainsRef.current, stageRef.current, skipRef.current).length === 0;
 
-  // Keeper: advance the stage as soon as it's settled. Away players are
-  // waited for until the clock runs out (forceAdvance). Runs both when a cell
-  // lands and when the room's list changes.
+  // Keeper: advance the stage as soon as it's settled (every prompt is in, or
+  // every drawing or guess). Away players are waited for until the clock runs
+  // out (forceAdvance). Runs both when a cell lands and when the room's list
+  // changes.
   const maybeAdvanceStage = () => {
     if (!isKeeperRef.current) return;
-    if (phaseRef.current !== 'draw' && phaseRef.current !== 'caption') return;
+    if (!isTurnPhase(phaseRef.current)) return;
     const settled = stageSettled();
     const filled = chainsRef.current.filter((ch) => ch.cells[stageRef.current]).length;
     console.log('[game] stage', stageRef.current, '—', filled, 'of', rosterRef.current.length, 'cells in, settled:', settled);
@@ -1086,52 +1041,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Whether the shared pool holds enough prompts to seed every chain of every
-  // round without repeating (and there are enough players). Every device can
-  // tell — it is the same broadcast pool — so every device can react the
-  // moment it happens, ahead of the keeper's round broadcast.
-  const poolFull = () => {
-    if (phaseRef.current !== 'prompts') return false;
-    const count = orderedNames().length;
-    const needed = promptsNeededFor(count, targetRef.current);
-    return count >= MIN_PLAYERS && allPromptsRef.current.length >= needed;
-  };
-
-  // Keeper: start the game once the pool is full — after a short hold, long
-  // enough for the theme to fade out on everyone's phone before the round
-  // lands. The hold is re-checked when it fires in case the room changed.
-  const maybePromptsComplete = () => {
-    if (!isKeeperRef.current || startDelayRef.current) return;
-    if (!poolFull()) return;
-    startDelayRef.current = setTimeout(() => {
-      startDelayRef.current = null;
-      if (isKeeperRef.current && poolFull()) startFirstRound();
-    }, MUSIC_FADE_MS);
-  };
-
-  // Whether everyone in the rotation has tapped through Round 1.
-  const viewDone = () => {
-    const waiting = rosterRef.current.filter((nm) => !skipRef.current.has(nm));
-    return waiting.length > 0 && waiting.every((nm) => viewAcksRef.current.has(nm));
-  };
-
-  // Keeper: leave Round 1 (view) once everyone in the rotation has tapped
-  // through (away players run out its clock), then kick off the first
-  // drawing stage.
-  const maybeAdvanceView = () => {
-    if (!isKeeperRef.current) return;
-    if (phaseRef.current !== 'view') return;
-    if (viewDone()) {
-      clearClock();
-      doAdvance();
-    }
-  };
-
   // ---- The clock's backup ----
   // Every caught-up phone on screen keeps an eye on the clock: when the game
-  // is past due to move on (a stage's time is up; the trough is full, everyone
-  // has tapped through Round 1, every turn is in, or the round's last chain is
-  // scored) and it hasn't, the keeper has gone quiet: it froze before it could
+  // is past due to move on (a stage's time is up; every prompt or turn is in,
+  // or the round's last chain is scored) and it hasn't, the keeper has gone quiet: it froze before it could
   // hand over, lost its connection, or is a 2.9.0 phone in the background,
   // which never hands over. Then the phones in line (clockRank) do what the
   // keeper would have, BACKUP_AFTER seconds late, BACKUP_STAGGER apart, and
@@ -1148,9 +1061,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const timeUp = stageStartedAtRef.current + (durationFor(p) + HOST_GRACE) * 1000;
     const job = (ready: boolean, act: () => void) =>
       ready ? { key: `${id}:ready`, at: null, act } : { key: id, at: timeUp, act };
-    if (p === 'prompts') return job(poolFull(), startFirstRound);
-    if (p === 'view') return job(viewDone(), doAdvance);
-    if (p === 'draw' || p === 'caption') return job(stageSettled(), forceAdvance);
+    if (isTurnPhase(p)) return job(stageSettled(), forceAdvance);
     if (p === 'reveal') {
       return revealIndexRef.current >= chainsRef.current.length ? job(true, finishRound) : job(false, forceRevealChain);
     }
@@ -1189,7 +1100,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ---- Broadcast handlers (fire on every client, including the sender) ----
-  const onToPrompts = (t: number, playedTo: Rules) => {
+  // A new game: scores and all start over, and round 0 starts at once, with
+  // the room's players as its roster (every phone has the same list).
+  const onToPrompts = (t: number, playedTo: Rules, roster: string[]) => {
     targetRef.current = t;
     setTarget(t);
     rulesRef.current = playedTo;
@@ -1197,66 +1110,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     forgetDocks();
     scoresRef.current = {};
     setScores({});
-    allPromptsRef.current = [];
-    poolRef.current = [];
-    usedRef.current = new Map();
-    setPromptCount(0);
     chainsRef.current = [];
     setChains([]);
-    roundRef.current = 0;
     forgetTurns();
     gameNamesRef.current = new Set();
     setGameNames([]);
     dbPhaseRef.current = 'playing';
     // A new game is the whole state: anyone who was still catching up is caught up.
     if (!syncedRef.current) markSynced();
-    go('/prompts');
-    beginStage('prompts');
-    changed();
+    onRound(0, roster, roster[0] ?? '');
   };
 
-  // One prompt added to the shared pool (every client accumulates, so the live
-  // count is consistent and a keeper handover keeps the pool).
-  const onPrompt = (text: string, author: string) => {
-    const clean = (text ?? '').trim();
-    if (!clean) return;
-    allPromptsRef.current.push({ text: clean, author });
-    setPromptCount(allPromptsRef.current.length);
-    // The prompt that fills the pool is the cue for the music to go: it fades
-    // during the keeper's hold, so the round arrives to silence. (Harmless if
-    // the music is already off.)
-    if (poolFull()) stopMusic();
-    maybePromptsComplete();
-    changed();
-  };
-
-  const onViewAck = (name: string) => {
-    viewAcksRef.current.add(name);
-    if (name === usernameRef.current) setViewReady(true);
-    maybeAdvanceView();
-    changed();
-  };
-
-  const onRound = (round: number, roster: string[], seeds: { text: string; author: string }[], lead: string) => {
-    clearStartDelay();
-    roundRef.current = round;
+  // A round starts with its prompts: chain c is OWNED by roster[c], who writes
+  // the prompt it starts from (stage 0) and judges it at the reveal. Nobody
+  // draws their own: stage 1 hands each chain to the player after its owner.
+  const onRound = (r: number, roster: string[], lead: string) => {
+    roundRef.current = r;
+    setRound(r);
     forgetTurns();
     forgetDocks();
-    noteUsed(seeds);
     rosterRef.current = roster;
+    setRoster(roster);
     addGameNames(roster);
     leaderRef.current = lead;
-    advancedForRef.current = -1; // stages start at 0 (the Round 1 view) this round
+    advancedForRef.current = -1; // stages start at 0 (the prompts) this round
     revealIndexRef.current = 0;
     setRevealIndex(0);
-    viewAcksRef.current = new Set();
-    setViewReady(false);
-    // Chain c is OWNED by roster[c]: they view its prompt in Round 1 and judge it
-    // at the reveal (judge = prompt author). The pooled prompt's original writer
-    // is irrelevant to ownership.
-    chainsRef.current = seeds.map((s, c) => ({
-      cells: [{ kind: 'prompt', text: s.text, author: roster[c] ?? s.author } as Cell],
-    }));
+    chainsRef.current = roster.map(() => ({ cells: [] as Cell[] }));
     setChains(chainsRef.current.map((c) => ({ cells: [...c.cells] })));
     routeForStage(0);
     computeSkips();
@@ -1463,7 +1343,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setTarget(targetRef.current);
     leaderRef.current = st.leader ?? '';
     roundRef.current = st.round ?? 0;
+    setRound(roundRef.current);
     rosterRef.current = st.roster ?? [];
+    setRoster(rosterRef.current);
     chainsRef.current = sameRound ? mergeChains(chainsRef.current, incoming) : incoming;
     setChains(chainsRef.current);
     scoresRef.current = st.scores ?? {};
@@ -1484,32 +1366,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dockedAtRef.current = { ...st.dockedAt };
     setDockedAt(dockedAtRef.current);
     stoodInRef.current = st.stoodIn;
-    if (Array.isArray(st.prompts)) allPromptsRef.current = st.prompts;
-    if (Array.isArray(st.pool)) poolRef.current = st.pool;
-    // The prompts handed out so far (a keeper from before this was kept sends
-    // none: this round's own are known from its chains, at least).
-    usedRef.current = new Map();
-    noteUsed(st.used);
-    noteUsed(chainsRef.current.map((c) => c.cells[0]).filter((c): c is Extract<Cell, { kind: 'prompt' }> => c?.kind === 'prompt'));
-    viewAcksRef.current = new Set(Array.isArray(st.viewAcks) ? st.viewAcks : []);
-    setViewReady(viewAcksRef.current.has(usernameRef.current));
-    setPromptCount(st.promptCount ?? allPromptsRef.current.length);
     advancedForRef.current = (st.stage ?? 0) - 1;
     if (p !== 'lobby' && p !== 'gameover') dbPhaseRef.current = 'playing';
 
     if (same) {
       // Stay put (the clock is re-armed below).
-    } else if (p === 'view' || p === 'draw' || p === 'caption') {
-      routeForStage(st.stage ?? (p === 'view' ? 0 : 1));
+    } else if (isTurnPhase(p)) {
+      routeForStage(st.stage ?? 0);
     } else if (p === 'reveal') {
       go('/reveal');
       beginStage('reveal');
     } else if (p === 'gameover') {
       go('/scoreboard');
       beginStage('gameover');
-    } else if (p === 'prompts') {
-      go('/prompts');
-      beginStage('prompts');
     } else {
       // The lobby: only if this phone isn't in it already (./nav lobbyOnCatchUp).
       const was = phaseRef.current;
@@ -1637,8 +1506,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
       send('state', { to: '*', ...buildState(), sentAt: Date.now() });
       changed();
-      maybePromptsComplete();
-      maybeAdvanceView();
       maybeAdvanceStage();
       maybeAutoRule();
     }, force ? 0 : 1200);
@@ -1672,8 +1539,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // Someone leaving may be exactly what unblocks the current stage (a
     // skipped player is no longer waited for), so re-check completion now;
     // and someone coming or going may be the judge the reveal waits for.
-    maybePromptsComplete();
-    maybeAdvanceView();
     maybeAdvanceStage();
     maybeAutoRule();
     updateJudgeWait();
@@ -1802,27 +1667,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     on('to-prompts', (p) => {
       const t = asTarget(p.target);
       if (t === null) return;
+      // Started on an app that plays the old way (a shared trough, a Round 1
+      // view): this one can't play that game. It says so and stays where it is.
+      if ((asInt(p.v, 1, 1000) ?? 1) < ROUND_FLOW) {
+        showToast('This game was started on an older version of Squigglepig. Everyone needs the latest version to play together.', 6000);
+        return;
+      }
       // Two players tapping New game together send two: the second, a moment
-      // after the first, would empty the trough everyone has started filling.
-      if (phaseRef.current === 'prompts' && Date.now() - promptsAtRef.current < 10_000) return;
+      // after the first, would throw away the prompts everyone has started on.
+      if (phaseRef.current === 'prompts' && roundRef.current === 0 && Date.now() - promptsAtRef.current < 10_000) return;
+      const roster = asRoster(p.roster) ?? orderedNames();
+      if (roster.length < MIN_PLAYERS) return;
       promptsAtRef.current = Date.now();
-      // The game's scoring rules: whoever started it says (2.9.0 doesn't: its own).
-      onToPrompts(t, asRules(asInt(p.rules, 1, 1000)));
-    });
-    on('prompt', (p) => {
-      const prompt = asPrompt(p);
-      if (prompt) onPrompt(prompt.text, prompt.author);
-    });
-    on('view-ack', (p) => {
-      const who = cleanName(p.username);
-      if (who && fits('view-ack', verdictForViewAck(position(), asRound(p.round)))) onViewAck(who);
+      // The game's scoring rules: whoever started it says.
+      onToPrompts(t, asRules(asInt(p.rules, 1, 1000)), roster);
     });
     on('round', (p) => {
       const round = asInt(p.round, 0, 100_000);
       const roster = asRoster(p.roster);
-      const seeds = asSeeds(p.seeds);
-      if (round === null || !roster || !seeds) return;
-      if (fits('round', verdictForRound(position(), round))) onRound(round, roster, seeds, cleanName(p.leader));
+      if (round === null || !roster) return;
+      if (fits('round', verdictForRound(position(), round))) onRound(round, roster, cleanName(p.leader));
     });
     on('cell', (p) => {
       const chain = asIndex(p.chain);
@@ -1884,8 +1748,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           if (who) seen[who] = cleanAvatar(m.avatar);
           // Which scoring rules this phone knows (./rules gameRules), kept
           // after it goes away: a game started without it still counts it.
-          const v = asInt(m.v, 1, 1000);
-          if (v !== null) versionsRef.current.set(String(m.userId), v);
+          // (2.9.0 says nothing: the first.)
+          versionsRef.current.set(String(m.userId), asInt(m.v, 1, 1000) ?? 1);
         }
         setAvatars((was) => ({ ...was, ...seen }));
         updateKeeper();
@@ -1939,7 +1803,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // game's own, which carries on.)
     if (isRoomScreen(pathRef.current)) closeConfirm();
     clearClock();
-    clearStartDelay();
     stopAsking();
     forgetAnswers();
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
@@ -1969,13 +1832,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dbPhaseRef.current = 'lobby';
     phaseRef.current = 'lobby';
     rosterRef.current = [];
+    setRoster([]);
     skipRef.current = new Set();
     gameNamesRef.current = new Set();
     chainsRef.current = [];
     scoresRef.current = {};
-    allPromptsRef.current = [];
-    poolRef.current = [];
-    usedRef.current = new Map();
+    roundRef.current = 0;
+    setRound(0);
     setPhase('lobby');
     setMembersState([]);
     setPresentIds([]);
@@ -2075,10 +1938,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // The brush (./brush) lasts the game: a new one, or another room, starts
   // it again in black at the usual width. Every game passes through the lobby
-  // or the trough (prompts) before anyone draws.
+  // or its first round's prompts before anyone draws.
   useEffect(() => {
-    if (phase === 'lobby' || phase === 'prompts') newGameBrush();
-  }, [room, phase]);
+    if (phase === 'lobby' || (phase === 'prompts' && round === 0)) newGameBrush();
+  }, [room, phase, round]);
 
   // A change to the pig (an outfit, a bubble, a theme part) while in a room
   // goes out at once.
@@ -2092,6 +1955,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const startGame = async (t: number) => {
     const code = roomRef.current;
     if (!code || startingRef.current || orderedNames().length < MIN_PLAYERS) return;
+    const old = outdatedPlayers(membersRef.current, versionsRef.current);
+    if (old.length) {
+      showToast(`${old.join(', ')} ${old.length === 1 ? 'needs' : 'need'} to update Squigglepig first.`, 4000);
+      return;
+    }
     startingRef.current = true;
     try {
       // The server closes the room to newcomers first.
@@ -2103,38 +1971,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       dbPhaseRef.current = 'playing';
       // The scoring rules every phone in the game knows (./rules gameRules).
       const rules = gameRules(membersRef.current, versionsRef.current);
-      send('to-prompts', { target: Math.max(1, t), rules });
+      send('to-prompts', { target: Math.max(1, t), rules, roster: orderedNames(), v: PROTOCOL });
       nudge(code, 'start', awayIds());
     } finally {
       startingRef.current = false;
     }
   };
 
-  // Add one prompt to the shared pool (broadcast so the live count updates on
-  // every device). Players keep adding until the pool is full and the game auto-starts.
-  const addPrompt = (text: string) => {
-    const clean = cleanPhrase(text);
-    if (!clean) return;
-    send('prompt', { text: clean, author: usernameRef.current });
-    touchRoom(roomRef.current);
-  };
-
-  // Round 1: tap through after reading the prompt of the chain you own (or
-  // the clock does it for you).
-  // Only while Round 1's view is still on: a tap landing as the game moves on
-  // mustn't count for the drawing they've just been handed.
-  // The player stays on Round 1, which says Player ready at once (the room
-  // hears it a moment later, this phone too: onViewAck); once everyone in the
-  // round is ready, the keeper starts the drawing and everyone goes straight to it.
-  const readyView = (byHand = true) => {
-    if (phaseRef.current !== 'view') return;
-    setViewReady(true);
-    send('view-ack', { round: roundRef.current, username: usernameRef.current });
-    if (byHand) touchRoom(roomRef.current);
-  };
-
-  // Hand in a turn: a drawing (JSON) on a drawing stage, a guess on a
-  // guessing one. `forTurn` is the turn the screen was opened for (its
+  // Hand in a turn: a prompt at the round's start, a drawing (JSON) on a
+  // drawing stage, a guess on a guessing one. A prompt stays on its screen,
+  // which says Player ready until everyone's is in. `forTurn` is the turn the screen was opened for (its
   // `turn`); without it, the current one. One handed in after its turn has
   // passed (Submit tapped, or the clock running out, just as the stage moved
   // on; or the screen closing with a drawing on it) still goes to that turn,
@@ -2155,11 +2001,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!awakeRef.current) return;
     const now = currentTurn();
     const t = forTurn ?? now;
-    if (!t || t.chain < 0 || t.stage < 1 || !roomRef.current) return;
+    if (!t || t.chain < 0 || t.stage < 0 || !roomRef.current) return;
+    const stagePhase = phaseForStage(t.stage);
     const cell: Cell =
-      phaseForStage(t.stage) === 'draw'
-        ? { kind: 'drawing', data, author: usernameRef.current }
-        : { kind: 'caption', text: cleanPhrase(data), author: usernameRef.current };
+      stagePhase === 'prompts'
+        ? { kind: 'prompt', text: cleanPhrase(data), author: usernameRef.current }
+        : stagePhase === 'draw'
+          ? { kind: 'drawing', data, author: usernameRef.current }
+          : { kind: 'caption', text: cleanPhrase(data), author: usernameRef.current };
+    // An empty prompt is no prompt: a stand-in takes its place when the clock runs out.
+    if (cell.kind === 'prompt' && !cell.text) return;
     const current = sameTurn(t, now);
     if (handedRef.current.has(turnKey(t))) return;
     if (isLate(deadlinesRef.current.get(turnKey(t)) ?? 0, Date.now())) {
@@ -2172,7 +2023,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!current && (isEmptyTurn(cell) || t.round !== roundRef.current)) return;
     handIn(t, cell);
     if (!isEmptyTurn(cell)) touchRoom(roomRef.current);
-    if (current && !closing) go('/waiting');
+    if (current && !closing && t.stage > 0) go('/waiting');
   };
 
   // Let a guessing turn go without a guess (the clock ran out on an empty
@@ -2267,14 +2118,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     status === 'connected' && presentIds.length ? active.filter((m) => !here.has(m.id)).map((m) => m.name) : [];
   const departed = members.length ? gameNames.filter((n) => !players.includes(n)) : [];
   // Who's still at this stage's turn (`chains` moves as each turn comes in).
-  const stillWorking =
-    phase === 'draw' || phase === 'caption' ? stillToGo(rosterRef.current, chains, stage, skipRef.current, username) : [];
+  const stillWorking = isTurnPhase(phase) ? stillToGo(rosterRef.current, chains, stage, skipRef.current, username) : [];
 
   // The host is the longest in, away or not; while they're away, anyone here
   // can start the game.
   const host = roomHost(members);
   const isHost = username !== '' && username === host;
   const canStart = isHost || (present.includes(username) && !present.includes(host));
+  // Read with presence, which every version change comes in on (presentIds).
+  const outdated = outdatedPlayers(members, versionsRef.current);
 
   const liveLeader = effectiveLeader(present);
   const currentJudge = (() => {
@@ -2283,7 +2135,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (judgeWait) return ''; // waiting for the owner to come back
     return liveLeader;
   })();
-  const promptsNeeded = promptsNeededFor(players.length, target);
   return (
     <GameCtx.Provider
       value={{
@@ -2291,7 +2142,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         room,
         host,
         canStart,
+        outdated,
         players,
+        roster,
         away,
         departed,
         avatars,
@@ -2312,8 +2165,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         judgeWait,
         rules,
         dockedAt,
-        promptCount,
-        promptsNeeded,
+        round,
         turn,
         turnEndsAt,
         stillWorking,
@@ -2322,9 +2174,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         returnToRoom,
         askToLeave,
         startGame,
-        addPrompt,
-        readyView,
-        viewReady,
         submitCell,
         passTurn,
         vote,

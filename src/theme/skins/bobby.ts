@@ -26,7 +26,7 @@ function withRifle(decor: Skin['decor']): Skin['decor'] {
 // neon city at night, and a pig with attitude. A neon-violet dusk by day, a
 // deep indigo night; buttons in hot magenta, links in cyan glow. The pig in a
 // pink mohawk and shield sunglasses, a two-handed blaster in its hooves;
-// flying cars and a neon pig sign overhead; a trough full of microchips. No season: it shows
+// flying cars and a neon pig sign overhead. No season: it shows
 // once its owner chooses it, except while a birthday or holiday is showing
 // over it (index.ts UNLOCKABLE).
 // Every text pair meets WCAG AA (4.5:1, 3:1 for large bold text);
@@ -73,5 +73,4 @@ export const bobby: Skin = {
   },
 
   decor: withRifle(withVisor(dress({ head: 'mohawk', sky: ['hoverCar', { prop: 'neonSign', twinkle: true }] }))),
-  trough: ['chip'],
 };

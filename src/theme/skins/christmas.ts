@@ -48,5 +48,4 @@ export const christmas: Skin = {
   },
 
   decor: dress({ head: 'santaHat', sky: ['snowflake', 'snowflake'], hold: 'gift' }),
-  trough: ['gift'],
 };

@@ -48,5 +48,4 @@ export const newYear: Skin = {
   },
 
   decor: dress({ head: 'goldHat', sky: [{ prop: 'fireworkGold', twinkle: true }, { prop: 'fireworkPink', twinkle: true }], hold: 'popper' }),
-  trough: ['champagneGreen', 'champagneBlack', 'champagneRose'],
 };

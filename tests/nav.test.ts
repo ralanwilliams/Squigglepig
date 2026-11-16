@@ -44,7 +44,7 @@ describe('looking around while waiting', () => {
 
 describe('Back', () => {
   test('is held during a game, on its screens', () => {
-    for (const here of ['/prompts', '/view', '/drawing', '/guessing', '/waiting', '/reveal']) {
+    for (const here of ['/prompts', '/drawing', '/guessing', '/waiting', '/reveal']) {
       assert.ok(holdsBack(true, 'draw', here), here);
     }
   });

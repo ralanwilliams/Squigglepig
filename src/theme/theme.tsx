@@ -21,7 +21,7 @@ type ThemeName = 'light' | 'dark';
 //   contrast — the high-contrast palettes (iOS "Increase Contrast", Android
 //              "High contrast text", a browser's prefers-contrast: more);
 //   motion   — Reduce motion: the theme flips without the wipe, and the
-//              walkthrough, toggle glyph and trough rest on still frames.
+//              walkthrough and toggle glyph rest on still frames.
 // A third, `seasonal`, is the app's own: the seasonal skin (src/theme/skins),
 // a birthday or holiday, shows by date unless the player turns it off. It is
 // on by default, and has a switch in two places: there, and beside the theme

@@ -49,5 +49,4 @@ export const fourthOfJuly: Skin = {
 
   decor: dress({ head: 'unclesamHat', sky: [{ prop: 'fireworkRed', twinkle: true }, { prop: 'fireworkBlue', twinkle: true }], hold: 'flag' }),
   // Fireworks still waiting to go off.
-  trough: ['rocketRed', 'rocketBlue', 'rocketWhite', 'rocketStars'],
 };

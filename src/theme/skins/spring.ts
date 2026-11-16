@@ -49,5 +49,4 @@ export const spring: Skin = {
   },
 
   decor: dress({ head: 'flowerCrown', sky: ['butterfly', 'butterfly'], hold: 'tulips' }),
-  trough: ['daisyWhite', 'daisyPink', 'daisyLavender'],
 };

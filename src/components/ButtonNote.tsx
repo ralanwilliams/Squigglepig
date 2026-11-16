@@ -5,7 +5,7 @@ import { useThemedStyles } from '../theme/theme';
 import { FONT_CAP, useUi } from '../theme/responsive';
 
 // A message in a button's place: the lobby's "Need 3+ players" where Start
-// Game goes, and Round 1's "Player ready" once Got it is tapped. The same
+// Game goes, and a round's "Player ready" once its prompt is in. The same
 // size as a PigButton, so nothing around it moves, but recessed and muted, so
 // it doesn't read as something to tap. `live` has a screen reader say it as
 // it appears (a live region on Android, an announcement on iOS, like the

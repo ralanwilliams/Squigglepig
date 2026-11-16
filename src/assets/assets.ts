@@ -15,6 +15,13 @@ export const IMAGES = {
   icon: require('./images/logo-192X192.png'), // the app icon, for the menu drawer
 };
 
+// The Home pig without its tail and wordmark (scripts/bare-pig.py), the same
+// size, for a row of players' pigs (PigRoster). It is the Home art as far as
+// anything placed on it goes (artName: 'home'), so every outfit and theme
+// part lands on it as it does on Home. Not one of IMAGES: no skin or outfit
+// places anything on it of its own.
+export const BARE_PIG: number = require('./images/squigglepig_bare.png');
+
 // Dark-mode versions: the same art with a light "sticker" border, so the black
 // outline and the thin "squigglepig" wordmark don't sink into the dark
 // background. Each has a transparent margin around the original for the
@@ -24,6 +31,7 @@ export const IMAGES = {
 // images above.
 const DARK = new Map<number, number>([
   [IMAGES.home, require('./images/squigglepig_clear_dark.png')],
+  [BARE_PIG, require('./images/squigglepig_bare_dark.png')],
   [IMAGES.join, require('./images/squigglepig_join_game_clear_dark.png')],
   [IMAGES.lobby, require('./images/squigglepig_lobby_clear_dark.png')],
   [IMAGES.cell, require('./images/squigglepig_cell_dark.png')],
@@ -35,6 +43,7 @@ const DARK = new Map<number, number>([
 // Which artwork a source is, by its IMAGES name (seasonal skins place their
 // props by name; src/theme/skins).
 const NAMES = new Map(Object.entries(IMAGES).map(([name, mod]) => [mod as number, name as keyof typeof IMAGES]));
+NAMES.set(BARE_PIG, 'home');
 export const artName = (source: number) => NAMES.get(source);
 
 // The version of an image to show on the given palette (images without a

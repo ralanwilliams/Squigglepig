@@ -67,5 +67,4 @@ export const groundhogDay: Skin = {
   },
 
   decor: withStump(dress({ head: 'beanie', hold: 'beerBottle' })),
-  trough: ['beerBottle'],
 };

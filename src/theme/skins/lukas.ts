@@ -83,7 +83,7 @@ function outlaw(decor: Skin['decor']): Skin['decor'] {
 // to a moon and the bluebirds turned vultures. When the
 // light changes each prop morphs into the other (morph.ts) to a sting: dun,
 // dun, dunnn going dark, a hero's fanfare coming back (scripts/
-// stings.py). A trough full of horseshoes. No season: it shows once its
+// stings.py). No season: it shows once its
 // owner chooses it, except while a birthday or holiday is showing over it
 // (index.ts UNLOCKABLE).
 // Every text pair meets WCAG AA (4.5:1, 3:1 for large bold text);
@@ -130,6 +130,5 @@ export const lukas: Skin = {
   },
 
   decor: outlaw(dress({ head: 'sheriffHat', sky: ['sun', 'bluebird', 'bluebird'] })),
-  trough: ['horseshoe'],
   sounds: { dark: 'outlaw', light: 'hero' },
 };
