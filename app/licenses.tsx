@@ -68,7 +68,7 @@ export default function Licenses() {
               Attribution-ShareAlike 4.0 licence.
             </Text>
             <Text style={[styles.intro, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP}>
-              Draw from memory drawings from the Quick, Draw! dataset by Google (quickdraw.withgoogle.com), used under the
+              Draw from memory and Pig Off drawings from the Quick, Draw! dataset by Google (quickdraw.withgoogle.com), used under the
               Creative Commons Attribution 4.0 licence.
             </Text>
           </View>

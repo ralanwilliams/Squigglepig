@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { WinnerPig } from '../src/avatar/WinnerPig';
+import { AvatarRow } from '../src/components/AvatarRow';
 import { NO_AVATAR } from '../src/avatar/avatar';
 import { Heading } from '../src/components/Heading';
 import { PigButton } from '../src/components/PigButton';
@@ -23,9 +24,13 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 //
 // The winner's pig is dressed as they dressed it (src/avatar): their outfit,
 // and their speech bubble saying what they wrote, for everyone in the room to
-// see. A tie lines up every winner's pig, each named underneath (up to
-// LINEUP of them).
-const LINEUP = 4;
+// see. A tie lines up every winner's pig, each named underneath, as big as
+// the pane allows; more than fit scroll sideways (AvatarRow).
+//
+// The winner art is 480 × 456; a pig in a lineup is never smaller than this
+// (base dp, tall), nor bigger than the pane.
+const WINNER_ASPECT = 480 / 456;
+const LINEUP_MIN_H = 120;
 export default function Scoreboard() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -67,15 +72,26 @@ export default function Scoreboard() {
 
   const focus =
     winners.length > 1 ? (
-      <View style={[styles.lineup, { gap: ui.sp(8) }]}>
-        {winners.slice(0, LINEUP).map((name) => (
-          <View key={name} style={[styles.lineupPig, { gap: ui.sp(4) }]}>
-            <WinnerPig avatar={avatars[name] ?? NO_AVATAR} />
-            <Text style={[styles.lineupName, { fontSize: ui.f(14) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
-              {name}
-            </Text>
-          </View>
-        ))}
+      <View style={styles.lineup}>
+        <AvatarRow
+          count={winners.length}
+          aspect={WINNER_ASPECT}
+          maxH={ui.paneH}
+          minH={ui.sp(LINEUP_MIN_H)}
+          gap={ui.sp(8)}
+          below={ui.sp(4) + ui.f(14) * 1.3}
+          label={title}
+          item={(i, { w, h }) => (
+            <View style={[styles.lineupPig, { gap: ui.sp(4) }]}>
+              <View style={{ width: w, height: h }}>
+                <WinnerPig avatar={avatars[winners[i]] ?? NO_AVATAR} />
+              </View>
+              <Text style={[styles.lineupName, { fontSize: ui.f(14), maxWidth: w }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
+                {winners[i]}
+              </Text>
+            </View>
+          )}
+        />
       </View>
     ) : (
       <WinnerPig avatar={(winners[0] && avatars[winners[0]]) || NO_AVATAR} />
@@ -143,7 +159,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   score: { color: t.surfaceText, fontFamily: font.bold },
   winnerText: { color: t.buttonText },
   more: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
-  lineup: { flex: 1, minHeight: 0, flexDirection: 'row' },
-  lineupPig: { flex: 1, minWidth: 0, minHeight: 0 },
+  lineup: { flex: 1, minHeight: 0, width: '100%', justifyContent: 'center' },
+  lineupPig: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   lineupName: { color: t.text, fontFamily: font.medium, textAlign: 'center' },
 });

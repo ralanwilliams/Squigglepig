@@ -38,7 +38,8 @@ export type Prev =
 
 // 'prompts' is every round's first stage (stage 0): each player writes the
 // prompt their own chain starts from.
-export type Phase = 'lobby' | 'prompts' | 'draw' | 'caption' | 'reveal' | 'gameover';
+// 'pigoff' breaks a tie at the end of the game (Pig Off, below).
+export type Phase = 'lobby' | 'prompts' | 'draw' | 'caption' | 'reveal' | 'pigoff' | 'gameover';
 
 // The live channel's view of a player: they have the app open right now.
 // `synced` says their phone holds the game as it stands (it isn't still
@@ -385,6 +386,51 @@ export function verdictForChainScored(at: Position, chain: number, round: number
   if (at.phase !== 'reveal') return isTurnPhase(at.phase) ? 'resync' : 'stale';
   if (chain === at.revealIndex) return 'apply';
   return chain < at.revealIndex ? 'stale' : 'resync';
+}
+
+// ---- Pig Off ----
+// The game ends tied (two or more share the top score once someone has
+// reached the points to win): the tied players play a Pig Off. They're all
+// shown the same drawing for a moment, then draw it from memory (the solo
+// game's scoring, src/arcade/games/memory/score.ts); the closest match wins
+// and takes a point, which settles the tie. A tie on that too plays again,
+// with just the ones still tied and a new drawing, up to PIG_OFF_TRIES
+// times; after that they share the win. Everyone in the room watches. While
+// it's on, a game message's stage is the Pig Off's attempt (1, 2, …).
+export const PIG_OFF_TRIES = 3;
+
+// The players sharing the top score, of those named (the ones still in),
+// in that order; nobody when the top score is 0.
+export function tiedLeaders(scores: Record<string, number>, names: string[]): string[] {
+  const top = Math.max(0, ...names.map((n) => scores[n] ?? 0));
+  return top > 0 ? names.filter((n) => (scores[n] ?? 0) === top) : [];
+}
+
+// A Pig Off's result: its winner, if one scored highest on their own, else
+// who's still tied at the top (everyone named, at 0 all round).
+export function pigOffOutcome(matches: Record<string, number>, names: string[]): { winner: string; tied: string[] } {
+  const top = Math.max(0, ...names.map((n) => matches[n] ?? 0));
+  const best = names.filter((n) => (matches[n] ?? 0) === top);
+  return best.length === 1 ? { winner: best[0], tied: [] } : { winner: '', tied: best };
+}
+
+// 'pigoff': a Pig Off starts — the first straight on from the round's last
+// chain scored, the next after the last one's result.
+export function verdictForPigOff(at: Position, attempt: number, round: number | null): Verdict {
+  const r = byRound(at, round);
+  if (r) return r;
+  if (at.phase === 'reveal') return attempt === 1 && at.revealIndex >= at.chains ? 'apply' : 'resync';
+  if (at.phase === 'pigoff') return attempt === at.stage + 1 ? 'apply' : attempt <= at.stage ? 'stale' : 'resync';
+  return at.phase === 'gameover' ? 'stale' : 'resync';
+}
+
+// 'pigoff-drawing' (a tied player's drawing) and 'pigoff-result': only for
+// the attempt on now.
+export function verdictForPigOffTurn(at: Position, attempt: number, round: number | null): Verdict {
+  const r = byRound(at, round);
+  if (r) return r;
+  if (at.phase === 'pigoff') return attempt === at.stage ? 'apply' : attempt < at.stage ? 'stale' : 'resync';
+  return at.phase === 'gameover' ? 'stale' : 'resync';
 }
 
 // 'game-over'.

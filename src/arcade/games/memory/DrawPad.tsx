@@ -38,6 +38,35 @@ export const fitAspect = (box: { w: number; h: number }) => {
 
 const px = (n: number) => n.toFixed(1);
 
+// What's drawn on a pad, for whoever holds it (the solo round, the room's Pig
+// Off): the finished strokes, kept in a ref too so Undo and Clear (and the
+// score) always see the latest, and what each Clear cleared, latest last:
+// Undo takes back the strokes since a Clear one at a time, then the Clear, as
+// on the drawing board. Spread `pad` into DrawPad.
+export function useStrokes() {
+  const [strokes, setStrokes] = useState<string[]>([]);
+  const ref = useRef(strokes);
+  const cleared = useRef<string[][]>([]);
+  const draw = (next: string[]) => {
+    ref.current = next;
+    setStrokes(next);
+  };
+  const onClear = () => {
+    if (!ref.current.length) return;
+    cleared.current.push(ref.current);
+    draw([]);
+  };
+  const onUndo = () => {
+    if (ref.current.length) draw(ref.current.slice(0, -1));
+    else {
+      const back = cleared.current.pop();
+      if (back) draw(back);
+    }
+  };
+  const onStroke = (d: string) => draw([...ref.current, d]);
+  return { strokes, latest: () => ref.current, pad: { strokes, onStroke, onClear, onUndo } };
+}
+
 export function DrawPad({
   strokes,
   onStroke,

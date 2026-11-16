@@ -7,6 +7,19 @@ export const TIMERS = {
   reveal: 60, // per-chain: how long the judge has to rule before auto-skip
 };
 
+// A Pig Off (src/state/rules.ts), in seconds: the announcement (shorter for
+// a second go), the drawing shown, the drawing from memory, and the results.
+export const PIG_OFF = {
+  intro: 8,
+  again: 5,
+  flash: 3, // as the solo game's first round (src/arcade/games/memory)
+  draw: 20,
+  results: 9,
+};
+// From an attempt's start to its drawing time running out.
+export const pigOffIntro = (attempt: number) => (attempt > 1 ? PIG_OFF.again : PIG_OFF.intro);
+export const pigOffTime = (attempt: number) => pigOffIntro(attempt) + PIG_OFF.flash + PIG_OFF.draw;
+
 // The keeper of the game's clock waits this many extra seconds past a stage
 // deadline before force-advancing, so a player's last-second (or
 // auto-submitted) input still lands.

@@ -432,8 +432,9 @@ begin
   update public.rooms set snapshot = p_state where code = v_code and phase = 'playing';
 end $$;
 
--- Tell away players how the game is going: it has started, it's their turn,
--- their chain is up for judging, or it's over. Whoever moves the game on
+-- Tell away players how the game is going: it has started, a new round wants
+-- their prompt, it's their turn (to draw in a Pig Off too), their chain is up
+-- for judging, or it's over. Whoever moves the game on
 -- names who is away (it can see who has the app open). Every one replaces the
 -- last on the phone (push), so they're told each time; a player can't be
 -- sent more than one every 5 seconds, so no phone in the room can flood
@@ -585,6 +586,7 @@ begin
         when 'draw' then 'Come back to draw!'
         when 'caption' then 'Come back to guess!'
         when 'reveal' then 'Come back for the reveal!'
+        when 'pigoff' then 'Come back for the Pig Off!'
         else 'Come back to play!'
       end,
       jsonb_build_object('room', g.code, 'kind', 'paused')

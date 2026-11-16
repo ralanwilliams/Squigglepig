@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { WorkStage } from '../src/components/WorkStage';
-import { FitBox } from '../src/components/FitBox';
 import { PigRoster } from '../src/components/PigRoster';
 import { PigInput } from '../src/components/PigInput';
 import { PigButton } from '../src/components/PigButton';
@@ -93,19 +92,18 @@ export default function Prompts() {
       ? 'Everyone’s in. Time to draw…'
       : `Waiting on ${waiting.slice(0, NAMES).join(', ')}${more > 0 ? ` and ${more} more` : ''}…`;
 
-  // The round, who's in, and what's happening, shrunk as one if the pane is short.
+  // The round, who's in, and what's happening. The pigs take the room the
+  // other two leave, and scroll sideways if there are more than fit (PigRoster).
   const focus = (
-    <FitBox style={styles.fill}>
-      <View style={[styles.wrap, { gap: ui.sp(18) }]}>
-        <Text style={[styles.round, { fontSize: ui.f(20) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityRole="header">
-          Round {round + 1}
-        </Text>
-        <PigRoster players={players} />
-        <Text style={[styles.line, { fontSize: ui.f(16) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityLiveRegion="polite">
-          {line}
-        </Text>
-      </View>
-    </FitBox>
+    <View style={[styles.wrap, { gap: ui.sp(14) }]}>
+      <Text style={[styles.round, { fontSize: ui.f(20) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityRole="header" numberOfLines={1}>
+        Round {round + 1}
+      </Text>
+      <PigRoster players={players} />
+      <Text style={[styles.line, { fontSize: ui.f(16) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityLiveRegion="polite" numberOfLines={2}>
+        {line}
+      </Text>
+    </View>
   );
 
   return (
@@ -138,7 +136,7 @@ export default function Prompts() {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     fill: { flex: 1, width: '100%' },
-    wrap: { width: '100%', alignItems: 'center', justifyContent: 'center' },
+    wrap: { flex: 1, minHeight: 0, width: '100%', alignItems: 'center', justifyContent: 'center' },
     round: { color: t.text, fontFamily: font.medium, textAlign: 'center' },
     line: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },
     // The box once the prompt's in: it keeps it, locked and recessed.
