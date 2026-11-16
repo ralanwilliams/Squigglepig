@@ -56,7 +56,6 @@ export function birthday({ name, month, day }: Birthday): Skin {
       divider: 'rgba(244,238,255,0.22)',
     },
     decor,
-    trough: ['giftBlue', 'gift'], // presents: the cake is the pig's, not the trough's
   };
 }
 

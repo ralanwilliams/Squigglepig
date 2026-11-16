@@ -80,7 +80,6 @@ export const halloween: Skin = {
       { prop: 'bat', x: 0.93, y: 0.55, w: 0.1, rotate: -10, flip: true, bob: true },
     ],
   },
-  trough: ['pumpkin'],
 };
 
 function still(): Placement[] {

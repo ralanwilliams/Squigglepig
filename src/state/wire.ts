@@ -14,13 +14,12 @@ import { cleanName, cleanPhrase } from '../lib/text';
 // Generous ceilings, far past any real game, so nothing real is cut.
 const MAX_PLAYERS = 100; // names in a roster, chains in a round
 const MAX_STAGES = 200; // cells in a chain
-const MAX_PROMPTS = 2000; // prompts in the pool
 const MAX_TARGET = 99; // the points-to-win stepper
 // A drawing is small JSON (src/lib/drawing.ts); one bigger than this is junk
 // and counts as blank.
 const MAX_DRAWING = 1_000_000;
 
-const PHASES: Phase[] = ['lobby', 'prompts', 'view', 'draw', 'caption', 'reveal', 'gameover'];
+const PHASES: Phase[] = ['lobby', 'prompts', 'draw', 'caption', 'reveal', 'gameover'];
 
 type Obj = Record<string, unknown>;
 export const asObj = (v: unknown): Obj => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : {});
@@ -39,16 +38,7 @@ export const asRound = (v: unknown) => asInt(v, 0, 100_000);
 export const asStage = (v: unknown) => asInt(v, 0, MAX_STAGES);
 export const asTarget = (v: unknown) => asInt(v, 1, MAX_TARGET);
 
-export type Prompt = { text: string; author: string };
-export function asPrompt(v: unknown): Prompt | null {
-  const p = asObj(v);
-  const text = cleanPhrase(p.text);
-  return text ? { text, author: cleanName(p.author) } : null;
-}
-export const asPrompts = (v: unknown): Prompt[] =>
-  list(v, MAX_PROMPTS).map(asPrompt).filter((p): p is Prompt => !!p);
-
-// Lists matched to the roster by position (a round's seeds, its chains): one
+// Lists matched to the roster by position (a round's roster, its chains): one
 // bad entry would move everyone after it onto someone else's turn, so the
 // whole list is refused instead.
 function strict<T>(v: unknown, read: (x: unknown) => T | null): T[] | null {
@@ -56,7 +46,6 @@ function strict<T>(v: unknown, read: (x: unknown) => T | null): T[] | null {
   const out = v.map(read);
   return out.every((x) => x !== null) ? (out as T[]) : null;
 }
-export const asSeeds = (v: unknown) => strict(v, asPrompt);
 export const asRoster = (v: unknown) => strict(v, (x) => cleanName(x) || null);
 
 // A turn. Empty guesses and blank drawings are real turns (they score), so
@@ -84,9 +73,11 @@ export function asCell(v: unknown): Cell | null {
 // (null), which every reader of a chain already passes over.
 export const asCells = (v: unknown): Cell[] => list(v, MAX_STAGES).map(asCell) as Cell[];
 
+// A chain starts from its prompt; one with no cells at all is a chain whose
+// owner hasn't handed their prompt in yet (the round's prompts stage).
 export function asChain(v: unknown): Chain | null {
   const cells = asCells(asObj(v).cells);
-  return cells[0]?.kind === 'prompt' ? { cells } : null;
+  return cells.length === 0 || cells[0]?.kind === 'prompt' ? { cells } : null;
 }
 export const asChains = (v: unknown) => strict(v, asChain);
 
@@ -128,7 +119,6 @@ function asDockedAt(v: unknown): Record<string, string> {
 export function asState(v: unknown) {
   const st = asObj(v);
   const phase = PHASES.includes(st.phase as Phase) ? (st.phase as Phase) : 'lobby';
-  const prompts = asPrompts(st.prompts);
   return {
     to: st.to === '*' ? '*' : cleanName(st.to),
     phase,
@@ -142,13 +132,6 @@ export function asState(v: unknown) {
     revealIndex: asIndex(st.revealIndex) ?? 0,
     revealStep: asStage(st.revealStep) ?? 0,
     rulings: asRulings(st.rulings),
-    promptCount: asInt(st.promptCount, 0, MAX_PROMPTS) ?? prompts.length,
-    prompts,
-    pool: asPrompts(st.pool),
-    // Prompts handed out so far this game (a keeper from before this was kept
-    // sends none: []).
-    used: asPrompts(st.used),
-    viewAcks: asNames(st.viewAcks),
     // The game's scoring rules, null from an app that doesn't say (2.9.0,
     // which only knows the first: ./rules asRules), and under the per-round
     // rule who has lost this round's point, and where; whether someone has

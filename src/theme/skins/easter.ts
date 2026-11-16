@@ -69,5 +69,4 @@ export const easter: Skin = {
 
   decor: withEars(dress({ sky: ['butterfly', 'butterfly'], hold: 'eggBasket' })),
   // Loose painted eggs, tumbling in.
-  trough: ['eggPink', 'eggLavender', 'eggBerry', 'eggPurple', 'eggBlush'],
 };

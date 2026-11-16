@@ -5,7 +5,7 @@ import type { Skin } from './types';
 // Forest, men in tights. A leafy lime green by day and deep forest at night,
 // lettering in the lime of an old movie poster, buttons in the hot pink of
 // the tights. The pig in a feathered archer's cap, a longbow in its hoof,
-// arrows flying past; a trough full of arrows. No season: it shows once its
+// arrows flying past. No season: it shows once its
 // owner chooses it, except while a birthday or holiday is showing over it
 // (index.ts UNLOCKABLE).
 // Every text pair meets WCAG AA (4.5:1, 3:1 for large bold text);
@@ -52,5 +52,4 @@ export const paul: Skin = {
   },
 
   decor: dress({ head: 'archerCap', sky: ['arrow'], hold: 'longbow' }),
-  trough: ['arrow'],
 };

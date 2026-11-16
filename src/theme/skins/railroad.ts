@@ -4,7 +4,7 @@ import type { Skin } from './types';
 // Railroad, a theme won in solo play (src/rewards/catalog.ts theme.railroad):
 // ballast-and-brass by day, a coal-black night lit by a lantern; navy
 // buttons like a conductor's uniform. The pig in a conductor's cap, holding a
-// red railroad lantern, steam puffing past; a trough full of coal. No season:
+// red railroad lantern, steam puffing past. No season:
 // it shows once its owner chooses it, except while a birthday or holiday is
 // showing over it (index.ts UNLOCKABLE).
 // Every text pair meets WCAG AA (4.5:1, 3:1 for large bold text);
@@ -51,5 +51,4 @@ export const railroad: Skin = {
   },
 
   decor: dress({ head: 'conductorCap', sky: ['steam'], hold: 'lantern' }),
-  trough: ['coalA', 'coalB'],
 };

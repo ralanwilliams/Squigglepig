@@ -50,5 +50,4 @@ export const thanksgiving: Skin = {
   },
 
   decor: dress({ head: 'pilgrimHat', sky: ['leafRed', 'leafGold'], hold: 'turkey' }),
-  trough: ['turkey'],
 };

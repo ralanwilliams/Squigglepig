@@ -7,7 +7,7 @@ import { isGameOn, type Phase } from './rules';
 // The screens a room is played on. The rest of the app — home, solo games,
 // Your pig, Rewards — a player can look around while they're in a room and
 // nothing is going on in it.
-const ROOM_SCREENS = new Set(['/lobby', '/prompts', '/view', '/drawing', '/guessing', '/waiting', '/reveal', '/scoreboard']);
+const ROOM_SCREENS = new Set(['/lobby', '/prompts', '/drawing', '/guessing', '/waiting', '/reveal', '/scoreboard']);
 export const isRoomScreen = (path: string) => ROOM_SCREENS.has(path);
 
 // How to get from `here` to the room's screen `path`:

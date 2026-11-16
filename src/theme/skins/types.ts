@@ -61,10 +61,6 @@ export type Skin = {
   light: Palette;
   dark: Palette;
   decor: Partial<Record<ArtName, Placement[]>>;
-  // What fills the prompts screen's trough in place of mud (trough.ts), the
-  // list repeated across its slots: usually what the pig holds. Without one
-  // the trough keeps its mud.
-  trough?: PropName[];
   // A sting to play as the screen turns dark, or light, while this skin
   // shows (theme.tsx): what the morph to its night or day props sounds like.
   sounds?: Record<'light' | 'dark', keyof typeof SOUNDS>;

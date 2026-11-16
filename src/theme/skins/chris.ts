@@ -68,7 +68,7 @@ function villain(decor: Skin['decor']): Skin['decor'] {
 // lightning. When the light changes each prop morphs into the other
 // (morph.ts), the cape blowing out in the wind on the way, to a sting: a
 // villain's menace going dark, a hero's fanfare coming back (scripts/
-// stings.py). A trough full of gold stars. No season: it shows once its
+// stings.py). No season: it shows once its
 // owner chooses it, except while a birthday or holiday is showing over it
 // (index.ts UNLOCKABLE).
 // Every text pair meets WCAG AA (4.5:1, 3:1 for large bold text);
@@ -115,6 +115,5 @@ export const chris: Skin = {
   },
 
   decor: villain(dress({ sky: ['cloud', { prop: 'heroStar', twinkle: true }, { prop: 'heroStar', twinkle: true }] })),
-  trough: ['heroStar'],
   sounds: { dark: 'supervillain', light: 'superhero' },
 };

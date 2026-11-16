@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { Trough } from './Trough';
 import { canvas, font, verdict, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemedStyles } from '../theme/theme';
 
 // The first-run walkthrough's illustrations (src/components/Walkthrough.tsx):
 // one looping animation per step, built from the game's own pieces (phones,
-// the room code, avatars, the trough, the white canvas) so the motion explains
+// the room code, avatars, prompt chips, the white canvas) so the motion explains
 // the step and the caption can stay one line. Prompts and guesses are short
 // phrases, as in the game: the fun is in how the words drift.
 //
@@ -311,52 +310,59 @@ export function GatherScene() {
 }
 
 // ---------------------------------------------------------------------------
-// 3 · Prompts: prompts drop into the trough one by one and the mud rises.
+// 3 · Prompts: each player writes a prompt on their phone, then every prompt
+// moves on to the next player (the last one round to the first), so nobody
+// draws their own.
 // ---------------------------------------------------------------------------
-const DROPS = [
-  { x: 92, text: 'pig in a hat', start: 0.18 },
-  { x: 228, text: 'dancing chicken', start: 0.3 },
-  { x: 132, text: 'sad unicorn', start: 0.42 },
-  { x: 196, text: 'frog on a bike', start: 0.54 },
-  { x: 160, text: 'giant pizza', start: 0.66 },
-].map((d) => ({ ...d, end: d.start + 0.13 }));
+// Short enough to fit a chip the width of a phone (they don't wrap or shrink
+// on the web: numberOfLines cuts them off).
+const WRITERS = [
+  { x: 70, text: 'pig in a hat' },
+  { x: 160, text: 'sad cat' },
+  { x: 250, text: 'tiny frog' },
+];
+const PASS = { start: 0.52, end: 0.74 }; // when the prompts move on
 
 export function PromptsScene() {
-  const { t, reduced } = useLoop(4800, 0.86);
-  const [landed, setLanded] = useState(0);
-  useEffect(() => {
-    const id = t.addListener(({ value }) => {
-      const n = DROPS.filter((d) => value >= d.end).length;
-      setLanded((c) => (c === n ? c : n));
-    });
-    return () => t.removeListener(id);
-  }, [t]);
+  const { t } = useLoop(4800, 0.86);
   return (
     <SceneBox t={t}>
-      <View style={{ position: 'absolute', left: 40, top: 112, width: 240 }}>
-        <Trough count={reduced ? DROPS.length : landed} target={DROPS.length} labels={false} fallFrom="trough" />
-      </View>
-      {DROPS.map((d, i) => (
-        <Animated.View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: d.x - 54,
-            top: 0,
-            opacity: t.interpolate({
-              inputRange: [d.start, d.start + 0.02, d.end - 0.03, d.end],
-              outputRange: [0, 1, 1, 0],
-              extrapolate: 'clamp',
-            }),
-            transform: [
-              { translateY: ramp(t, d.start, d.end, -10, 128, Easing.in(Easing.quad)) },
-              { rotate: ramp(t, d.start, d.end, 0, i % 2 ? 8 : -8).interpolate({ inputRange: [-8, 8], outputRange: ['-8deg', '8deg'] }) },
-            ],
-          }}
-        >
-          <Chip width={108}>{d.text}</Chip>
+      {WRITERS.map((w, i) => (
+        <Phone key={`p${i}`} style={{ left: w.x - 31, top: 34, transform: [{ scale: pop(t, 0.02 + i * 0.06, 0.1) }] }} />
+      ))}
+      {WRITERS.map((w, i) => (
+        <Animated.View key={`a${i}`} style={{ position: 'absolute', left: w.x - 14, top: 152, transform: [{ scale: pop(t, 0.06 + i * 0.06) }] }}>
+          <Avatar color={AVATAR[i]} size={28} />
         </Animated.View>
       ))}
+      {WRITERS.map((w, i) => {
+        const to = WRITERS[(i + 1) % WRITERS.length].x;
+        // The one going round to the first phone arcs up over the others.
+        const lift = to < w.x ? -64 : -14;
+        return (
+          <Animated.View
+            key={`c${i}`}
+            style={{
+              position: 'absolute',
+              left: w.x - 43,
+              top: 70,
+              transform: [
+                { translateX: ramp(t, PASS.start, PASS.end, 0, to - w.x) },
+                {
+                  translateY: t.interpolate({
+                    inputRange: [PASS.start, (PASS.start + PASS.end) / 2, PASS.end],
+                    outputRange: [0, lift, 0],
+                    extrapolate: 'clamp',
+                  }),
+                },
+                { scale: pop(t, 0.2 + i * 0.1) },
+              ],
+            }}
+          >
+            <Chip width={86}>{w.text}</Chip>
+          </Animated.View>
+        );
+      })}
     </SceneBox>
   );
 }

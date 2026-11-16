@@ -8,9 +8,9 @@ import type { Member } from '../lib/rooms';
 
 // ---- Game model: the "telephone" chain (a Telestrations booklet) ----
 //
-// A Chain is an alternating list of cells. cells[0] is always a text prompt
-// (drawn from the shared pool). Odd indices are drawings, even indices (>=2)
-// are captions. Every stage advances every chain by exactly one cell, so all
+// A Chain is an alternating list of cells. cells[0] is always a text prompt,
+// written by the chain's owner at the start of the round (stage 0). Odd
+// indices are drawings, even indices (>=2) are captions. Every stage advances every chain by exactly one cell, so all
 // players are doing the SAME action each stage (all drawing, or all captioning).
 //
 // `skip` marks the turn of a player who tapped Leave game while 3 or more
@@ -36,7 +36,9 @@ export type Prev =
   | { kind: 'drawing'; data: string }
   | { kind: 'blank' };
 
-export type Phase = 'lobby' | 'prompts' | 'view' | 'draw' | 'caption' | 'reveal' | 'gameover';
+// 'prompts' is every round's first stage (stage 0): each player writes the
+// prompt their own chain starts from.
+export type Phase = 'lobby' | 'prompts' | 'draw' | 'caption' | 'reveal' | 'gameover';
 
 // The live channel's view of a player: they have the app open right now.
 // `synced` says their phone holds the game as it stands (it isn't still
@@ -50,43 +52,6 @@ export const MIN_PLAYERS = 3;
 // The most a room holds. The server turns away a 13th ('room_full', join_room
 // in supabase/rooms.sql, which has the same number).
 export const MAX_PLAYERS = 12;
-
-// Prompts needed to seed every chain of every round without ever repeating one.
-// Worst case is the "all players maxed, one winner" scenario: a player scores at
-// most (N-1) per round, so ⌈target ÷ (N-1)⌉ rounds, each seeding N chains.
-export const promptsNeededFor = (players: number, target: number) =>
-  players >= 2 ? Math.ceil(target / (players - 1)) * players : Math.max(1, players);
-
-// ---- Prompts ----
-// A prompt in the shared pool, and who wrote it.
-export type Prompt = { text: string; author: string };
-export const promptKey = (p: Prompt) => `${p.author}\u0000${p.text}`;
-
-// The seeds for a round of n chains, taken from the front of the pool. When
-// it runs short it's refilled, shuffled, from the prompts not handed out yet
-// this game (`used`, which every phone keeps, so a host taking over mid-game
-// draws as the last one would have); once every prompt has been used, from
-// all of them again (a game that runs long: blank canvases cost points, so
-// it can need more rounds than the trough was filled for). With no prompts
-// at all, the fallbacks.
-export function drawSeeds(
-  pool: Prompt[],
-  all: Prompt[],
-  used: Set<string>,
-  n: number,
-  shuffle: <T>(a: T[]) => T[],
-  fallback: string[]
-): { seeds: Prompt[]; pool: Prompt[] } {
-  let next = pool.filter((p) => !used.has(promptKey(p)));
-  if (next.length < n) {
-    const source = all.length ? all : fallback.map((text) => ({ text, author: '' }));
-    const fresh = source.filter((p) => !used.has(promptKey(p)));
-    next = shuffle(fresh.length >= n ? fresh : source);
-  }
-  const seeds: Prompt[] = [];
-  for (let i = 0; i < n; i++) seeds.push(next.shift() ?? { text: fallback[i % fallback.length], author: '' });
-  return { seeds, pool: next };
-}
 
 // A blank drawing — an empty canvas handed in, or the clock running out —
 // costs the player who owed it a point, whether they were here or away.
@@ -123,11 +88,23 @@ export function mergeCell(have: Cell | undefined, incoming: Cell | undefined): C
 }
 
 // The same for whole chains, when they're the same round's: a chain whose
-// prompt doesn't match is another round's, and the incoming one stands.
+// prompt doesn't match is another round's, and the incoming one stands. While
+// the round's prompts are still coming in, a chain may have none yet on
+// either side: then it's merged like any other turn. One with a prompt and
+// nothing after it may meet one with no prompt yet (the room's copy is
+// missing it); one that has gone further than its prompt is another game's.
 export function mergeChains(have: Chain[], incoming: Chain[]): Chain[] {
   return incoming.map((chain, c) => {
     const mine = have[c];
-    const same = mine?.cells[0]?.kind === 'prompt' && chain.cells[0]?.kind === 'prompt' && mine.cells[0].text === chain.cells[0].text;
+    const a = mine?.cells[0];
+    const b = chain.cells[0];
+    const same =
+      !!mine &&
+      (a && b
+        ? a.kind === 'prompt' && b.kind === 'prompt' && a.text === b.text
+        : !b
+          ? mine.cells.length <= 1
+          : chain.cells.length <= 1);
     if (!same) return chain;
     const length = Math.max(mine.cells.length, chain.cells.length);
     return { cells: Array.from({ length }, (_, i) => mergeCell(mine.cells[i], chain.cells[i])) as Cell[] };
@@ -135,12 +112,12 @@ export function mergeChains(have: Chain[], incoming: Chain[]): Chain[] {
 }
 
 // ---- Stages ----
-// Stage 0 is Round 1's "view" (read the prompt of the chain you own); after
-// that odd stages draw and even ones caption.
-export const phaseForStage = (s: number): Phase => (s === 0 ? 'view' : s % 2 === 1 ? 'draw' : 'caption');
+// Stage 0 is the round's prompts (each player writes the one their own chain
+// starts from); after that odd stages draw and even ones caption.
+export const phaseForStage = (s: number): Phase => (s === 0 ? 'prompts' : s % 2 === 1 ? 'draw' : 'caption');
 
 // The phases a round is played in, turn by turn (the reveal comes after).
-export const isTurnPhase = (p: Phase) => p === 'view' || p === 'draw' || p === 'caption';
+export const isTurnPhase = (p: Phase) => p === 'prompts' || p === 'draw' || p === 'caption';
 
 // A game is on from the prompts to the last chain's reveal.
 export const isGameOn = (p: Phase) => p !== 'lobby' && p !== 'gameover';
@@ -148,7 +125,8 @@ export const isGameOn = (p: Phase) => p !== 'lobby' && p !== 'gameover';
 // At stage s, player at roster position `pos` handles chain (pos - s) mod N.
 // Over stages 1..N-1 this hands each chain to every player except (implicitly)
 // never lets anyone touch the same chain twice. chainForStage(pos, 0) === pos:
-// at the view stage you're handed the very chain you own.
+// the prompt you write starts the very chain you own, and nobody draws their
+// own prompt (stage 1 hands chain c to the player after its owner).
 export const chainForStage = (pos: number, s: number, n: number) => (((pos - s) % n) + n) % n;
 
 // Who is responsible for chain c at stage s (the inverse of chainForStage).
@@ -167,7 +145,7 @@ export function stillToGo(roster: string[], chains: Chain[], s: number, skip: Se
 
 // Production runs stages 1..(n-1): each of the n-1 players who don't OWN a chain
 // adds exactly one cell to it, so by the end everyone has touched every chain
-// (the owner via the Round 1 view). Scoring judges every cell against the
+// (the owner by writing its prompt). Scoring judges every cell against the
 // original prompt, so it doesn't matter whether the last cell is a drawing.
 export const finalStage = (n: number) => Math.max(1, n - 1);
 
@@ -177,7 +155,7 @@ export const finalStage = (n: number) => Math.max(1, n - 1);
 // always finds text (the prompt at worst); a guessing turn with no drawing
 // anywhere before it gets 'blank'.
 export function prevFor(chain: Chain | undefined, s: number): Prev | null {
-  if (!chain) return null;
+  if (!chain || s < 1) return null;
   const wantDrawing = s % 2 === 0;
   for (let i = s - 1; i >= 0; i--) {
     const c = chain.cells[i];
@@ -225,7 +203,24 @@ export function computeSkips(phase: Phase, roster: string[], members: Member[]):
 // played to rules 2 if every player in it has an app that knows them; each
 // phone says which rules it knows in its presence (PROTOCOL; 2.9.0 says
 // nothing). Whoever starts the game decides, and it travels with the game.
-export const PROTOCOL = 2;
+//
+// 3 is the round flow: every round starts with each player writing a prompt
+// (stage 0), with no shared pool and no Round 1 view. A phone that knows only
+// 2 or less plays a different game (it waits on a trough nobody fills), so a
+// game can't be started while one is in the room (outdatedPlayers), and a
+// game started by one is refused (GameContext to-prompts).
+export const PROTOCOL = 3;
+export const ROUND_FLOW = 3;
+
+// Who in the room has an app too old for this one's game (ROUND_FLOW), by
+// name: those whose presence has said which version they are, or, said
+// nothing (2.9.0). A player never seen here (away the whole time) isn't
+// known, and doesn't hold the game up.
+export function outdatedPlayers(members: Member[], versions: Map<string, number>): string[] {
+  return activeMembers(members)
+    .filter((m) => versions.has(m.id) && (versions.get(m.id) ?? 1) < ROUND_FLOW)
+    .map((m) => m.name);
+}
 export type Rules = 1 | 2;
 export function gameRules(members: Member[], versions: Map<string, number>): Rules {
   const all = activeMembers(members);
@@ -331,10 +326,9 @@ export type Verdict = 'apply' | 'stale' | 'resync';
 const byRound = (at: Position, round: number | null): Verdict | null =>
   round === null ? null : round < at.round ? 'stale' : round > at.round ? 'resync' : null;
 
-// 'round': a round starts (the first from the prompts, the next once the
-// last chain of a reveal is scored).
+// 'round': the next round starts, once the last chain of a reveal is scored.
+// (Round 0 comes with the game's start: 'to-prompts'.)
 export function verdictForRound(at: Position, round: number): Verdict {
-  if (at.phase === 'prompts') return round === 0 ? 'apply' : 'resync';
   if (at.phase === 'lobby' || at.phase === 'gameover') return 'resync'; // missed the game starting
   if (round <= at.round) return 'stale';
   // Straight on from a finished reveal; anything else skipped scoring.
@@ -361,21 +355,18 @@ export function verdictForToReveal(at: Position, round: number | null): Verdict 
 
 // 'cell': a turn handed in (or handed in again, see mergeCell). In the reveal
 // only one not shown yet, or the one on screen, can still change (GameContext
-// leaves one that's already been ruled alone).
+// leaves one that's already been ruled alone). A prompt only while the round's
+// prompts are still open: once the drawing has started, a stand-in has taken
+// its place (one that came too late), and the drawing is of that.
 export function verdictForCell(at: Position, chain: number, stage: number, round: number | null): Verdict {
   const r = byRound(at, round);
   if (r) return r;
+  if (stage === 0) return at.phase === 'prompts' ? 'apply' : 'stale';
   if (isTurnPhase(at.phase)) return 'apply';
   if (at.phase === 'reveal') {
     return chain > at.revealIndex || (chain === at.revealIndex && stage >= at.revealStep) ? 'apply' : 'stale';
   }
   return 'stale'; // no round's chains to put it in
-}
-
-// 'view-ack': a player has read their Round 1 prompt.
-export function verdictForViewAck(at: Position, round: number | null): Verdict {
-  if (round !== null && round !== at.round) return 'stale';
-  return at.phase === 'view' ? 'apply' : 'stale';
 }
 
 // 'reveal-state': the judge moved the reveal on, or ruled the cell shown.

@@ -112,8 +112,7 @@ function player(decor: Skin['decor']): Skin['decor'] {
 // night he leans on crutches with his ankle in a signed cast. When the light
 // changes the ball and the crutches and cast trade places to a crowd: an
 // "ooooh!!!" going dark, as though he's just gone down hurt, and a cheer coming back
-// (scripts/stings.py). A hoop and basketballs overhead, a trough full of
-// basketballs. The team, its pig and its look are our own. No season: it
+// (scripts/stings.py). A hoop and basketballs overhead. The team, its pig and its look are our own. No season: it
 // shows once its owner chooses it, except while a birthday or holiday is
 // showing over it (index.ts UNLOCKABLE).
 // Every text pair meets WCAG AA (4.5:1, 3:1 for large bold text);
@@ -160,6 +159,5 @@ export const ash: Skin = {
   },
 
   decor: player(dress({ sky: ['hoop', 'basketball', 'basketball'] })),
-  trough: ['basketball'],
   sounds: { dark: 'ooh', light: 'cheer' },
 };

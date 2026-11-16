@@ -446,7 +446,8 @@ declare
   v_to uuid[];
 begin
   v_body := case p_kind
-    when 'start' then 'The game has started! Come back to add your prompts.'
+    when 'start' then 'The game has started! Come back to write your prompt.'
+    when 'prompt' then 'A new round is starting! Come back to write your prompt.'
     when 'draw' then 'It''s your turn to draw!'
     when 'guess' then 'It''s your turn to guess!'
     when 'judge' then 'Your chain is up! Come back and judge it.'
@@ -580,8 +581,7 @@ begin
       array(select user_id from public.room_members where room = g.code and left_at is null),
       'Room ' || g.code,
       'Everyone''s away, so the game is paused. ' || case g.phase
-        when 'prompts' then 'Come back to fill the trough!'
-        when 'view' then 'Come back to see your prompt!'
+        when 'prompts' then 'Come back to write your prompt!'
         when 'draw' then 'Come back to draw!'
         when 'caption' then 'Come back to guess!'
         when 'reveal' then 'Come back for the reveal!'

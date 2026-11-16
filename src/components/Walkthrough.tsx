@@ -1,11 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import { Stage } from './Stage';
 import { PigButton } from './PigButton';
+import { PageDots } from './PageDots';
+import { useSlideIn } from './SwipePager';
+import { useSwipe } from '../lib/useSwipe';
 import { ChainScene, DrawScene, GatherScene, HostScene, PromptsScene, ScoreScene } from './WalkthroughScenes';
 import { font, type Theme } from '../theme/tokens';
-import { useReducedMotion, useThemedStyles } from '../theme/theme';
+import { useThemedStyles } from '../theme/theme';
 import { ANY_WAY_UP, FONT_CAP, useUi } from '../theme/responsive';
 import { closeWalkthrough, markTutorialDone, useWalkthroughOpen } from '../lib/tutorial';
 
@@ -39,18 +42,16 @@ export function WalkthroughOverlay() {
 const STEPS = [
   { Scene: HostScene, caption: 'The host taps Create Game, then shares the room code.' },
   { Scene: GatherScene, caption: 'Get 3 to 12 players into one room.' },
-  { Scene: PromptsScene, caption: 'Everyone fills the trough with prompts.' },
+  { Scene: PromptsScene, caption: 'Everyone writes a prompt. It’s passed on for someone else to draw.' },
   { Scene: DrawScene, caption: 'Draw the prompt you’re handed.' },
   { Scene: ChainScene, caption: 'Guess the drawing you’re passed. Your guess gets drawn next.' },
   { Scene: ScoreScene, caption: 'The prompt’s writer scores the matches. First to the target wins!' },
 ];
 const LAST = STEPS.length - 1;
-const NATIVE = Platform.OS !== 'web';
 
 function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
   const last = step === LAST;
 
@@ -63,41 +64,17 @@ function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void
   const next = () => (last ? onDone() : go(step + 1));
 
   // Each step slides in from the side it came from (with reduced motion it
-  // just appears).
-  const enter = useRef(new Animated.Value(1)).current;
-  const dir = useRef(1);
-  const prev = useRef(step);
-  useEffect(() => {
-    dir.current = step >= prev.current ? 1 : -1;
-    prev.current = step;
-    if (reduced) {
-      enter.setValue(1);
-      return;
-    }
-    enter.setValue(0);
-    Animated.timing(enter, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: NATIVE }).start();
-  }, [step, enter, reduced]);
-
-  // Swipe left / right between steps (never past the ends: finishing is a tap).
+  // just appears). Swipe left / right between steps (never past the ends:
+  // finishing is a tap).
+  const slide = useSlideIn(step);
   const stepRef = useRef(step);
   stepRef.current = step;
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 16 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-        onPanResponderRelease: (_, g) => {
-          if (g.dx < -48) setStep((s) => Math.min(LAST, s + 1));
-          else if (g.dx > 48) setStep((s) => Math.max(0, s - 1));
-        },
-      }),
-    []
+  const swipe = useSwipe(
+    () => setStep((s) => Math.min(LAST, s + 1)),
+    () => setStep((s) => Math.max(0, s - 1))
   );
 
   const { Scene, caption } = STEPS[step];
-  const slide = {
-    opacity: enter,
-    transform: [{ translateX: enter.interpolate({ inputRange: [0, 1], outputRange: [dir.current * ui.sp(28), 0] }) }],
-  };
 
   return (
     <Modal
@@ -109,9 +86,9 @@ function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void
       // Android back steps back through the walkthrough; it never dismisses it.
       onRequestClose={() => go(stepRef.current - 1)}
     >
-      <View style={styles.fill} {...pan.panHandlers}>
+      <View style={styles.fill} {...swipe}>
         <Stage
-          header={<Dots step={step} />}
+          header={<PageDots count={STEPS.length} index={step} upTo label={`Step ${step + 1} of ${STEPS.length}`} />}
           focus={
             <Animated.View key={step} style={[styles.fill, slide]}>
               <Scene />
@@ -151,53 +128,10 @@ function Walkthrough({ visible, onDone }: { visible: boolean; onDone: () => void
   );
 }
 
-// Progress: one dot per step; the current one stretches into a pill.
-function Dots({ step }: { step: number }) {
-  const ui = useUi();
-  const styles = useThemedStyles(makeStyles);
-  const reduced = useReducedMotion();
-  const widths = useRef(STEPS.map((_, i) => new Animated.Value(i === step ? 1 : 0))).current;
-  useEffect(() => {
-    if (reduced) {
-      widths.forEach((w, i) => w.setValue(i === step ? 1 : 0));
-      return;
-    }
-    Animated.parallel(
-      widths.map((w, i) =>
-        Animated.timing(w, { toValue: i === step ? 1 : 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false })
-      )
-    ).start();
-  }, [step, widths, reduced]);
-
-  const d = ui.sp(8);
-  return (
-    <View
-      style={[styles.dots, { gap: ui.sp(8) }]}
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLabel={`Step ${step + 1} of ${STEPS.length}`}
-    >
-      {widths.map((w, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.dot,
-            i <= step && styles.dotDone,
-            { height: d, borderRadius: d / 2, width: w.interpolate({ inputRange: [0, 1], outputRange: [d, d * 3] }) },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     fill: { flex: 1, minHeight: 0 },
     caption: { color: t.text, fontFamily: font.medium, textAlign: 'center', textAlignVertical: 'center' },
     skip: { alignItems: 'center', justifyContent: 'center' },
     skipText: { color: t.link, fontFamily: font.regular, textDecorationLine: 'underline' },
-    dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-    dot: { backgroundColor: t.divider },
-    dotDone: { backgroundColor: t.link },
   });

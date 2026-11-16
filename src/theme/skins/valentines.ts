@@ -76,5 +76,4 @@ export const valentines: Skin = {
   },
 
   decor: withQuiver(dress({ sky: ['heartRed', 'heartPink'], hold: 'cupidBow' })),
-  trough: ['cupidBow'],
 };

@@ -37,6 +37,18 @@ describe("the reveal's chains against this phone's (mergeChains)", () => {
     const hosts = [chain(prompt('a cat', 'Ann'), blankDrawing('Bo'))];
     assert.deepEqual(mergeChains(mine, hosts), hosts);
   });
+  test("while the prompts come in: this phone's prompt is kept where the room's copy has none yet", () => {
+    const mine = [chain(prompt('a cat', 'Ann')), chain()];
+    const room = [chain(), chain()];
+    assert.deepEqual(mergeChains(mine, room), mine);
+  });
+  test("a chain that went further than its prompt is another game's: a new game's empty one stands", () => {
+    // A phone asleep through a whole game wakes up mid-round of the old one,
+    // while the room is writing the new game's prompts.
+    const mine = [chain(prompt('a dog', 'Ann'), drawing('Bo'))];
+    const room = [chain()];
+    assert.deepEqual(mergeChains(mine, room), room);
+  });
 });
 
 describe('the whole story: a drawing that missed the host', () => {

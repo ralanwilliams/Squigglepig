@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Heading } from '../src/components/Heading';
@@ -7,7 +7,8 @@ import { DrawingImage } from '../src/components/DrawingImage';
 import { PigButton } from '../src/components/PigButton';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { RuleBadge } from '../src/components/RuleBadge';
-import { isBlankCell, isEmptyTurn, useGame } from '../src/state/GameContext';
+import { SwipePager } from '../src/components/SwipePager';
+import { isBlankCell, isEmptyTurn, nextShown, useGame, type Chain } from '../src/state/GameContext';
 import { TIMERS } from '../src/lib/timers';
 import { font, layout, type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
@@ -20,8 +21,14 @@ const EMPTY_CANVAS = JSON.stringify({ w: SPACE.w, h: SPACE.h, strokes: [] });
 
 // End-of-round scoring. The chain is judged by its ORIGINAL PROMPT AUTHOR, who
 // votes the current cell (drawing/guess) against the original prompt. The cell
-// under judgement fills the left; the prompt, verdict buttons and running scores
-// sit on the right. Everyone's screen mirrors the same cell + ✓/✗ animation.
+// under judgement fills the left, on its own. The original prompt, verdict
+// buttons and running scores sit on the right. Everyone's screen mirrors the
+// same cell + ✓/✗ animation.
+//
+// The turns already voted on are pages: anyone can swipe back through them
+// (the dots under the cell say there are more) to see the chain so far, each
+// with its ✓/✗; nothing past the one being judged. Each new turn brings everyone back to it; the judge, looked away
+// from it, is offered the way back before the verdict buttons.
 //
 // An empty turn — a blank drawing, or a guess nobody wrote — has nothing to
 // judge: it shows as it came in and the judge's phone marks it ✗ by itself.
@@ -54,6 +61,18 @@ export default function Reveal() {
   const chain = chains[revealIndex];
   const step = chain ? Math.min(revealStep, chain.cells.length - 1) : 0;
 
+  // The turns shown so far (skipped ones passed over), one page each, and the
+  // one this player is looking at: the latest, until they swipe away from it.
+  // A new turn (or chain) brings them back to it.
+  const pages = useMemo(() => shownTurns(chain, step, rulings), [chain, step, rulings]);
+  const [looking, setLooking] = useState<number | null>(null);
+  useEffect(() => setLooking(null), [revealIndex, step]);
+  // The latest is the one being judged, or, once a chain's last turn was
+  // passed over (a player who left), the last one shown.
+  const latest = pages.includes(step) ? step : (pages[pages.length - 1] ?? step);
+  const page = looking !== null && pages.includes(looking) ? looking : latest;
+  const pageIndex = Math.max(0, pages.indexOf(page));
+
   // One deadline per chain, fixed when the chain comes up: Stage rebuilds its
   // panes (remounting the Countdown) when the phone turns, and the clock must
   // not restart mid-reveal. Changing chains does start a fresh one. It's the
@@ -68,20 +87,25 @@ export default function Reveal() {
 
   const cells = chain.cells;
   const prompt = cells[0];
+  // The turn being judged (the vote is always on it) …
   const frontier = cells[step];
   const frontierRuled = rulings[step] !== undefined;
-  const ruled = rulings[step];
-  const isDrawing = frontier?.kind === 'drawing';
-  const empty = isEmptyTurn(frontier);
-  const blankDrawing = isBlankCell(frontier);
-  const left = !!frontier && frontier.kind !== 'prompt' && !!frontier.left;
-  const author = frontier?.author || 'someone';
-  const caption = frontier?.kind === 'caption' ? (frontier.text ?? '') : '';
+  const frontierEmpty = isEmptyTurn(frontier);
+  const onLatest = page === latest;
+  // … and the one on screen, which is the same unless this player has swiped back.
+  const shown = cells[page];
+  const ruled = rulings[page];
+  const isDrawing = shown?.kind === 'drawing';
+  const empty = isEmptyTurn(shown);
+  const blankDrawing = isBlankCell(shown);
+  const left = !!shown && shown.kind !== 'prompt' && !!shown.left;
+  const author = shown?.author || 'someone';
+  const caption = shown?.kind === 'caption' ? (shown.text ?? '') : '';
   // Whether this turn cost its player a point: under the per-round rule, the
   // one turn that took this round's point; otherwise, any blank drawing ✗.
   const penalty =
     rules >= 2
-      ? !!frontier?.author && dockedAt[frontier.author] === `${revealIndex}:${step}`
+      ? !!shown?.author && dockedAt[shown.author] === `${revealIndex}:${page}`
       : blankDrawing && ruled === false;
 
   const board = [...players, ...departed].sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0));
@@ -93,8 +117,36 @@ export default function Reveal() {
   // The badge is sized to the pane so it never spills out of it.
   const badge = Math.min(ui.f(96), Math.round(ui.paneH * 0.45));
 
-  // Left: the single cell currently under judgement, with its ✓/✗ badge. The
-  // drawing fills the pane; a caption bubble sits centred in the same space.
+  // The turn on screen, on its own: a drawing fills the pane, a guess sits
+  // centred in it as a bubble. The ✓/✗ badge lands over the middle of it.
+  const bubble = (
+    <View
+      style={[
+        styles.bubble,
+        { borderRadius: ui.sp(8), paddingVertical: ui.sp(10), paddingHorizontal: ui.sp(14) },
+        ruled === true && styles.good,
+        ruled === false && styles.bad,
+      ]}
+    >
+      <Text style={[styles.bubbleText, { fontSize: ui.f(18) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={3} adjustsFontSizeToFit>
+        {caption.trim() || '(no answer)'}
+      </Text>
+    </View>
+  );
+  const turn = (
+    <View style={styles.overlayHost}>
+      {isDrawing ? (
+        <DrawingImage
+          data={blankDrawing ? EMPTY_CANVAS : shown.data}
+          frameStyle={[ruled === true && styles.good, ruled === false && styles.bad]}
+        />
+      ) : (
+        bubble
+      )}
+      {ruled !== undefined ? <RuleBadge correct={ruled} size={badge} /> : null}
+    </View>
+  );
+
   const focus = (
     <View style={[styles.cellArea, { gap: ui.sp(4) }]}>
       <Text style={[styles.author, { fontSize: ui.f(13) }]} maxFontSizeMultiplier={FONT_CAP} numberOfLines={1}>
@@ -109,42 +161,23 @@ export default function Reveal() {
                   ? ' didn’t guess'
                   : ' guessed')}
       </Text>
-      <View style={styles.overlayHost}>
-        {isDrawing ? (
-          <DrawingImage
-            data={blankDrawing ? EMPTY_CANVAS : frontier.data}
-            frameStyle={[ruled === true && styles.good, ruled === false && styles.bad]}
-          />
-        ) : (
-          <View
-            style={[
-              styles.bubble,
-              { borderRadius: ui.sp(8), paddingVertical: ui.sp(10), paddingHorizontal: ui.sp(14) },
-              ruled === true && styles.good,
-              ruled === false && styles.bad,
-            ]}
-          >
-            <Text
-              style={[styles.bubbleText, { fontSize: ui.f(18) }]}
-              maxFontSizeMultiplier={FONT_CAP}
-              numberOfLines={4}
-              adjustsFontSizeToFit
-            >
-              {caption.trim() || '(no answer)'}
-            </Text>
-          </View>
-        )}
-        {ruled !== undefined && <RuleBadge correct={ruled} size={badge} />}
-      </View>
+      <SwipePager
+        count={pages.length}
+        index={pageIndex}
+        onIndex={(i) => setLooking(pages[i])}
+        label={`Turn ${pageIndex + 1} of ${pages.length}`}
+      >
+        {turn}
+      </SwipePager>
       <Text
         style={[styles.awarded, { fontSize: ui.f(13) }, penalty && styles.penalty]}
         maxFontSizeMultiplier={FONT_CAP}
         numberOfLines={1}
       >
-        {ruled === true && frontier?.author
-          ? `✓ +1 ${frontier.author}`
-          : penalty && frontier?.author
-            ? `−1 ${frontier.author} (${rules >= 2 ? 'missed a turn' : 'blank canvas'})`
+        {ruled === true && shown?.author
+          ? `✓ +1 ${shown.author}`
+          : penalty && shown?.author
+            ? `−1 ${shown.author} (${rules >= 2 ? 'missed a turn' : 'blank canvas'})`
             : ' '}
       </Text>
     </View>
@@ -162,7 +195,7 @@ export default function Reveal() {
 
       <View style={[styles.darkCard, { borderRadius: ui.sp(8), padding: ui.sp(12), gap: ui.sp(4) }]}>
         <Text style={[styles.label, { fontSize: ui.f(12) }]} maxFontSizeMultiplier={FONT_CAP}>
-          DOES IT MATCH THIS PROMPT?
+          ORIGINAL PROMPT:
         </Text>
         <Text
           style={[styles.promptText, { fontSize: ui.f(18) }]}
@@ -179,7 +212,9 @@ export default function Reveal() {
           Waiting for {judgeWait} to come back and judge…
         </Heading>
       ) : isJudge ? (
-        !frontierRuled && frontier && !empty ? (
+        !frontierRuled && frontier && !frontierEmpty && !onLatest ? (
+          <PigButton name="Back to the latest" onPress={() => setLooking(null)} silent />
+        ) : !frontierRuled && frontier && !frontierEmpty ? (
           <View style={[styles.votes, { gap: ui.sp(10) }]}>
             <View style={styles.flex}>
               <PigButton name="✓ Yes" onPress={() => vote(true)} />
@@ -223,8 +258,21 @@ export default function Reveal() {
   return <Stage focus={focus} actions={actions} />;
 }
 
+// The turns of a chain a player may look at during the reveal, by cell index:
+// the one being judged, and the ones before it already voted on, passing over
+// skipped ones. Nothing not yet judged, so the chain is never spoiled.
+function shownTurns(chain: Chain | undefined, step: number, rulings: Record<number, boolean>): number[] {
+  const out: number[] = [];
+  if (!chain) return out;
+  for (let i = nextShown(chain, 0); i <= step && i < chain.cells.length; i = nextShown(chain, i)) {
+    if (i === step || rulings[i] !== undefined) out.push(i);
+  }
+  return out;
+}
+
 const makeStyles = (t: Theme) => StyleSheet.create({
   flex: { flex: 1 },
+  fill: { flex: 1, minHeight: 0 },
   cellArea: { flex: 1, minHeight: 0 },
   author: { color: t.text, fontFamily: font.regular, textAlign: 'center' },
   // Fills the pane; the cell is centred inside it so the badge lands over the

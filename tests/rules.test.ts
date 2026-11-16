@@ -8,6 +8,7 @@ import {
   electKeeper,
   finalStage,
   gameRules,
+  outdatedPlayers,
   isBlankCell,
   isEmptyTurn,
   isLate,
@@ -19,7 +20,6 @@ import {
   playerForChain,
   presentNames,
   prevFor,
-  promptsNeededFor,
   roomHost,
   stillToGo,
   tallyRulings,
@@ -28,8 +28,20 @@ import {
 import { DRAWN, EMPTY_CANVAS, blankDrawing, caption, chain, drawing, here, members, prompt } from './helpers/game';
 
 describe('stages and chains', () => {
-  test('stage 0 views, then drawing and guessing take turns', () => {
-    assert.deepEqual([0, 1, 2, 3, 4].map(phaseForStage), ['view', 'draw', 'caption', 'draw', 'caption']);
+  test('stage 0 is the prompts, then drawing and guessing take turns', () => {
+    assert.deepEqual([0, 1, 2, 3, 4].map(phaseForStage), ['prompts', 'draw', 'caption', 'draw', 'caption']);
+  });
+
+  test("nobody is ever handed their own prompt, or their own chain again", () => {
+    for (let n = 3; n <= 12; n++) {
+      const roster = Array.from({ length: n }, (_, i) => `P${i}`);
+      for (let c = 0; c < n; c++) {
+        // chain c starts from roster[c]'s prompt (stage 0) …
+        assert.equal(playerForChain(roster, c, 0), roster[c]);
+        // … and every later stage hands it to someone else.
+        for (let s = 1; s <= finalStage(n); s++) assert.notEqual(playerForChain(roster, c, s), roster[c], `chain ${c}, stage ${s}, ${n} players`);
+      }
+    }
   });
 
   test('every stage hands each player a different chain, and nobody gets the same chain twice', () => {
@@ -69,10 +81,11 @@ describe('stages and chains', () => {
     assert.deepEqual(stillToGo(roster, chains, 1, new Set()), [], 'everyone is in');
   });
 
-  test('prompts needed covers every chain of every round', () => {
-    assert.equal(promptsNeededFor(3, 5), 9); // ⌈5/2⌉ rounds × 3 chains
-    assert.equal(promptsNeededFor(12, 5), 12);
-    assert.equal(promptsNeededFor(1, 5), 1);
+  test('who is still writing their prompt', () => {
+    const roster = ['Ann', 'Bo', 'Cy'];
+    const chains = roster.map(() => chain());
+    chains[1].cells[0] = prompt('a sad unicorn', 'Bo');
+    assert.deepEqual(stillToGo(roster, chains, 0, new Set()), ['Ann', 'Cy']);
   });
 });
 
@@ -293,6 +306,17 @@ describe('a point a round for anything missed (rules 2)', () => {
     assert.equal(asRules(null), 1);
     assert.equal(asRules(2), 2);
     assert.equal(asRules(7), 2); // a later app's rules: the most this one knows
+  });
+
+  // The round flow (a prompt each at every round's start) is a different
+  // game from the trough and Round 1 view an older app plays.
+  test("a game can't start with a phone on an older app in the room", () => {
+    const room = members(['Ann', 'Bo', 'Cy', 'Di']);
+    // Bo's app says 2 (2.10 / 2.11), Cy's says nothing (2.9.0), Di's never seen.
+    const seen = new Map([['id-Ann', 3], ['id-Bo', 2], ['id-Cy', 1]]);
+    assert.deepEqual(outdatedPlayers(room, seen), ['Bo', 'Cy']);
+    assert.deepEqual(outdatedPlayers(members(['Ann', 'Bo'], { Bo: 1 }), seen), [], 'not one who left');
+    assert.deepEqual(outdatedPlayers(room, new Map([['id-Ann', 3], ['id-Bo', 4]])), [], 'a later app plays this game');
   });
 });
 

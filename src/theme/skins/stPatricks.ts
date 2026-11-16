@@ -48,5 +48,4 @@ export const stPatricks: Skin = {
   },
 
   decor: dress({ head: 'leprechaunHat', sky: ['shamrock', 'shamrock'], hold: 'potOfGold' }),
-  trough: ['coinFace', 'coinTilt', 'coinEdge'],
 };
