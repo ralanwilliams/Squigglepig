@@ -103,9 +103,14 @@ describe("a Pig Off's messages", () => {
   test('the game ends from it', () => {
     assert.equal(verdictForGameOver(pigoff(1), 4), 'apply');
   });
-  test('read off the wire: only drawing paths, and a Pig Off with two players or more', () => {
+  test('read off the wire: only drawing paths, and a Pig Off with someone in it', () => {
     assert.deepEqual(asStrokes(['M 1 2 Q 3 4 5 6 L 7 8', 'javascript:alert(1)', 42]), ['M 1 2 Q 3 4 5 6 L 7 8']);
-    assert.equal(asPigOff({ attempt: 1, players: ['Ann'], entry: 3 }), null);
+    assert.equal(asPigOff({ attempt: 1, players: [], entry: 3 }), null);
     assert.deepEqual(asPigOff({ attempt: 1, players: ['Ann', 'Bo'], entry: 3 })?.matches, null);
+  });
+  test("a Pig Off whose results have one left in (the others left) still comes through, for a phone catching up", () => {
+    const po = asPigOff({ attempt: 1, players: ['Ann'], entry: 3, matches: { Ann: 0 }, drawings: { Ann: [] } });
+    assert.deepEqual(po?.players, ['Ann']);
+    assert.deepEqual(po?.matches, { Ann: 0 });
   });
 });

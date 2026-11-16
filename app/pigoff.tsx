@@ -38,7 +38,7 @@ import { FONT_CAP, useUi } from '../src/theme/responsive';
 export default function PigOffScreen() {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
-  const { pigOff, stageStart, username, avatars, submitPigOff, resuming } = useGame();
+  const { pigOff, stageStart, username, avatars, submitPigOff, resuming, players: inRoom } = useGame();
   const myAvatar = useMyAvatar();
   const now = useNow(250);
 
@@ -140,12 +140,17 @@ export default function PigOffScreen() {
   const showing = now - stageStart >= PIG_OFF_SHOW_MS;
   const matches = pigOff.matches ?? {};
   const top = Math.max(0, ...pigOff.players.map((n) => matches[n] ?? 0));
-  const still = pigOff.players.filter((n) => (matches[n] ?? 0) === top);
+  // Still tied, as the game will see it: only those still in the room go
+  // again (GameContext pigOffNext). With one left, they win; once the tries
+  // run out, they share it.
+  const still = pigOff.players.filter((n) => (matches[n] ?? 0) === top && inRoom.includes(n));
   const verdict = pigOff.winner
     ? `${pigOff.winner === username ? 'You win' : `${pigOff.winner} wins`} the Pig Off! +1 point`
-    : attempt >= PIG_OFF_TRIES
-      ? `Still tied at ${top}%! ${capital(list(still))} share the win.`
-      : `Still tied at ${top}%! ${capital(list(still))} go again…`;
+    : still.length === 1
+      ? `${still[0] === username ? 'You win' : `${still[0]} wins`}: the others have left.`
+      : attempt >= PIG_OFF_TRIES || still.length === 0
+        ? `Still tied at ${top}%! ${capital(list(still.length ? still : pigOff.players))} share the win.`
+        : `Still tied at ${top}%! ${capital(list(still))} go again…`;
   return (
     <Stage
       header={title}

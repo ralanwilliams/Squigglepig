@@ -143,7 +143,8 @@ export function asPigOff(v: unknown): PigOff | null {
   const attempt = asInt(p.attempt, 1, 100);
   const entry = asPackIndex(p.entry);
   const players = asNames(p.players);
-  if (attempt === null || entry === null || players.length < 2) return null;
+  // Its results can have just one left in (the others tapped Leave game).
+  if (attempt === null || entry === null || players.length < 1) return null;
   return {
     attempt,
     players,
