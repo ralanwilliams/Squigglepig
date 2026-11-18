@@ -57,6 +57,7 @@ const GLYPHS = {
   fence: <Path d="M5 20V8l1.5-2.5L8 8v12M10.5 20V8L12 5.5 13.5 8v12M16 20V8l1.5-2.5L19 8v12M3 11h18M3 16h18" />, // Pigpen
   truffle: <Path d="M7.5 8.5c.4-2.6 3.3-4.2 5.9-3.4 2.4-.6 4.9 1.2 5 3.7 1.7 1.4 1.8 4.1.2 5.6.2 2.6-2.2 4.6-4.7 4.1-1.8 1.5-4.6 1.3-6-.5-2.5-.2-4-2.9-3-5.2-.9-1.7-.2-3.8 1.6-4.3zM10 11v.01M14 10v.01M12.5 14v.01" />, // Truffle Hunter
   bubble: <Path d="M4 5h16v11H10.5L6 20v-4H4z" />, // the pig's speech bubble
+  fireworks: <Path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4M6 6l2.8 2.8M15.2 15.2L18 18M18 6l-2.8 2.8M8.8 15.2L6 18" />, // a burst: the winner's celebrations
   // The drawing board's controls on the canvas (CanvasControls.tsx: the zoom,
   // Clear · Undo, a sticker's controls), drawn in white.
   minus: <Path d="M5 12h14" />,

@@ -115,7 +115,7 @@ export default function Prompts() {
       hold={resuming}
       top={
         <PigInput
-          style={[styles.fill, ready && styles.done]}
+          style={[styles.field, ready && styles.done]}
           placeholder="A puffin drinking hot chocolate"
           value={ready ? shown : draft}
           onChangeText={setDraft}
@@ -135,7 +135,9 @@ export default function Prompts() {
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
-    fill: { flex: 1, width: '100%' },
+    // The standard input height, at the top of WorkStage's slot (not stretched
+    // to fill it), so it matches every other input.
+    field: { width: '100%' },
     wrap: { flex: 1, minHeight: 0, width: '100%', alignItems: 'center', justifyContent: 'center' },
     round: { color: t.text, fontFamily: font.medium, textAlign: 'center' },
     line: { color: t.textMuted, fontFamily: font.regular, textAlign: 'center' },

@@ -1441,6 +1441,20 @@ export const PROPS = {
 
   // ---- Outfits (src/avatar/outfits.ts): worn by a player's own pig when
   // they win, placed on the winner art there.
+  // A magician's wand (an outfit carried in the hooves, src/avatar/outfits.ts):
+  // a plain black stick with a white tip. Drawn lying along, as the long guns
+  // are, gripped a quarter of the way along (layout.ts carried), the tip out
+  // in front.
+  magicWand: {
+    w: 100,
+    h: 10,
+    anchor: [25, 5],
+    shapes: [
+      { d: rect(1, 2.5, 83, 5), fill: '#1A1A1A', line: true }, // the stick
+      { d: rect(84, 2.5, 15, 5), fill: '#FFFFFF', line: true }, // its white tip
+      { d: rect(4, 3.6, 78, 0.8), fill: 'rgba(255,255,255,0.25)' }, // a glint along it
+    ],
+  },
   crown: {
     head: true,
     w: 100,

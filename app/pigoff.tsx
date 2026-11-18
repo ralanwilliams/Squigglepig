@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Stage } from '../src/components/Stage';
 import { Heading } from '../src/components/Heading';
 import { NoteCard } from '../src/components/NoteCard';
@@ -10,7 +10,9 @@ import { PigButton } from '../src/components/PigButton';
 import { ButtonNote } from '../src/components/ButtonNote';
 import { LeaveButton } from '../src/components/LeaveButton';
 import { PigRoster } from '../src/components/PigRoster';
-import { PigOffResults, PIG_OFF_SHOW_MS } from '../src/components/PigOffResults';
+import { PigOffResults, PIG_OFF_SHOW_MS, PIG_OFF_FIREWORKS_AT } from '../src/components/PigOffResults';
+import { FireworksLayer } from '../src/components/Fireworks';
+import { ClashTitle, ClashWords } from '../src/components/ClashTitle';
 import { DrawPad, useStrokes } from '../src/arcade/games/memory/DrawPad';
 import { PACK, answerFor } from '../src/arcade/games/memory/pack';
 import { useMyAvatar } from '../src/avatar/avatar';
@@ -18,9 +20,9 @@ import { useGame } from '../src/state/GameContext';
 import { PIG_OFF, pigOffIntro } from '../src/lib/timers';
 import { PIG_OFF_TRIES } from '../src/state/rules';
 import { SPACE } from '../src/lib/drawing';
-import { font, type Theme } from '../src/theme/tokens';
+import { type Theme } from '../src/theme/tokens';
 import { useThemedStyles } from '../src/theme/theme';
-import { FONT_CAP, useUi } from '../src/theme/responsive';
+import { useUi } from '../src/theme/responsive';
 
 // The game ended tied: a Pig Off (src/state/rules.ts). Everyone in the room
 // is here, the tied players and everyone watching, and sees each part as it
@@ -70,16 +72,16 @@ export default function PigOffScreen() {
   const drawUntil = stageStart + drawFrom + PIG_OFF.draw * 1000;
   const part = pigOff.matches ? 'results' : t < introMs ? 'intro' : t < drawFrom ? 'flash' : 'draw';
 
-  const title = (
-    <Text style={[styles.title, { fontSize: ui.f(34) }]} maxFontSizeMultiplier={FONT_CAP} accessibilityRole="header" numberOfLines={1}>
-      Pig Off!
-    </Text>
-  );
+  // In the clash title's style (ClashTitle): the words as it leaves them.
+  const title = <ClashWords left="PIG" right="OFF!" size={ui.f(30)} label="Pig Off!" />;
 
   if (part === 'intro') {
     return (
       <Stage
         header={title}
+        // The first time: PIG and OFF! charge in from either side and butt
+        // heads, then fade to show this (ClashTitle).
+        overlay={attempt === 1 ? <ClashTitle left="PIG" right="OFF!" start={stageStart} /> : null}
         focus={<PigRoster players={players} />}
         actions={
           <>
@@ -88,7 +90,9 @@ export default function PigOffScreen() {
                 ? `Once more, just ${names}: a new drawing, the same rules.`
                 : `${capital(names)} each see a drawing for a moment, then draw it from memory. The closest match wins!`}
             </NoteCard>
-            <ButtonNote text="Get ready…" live />
+            {/* Not `live`: it changes every second, and a screen reader
+                would read out each one. */}
+            <ButtonNote text={`Starts in ${Math.max(1, Math.ceil((introMs - t) / 1000))}`} />
             <LeaveButton />
           </>
         }
@@ -154,6 +158,12 @@ export default function PigOffScreen() {
   return (
     <Stage
       header={title}
+      // A winner: as the crown goes on, fireworks over the whole screen, their
+      // light on the winner's pig in the results (PigOffResults). 3 s in, the
+      // screen fades slowly to an iridescent black and stays there, the
+      // fireworks rolling on, until the scoreboard fades in from under the
+      // same night at the same rate, the fireworks still going.
+      overlay={<FireworksLayer from={stageStart + PIG_OFF_FIREWORKS_AT} on={!!pigOff.winner} encore night="fall" nightDelay={3000} />}
       focus={
         <View style={[styles.fill, { gap: ui.sp(6) }]}>
           <Heading size="h4" lines={1}>
@@ -248,8 +258,7 @@ const list = (names: string[]) =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const makeStyles = (t: Theme) =>
+const makeStyles = (_t: Theme) =>
   StyleSheet.create({
     fill: { flex: 1, minHeight: 0 },
-    title: { color: t.accent, fontFamily: font.bold, textAlign: 'center', letterSpacing: 1 },
   });

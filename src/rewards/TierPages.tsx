@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
-import { FitBox } from '../components/FitBox';
+import { LayoutChangeEvent, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Glyph } from '../components/Glyph';
 import { font, type Theme } from '../theme/tokens';
 import { useTheme, useThemedStyles } from '../theme/theme';
@@ -18,9 +17,12 @@ import type { Tier } from './catalog';
 // are shown as tiers of their own.
 //
 // The cards fill the card's width (as many to a row as fit) and fit its
-// height, every tab at the size of the tallest (tierFit.ts). In case the
-// sums are out (the system's text much larger than usual), the page is in a
-// FitBox, which shrinks it if it still runs over.
+// height, every tab at the size of the tallest (tierFit.ts). When there are
+// more than fit even at the smallest size a card's name can still be read
+// (tierFit.ts MIN_SCALE), as more rewards are added, or with the system's
+// text much larger than usual, the tiers scroll instead, at that size, the
+// foot staying put under them (so what the pig or the balloon says is always
+// in reach). Each tab opens scrolled to its top.
 export type TierKey = 'free' | 'seasonal' | Tier;
 const ORDER: TierKey[] = ['free', 'seasonal', 'common', 'rare', 'premium'];
 const LABELS: Record<TierKey, string> = { free: 'Free', seasonal: 'In season', common: 'Common', rare: 'Rare', premium: 'Premium' };
@@ -109,20 +111,36 @@ export function TierPages<K extends string>({ pages, open, count = wonOf }: { pa
     );
   });
 
-  const body = (
+  const foot = page.foot ? (
+    <View onLayout={onFoot} style={[styles.foot, { paddingTop: ui.sp(6) }]}>
+      {page.foot}
+    </View>
+  ) : null;
+  const body = fit.fits ? (
     <View style={styles.flex}>
       <View style={page.foot ? { paddingBottom: ui.sp(6) } : undefined}>{tiers}</View>
-      {page.foot ? (
-        <View onLayout={onFoot} style={[styles.foot, { paddingTop: ui.sp(6) }]}>
-          {page.foot}
-        </View>
-      ) : null}
+      {foot}
+    </View>
+  ) : (
+    // Too many to fit: the tiers scroll, the foot stays under them.
+    <View style={styles.flex}>
+      <ScrollView
+        key={page.key}
+        style={styles.flex}
+        contentContainerStyle={page.foot ? { paddingBottom: ui.sp(6) } : undefined}
+        showsVerticalScrollIndicator
+        persistentScrollbar
+        keyboardShouldPersistTaps="handled"
+      >
+        {tiers}
+      </ScrollView>
+      {foot}
     </View>
   );
 
   return (
     <View style={styles.flex} onLayout={onBox} accessibilityLabel={page.label}>
-      {box.w ? (fit.fits ? body : <FitBox align="top" style={styles.flex}>{body}</FitBox>) : null}
+      {box.w ? body : null}
     </View>
   );
 }

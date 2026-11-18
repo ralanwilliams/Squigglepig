@@ -77,7 +77,6 @@ export default function Guessing() {
       hold={resuming}
       top={
         <PigInput
-          style={styles.fill}
           placeholder={blank ? 'Something to draw' : 'Your guess'}
           value={guess}
           onChangeText={setGuess}

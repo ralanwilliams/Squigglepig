@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { DrawingImage } from './DrawingImage';
-import { PigFace } from './PigRoster';
+import { PigFace, PIG_FACE_ASPECT } from './PigRoster';
+import { PigShine, fireworkLights, fireworksEnd, useFireworksClock } from './Fireworks';
 import { SOUNDS } from '../assets/assets';
 import { playSound } from '../lib/sound';
 import { SPACE } from '../lib/drawing';
@@ -31,6 +32,10 @@ const SWAP_MS = 700; // the rows trading places
 const CROWN_AT = 3900; // the winner bursts out (or the tie shakes)
 const POP_MS = 500;
 export const PIG_OFF_SHOW_MS = CROWN_AT + POP_MS;
+// The fireworks for a winner start with the crown (the screen draws them over
+// everything: FireworksLayer in app/pigoff.tsx; their light falls on the
+// winner's pig here).
+export const PIG_OFF_FIREWORKS_AT = CROWN_AT;
 
 type Ease = (p: number) => number;
 const clamp = (p: number) => Math.max(0, Math.min(1, p));
@@ -83,6 +88,17 @@ export function PigOffResults({
   const swapped = along(t, SWAP_AT, SWAP_MS, inOut);
   const burst = along(t, CROWN_AT, POP_MS, back);
 
+  // The fireworks' light on the winner's pig, on their own clock from the
+  // crown (the same one the screen's fireworks run on). They go off in the
+  // whole screen, so each lights the side of the pig facing it: `lightAt` is
+  // where the pig is across the screen (0..1). The row's pig sits just past
+  // its rank: in the rail on the right with two panes, near the left edge in
+  // one column.
+  const fw = useFireworksClock(start + PIG_OFF_FIREWORKS_AT, fireworksEnd(), !!winner && !reduced);
+  const lights = fw >= 0 ? fireworkLights(fw) : [];
+  const pigInRow = ui.sp(10) + ui.sp(28) + ui.sp(10) + pigW / 2; // padding, rank, gap, half the pig
+  const lightAt = ((ui.twoPane ? ui.insets.left + ui.w - ui.pad - ui.railW : ui.insets.left + ui.pad) + pigInRow) / (ui.w + ui.insets.left + ui.insets.right);
+
   return (
     <View style={{ height: players.length * (rowH + gap) - gap }} accessible accessibilityLabel={summary(ranked, matches, winner)}>
       {players.map((name, i) => {
@@ -120,7 +136,14 @@ export function PigOffResults({
             <Text style={[styles.rank, isWinner && styles.winnerText, { width: ui.sp(28), fontSize: ui.f(isWinner ? 22 : 16) }]} maxFontSizeMultiplier={FONT_CAP}>
               {isWinner ? '👑' : t >= SWAP_AT + SWAP_MS ? `${finished + 1}` : ''}
             </Text>
-            <PigFace avatar={avatars[name]} w={pigW} />
+            {name === winner ? (
+              <View style={{ width: pigW, height: pigW / PIG_FACE_ASPECT }}>
+                <PigFace avatar={avatars[name]} w={pigW} />
+                <PigShine w={pigW} h={pigW / PIG_FACE_ASPECT} lights={lights} at={lightAt} />
+              </View>
+            ) : (
+              <PigFace avatar={avatars[name]} w={pigW} />
+            )}
             <Text
               style={[styles.name, isWinner && styles.winnerText, { fontSize: ui.f(16) }]}
               maxFontSizeMultiplier={FONT_CAP}

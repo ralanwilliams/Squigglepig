@@ -9,7 +9,9 @@ import { DEFAULT_SAY } from '../src/avatar/bubbles';
 import { PLACES, partsOf, placeOf, type Place, type ThemePart } from '../src/avatar/themeParts';
 import { Card, RewardTile } from '../src/rewards/RewardTile';
 import { propThumb } from '../src/rewards/RewardThumb';
-import { BUBBLE_MAX, rewardById, rewardsOf, slotOf, type Reward } from '../src/rewards/catalog';
+import { BALLOON, BUBBLE_MAX, rewardById, rewardsOf, slotOf, type Reward } from '../src/rewards/catalog';
+import { CelebrationLayer } from '../src/components/Celebration';
+import { BALLOON_SAY } from '../src/components/Balloon';
 import { cleanBubbleText, useInventory } from '../src/rewards/inventory';
 import { useSkin, useTheme } from '../src/theme/theme';
 import { UNLOCKABLE, type Skin } from '../src/theme/skins';
@@ -37,6 +39,10 @@ import { useUi } from '../src/theme/responsive';
 //   Feet     what's at its feet, and the ankle cast
 //   Sky      what floats about it: bats, clouds, birds, fireworks…
 //   Bubble   the speech bubbles, one at a time, and what the bubble says
+//   Celebrations  what plays over the scoreboard when the player wins a game
+//                 outright (catalog.ts CELEBRATIONS), one at a time; putting
+//                 one on plays it here once, over the screen, to see it; and
+//                 what the Balloon's balloon says, kept as the bubble's is
 //
 // A tab with nothing in it isn't shown. Each counts how many of its cards are
 // the player's (out of all of them), and a dot marks each tab with
@@ -49,7 +55,7 @@ import { useUi } from '../src/theme/responsive';
 // The bubble's words are kept as typed while the field is in use, and saved
 // (cleaned: one line, at most BUBBLE_MAX characters) when it's left or the
 // screen is, so a space typed at the end isn't trimmed away mid-word.
-type TabKey = Place | 'bubble';
+type TabKey = Place | 'bubble' | 'celebration';
 const TAB_LABELS: Record<TabKey, string> = {
   head: 'Head',
   eyes: 'Face',
@@ -58,7 +64,16 @@ const TAB_LABELS: Record<TabKey, string> = {
   feet: 'Feet',
   sky: 'Sky',
   bubble: 'Bubble',
+  celebration: 'Celebrations',
 };
+// A tab is 72 dp across (FolderTabs): too narrow for "Celebrations" beside
+// the dot that marks one on, so its tab says less. The page keeps the name.
+const TAB_SHORT: Partial<Record<TabKey, string>> = { celebration: 'Celebrate' };
+// The tabs that pick one reward of their kind (inventory.tsx choose), rather
+// than a place on the pig.
+const PICK_ONE = ['bubble', 'celebration'] as const;
+type PickOne = (typeof PICK_ONE)[number];
+const isPickOne = (k: TabKey): k is PickOne => (PICK_ONE as readonly TabKey[]).includes(k);
 
 // A theme's tier: a won one's own (catalog.ts), the holiday's In season.
 const tierOfSkin = (skin: Skin): TierKey => {
@@ -69,7 +84,7 @@ const tierOfSkin = (skin: Skin): TierKey => {
 export default function Pig() {
   const ui = useUi();
   const dark = useTheme().name === 'dark';
-  const { owns, worn, wear, chosen, choose, setPart, showPart, bubbleText, setBubbleText } = useInventory();
+  const { owns, worn, wear, chosen, choose, setPart, showPart, bubbleText, setBubbleText, balloonText, setBalloonText } = useInventory();
   const showing = useSkin();
   const themes = useThemeSkins();
   const mine = useMyAvatar();
@@ -77,14 +92,24 @@ export default function Pig() {
   const latest = useRef(draft);
   latest.current = draft;
   useEffect(() => () => setBubbleText(latest.current), [setBubbleText]);
+  // The balloon's words, kept the same way.
+  const [cheer, setCheer] = useState(balloonText);
+  const latestCheer = useRef(cheer);
+  latestCheer.current = cheer;
+  useEffect(() => () => setBalloonText(latestCheer.current), [setBalloonText]);
 
   const avatar = useMemo(() => ({ ...mine, say: cleanBubbleText(draft) }), [mine, draft]);
-  const bubble = chosen('bubble');
+  // When a celebration was last put on here, to play it once over the screen.
+  const [preview, setPreview] = useState(0);
 
   const tile = (r: Reward): TierCard => {
     const owned = owns(r.id);
-    const on = r.kind === 'outfit' ? worn.includes(r.id) : bubble === r.id;
-    const toggle = () => (r.kind === 'outfit' ? wear(r.id, !on) : choose('bubble', on ? null : r.id));
+    const on = r.kind === 'outfit' ? worn.includes(r.id) : chosen(r.kind) === r.id;
+    const toggle = () => {
+      if (r.kind === 'outfit') return wear(r.id, !on);
+      choose(r.kind, on ? null : r.id);
+      if (r.kind === 'celebration' && !on) setPreview(Date.now());
+    };
     return {
       key: r.id,
       tier: r.tier,
@@ -153,18 +178,26 @@ export default function Pig() {
         .map((part) => ({ place: placeOf(part.key), on: partSource(mine, showing, part.key) === s.id, card: themeTile(s, part) }))
     ),
   ];
-  const keys: TabKey[] = [...PLACES.filter((p) => items.some((i) => i.place === p)), 'bubble'];
+  const keys: TabKey[] = [...PLACES.filter((p) => items.some((i) => i.place === p)), ...PICK_ONE];
   const [tab, setTab] = useState<TabKey>('head');
   const open = keys.includes(tab) ? tab : keys[0];
-  const isOn = (k: TabKey) => (k === 'bubble' ? !!bubble : items.some((i) => i.place === k && i.on));
-  // A tab's cards: the speech bubbles, or what goes in that place. Its tab
-  // counts the ones the player has (a theme's parts are all theirs).
-  const cardsOf = (k: TabKey): TierCard[] => (k === 'bubble' ? rewardsOf('bubble').map(tile) : items.filter((i) => i.place === k).map((i) => i.card));
+  const isOn = (k: TabKey) => (isPickOne(k) ? !!chosen(k) : items.some((i) => i.place === k && i.on));
+  // A tab's cards: the speech bubbles or celebrations, or what goes in that
+  // place. Its tab counts the ones the player has (a theme's parts are all theirs).
+  const cardsOf = (k: TabKey): TierCard[] => (isPickOne(k) ? rewardsOf(k).map(tile) : items.filter((i) => i.place === k).map((i) => i.card));
+  const celebrate = chosen('celebration');
 
   return (
     <Stage
       menu
       focus={<WinnerPig avatar={avatar} />}
+      // A celebration just put on: a taste of it over the screen, as the
+      // scoreboard will play it (CelebrationLayer `preview`).
+      overlay={
+        preview && celebrate ? (
+          <CelebrationLayer key={`${celebrate}${preview}`} id={celebrate} from={preview} say={cleanBubbleText(cheer)} preview />
+        ) : null
+      }
       actionsFill
       actions={
         <FolderTabs
@@ -173,7 +206,7 @@ export default function Pig() {
             const owned = cards.filter((c) => c.owned).length;
             return {
               key: k,
-              label: TAB_LABELS[k],
+              label: TAB_SHORT[k] ?? TAB_LABELS[k],
               count: { text: `${owned} / ${cards.length}`, spoken: `${owned} of ${cards.length} unlocked` },
               marked: isOn(k) ? { spoken: 'on your pig' } : undefined,
             };
@@ -197,6 +230,20 @@ export default function Pig() {
                     maxLength={BUBBLE_MAX}
                     autoCapitalize="sentences"
                     accessibilityLabel="What your pig says"
+                  />
+                ) : k === 'celebration' ? (
+                  <PigInput
+                    placeholder={`What your balloon says (${BALLOON_SAY})`}
+                    value={cheer}
+                    onChangeText={setCheer}
+                    onEndEditing={() => {
+                      setBalloonText(cheer);
+                      // The balloon's on: drop it again, to see the new words on it.
+                      if (celebrate === BALLOON) setPreview(Date.now());
+                    }}
+                    maxLength={BUBBLE_MAX}
+                    autoCapitalize="sentences"
+                    accessibilityLabel="What your balloon says"
                   />
                 ) : undefined,
             }))}

@@ -3,18 +3,20 @@ import { StyleSheet, View } from 'react-native';
 import { Countdown, useDeadline } from './Countdown';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
-import { KeyboardLift } from './KeyboardLift';
+import { KeyboardLift, useKeyboardInset } from './KeyboardLift';
 import { PeekPig, peekPigHeight } from './PeekPig';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
 
-// The layout shared by the two "work" screens — drawing and guessing — so that
-// moving from one to the other doesn't feel like a jump. The rail is pinned to
-// the top, every slot has a fixed height, and both screens scale by the same
-// factor (see `fixedH`), so the pig, the timer, the top element and the primary
-// button sit on exactly the same pixels on both; only what comes after them
-// (Leave) differs.
+// The layout shared by the "work" screens — prompts, drawing and guessing — so
+// that moving from one to the next doesn't feel like a jump. The rail is
+// centred in its column, every slot has a fixed height, and every screen scales
+// by the same factor (see `fixedH`), so the pig, the timer, the top element and
+// the primary button sit on exactly the same pixels on each; only what comes
+// after them (Leave) differs. With a keyboard up the rail goes to the top
+// instead, so the text box stays clear of it (on its side, an iPhone doesn't
+// shrink the screen for the keyboard, and nothing slides it up).
 //
 // Rail, top to bottom:
 //   [ pig ........ ][ timer ]   the pig peeks up from BEHIND the element below,
@@ -27,8 +29,10 @@ import { useThemedStyles } from '../theme/theme';
 // In one column the same header sits above the focus, and the secondary buttons
 // share a row with the primary so the button row stays at the same height too.
 
-// Height of the top-element slot, in base dp (scaled by the UI scale).
-export const TOP_H = 60;
+// Height of the top-element slot, in base dp (scaled by the UI scale): the
+// standard input height (PigInput's minHeight), so the prompt and guess boxes
+// match every other input and the drawing screen's card matches them.
+export const TOP_H = 44;
 // The pig's share of the rail width (after the left inset).
 const PIG_SHARE = 0.55;
 // How far (base dp) the pig's hooves overlap the element below.
@@ -64,6 +68,7 @@ export function WorkStage({
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const keyboard = useKeyboardInset();
 
   // The deadline is kept here (useDeadline): the rail below is rebuilt (and
   // the Countdown remounted) whenever the layout flips between one and two
@@ -107,13 +112,9 @@ export function WorkStage({
   const slotH = ui.sp(TOP_H);
   const gap = ui.sp(12);
 
-  // Two-pane: the rail starts a little below the row's top so the pig's ears
-  // sit level with the top edge of the canvas / drawing beside it.
-  const railTop = ui.sp(16);
-
-  // Height of the TALLER variant (with secondary buttons). Handing it to both
-  // rails makes FitBox pick the same scale on both screens, so nothing shifts.
-  const fixedH = railTop + rowH + slotH + gap + ui.sp(44) + gap + ui.sp(44) + gap + ui.sp(36);
+  // Height of the TALLER variant (with secondary buttons). Handing it to every
+  // rail makes FitBox pick the same scale on each screen, so nothing shifts.
+  const fixedH = rowH + slotH + gap + ui.sp(44) + gap + ui.sp(44) + gap + ui.sp(36);
 
   const head = (
     <View>
@@ -142,8 +143,9 @@ export function WorkStage({
         <KeyboardLift enabled={!ui.landscape} gap={gap}>
           <View style={[styles.row, { padding: ui.pad, gap: ui.gap }]}>
             <View style={styles.focus}>{focus}</View>
-            <FitBox align="top" minContentH={fixedH} style={{ width: railW }}>
-              <View style={{ gap, paddingTop: railTop }}>
+            {/* The rail's items are centred in its column, or at its top with a keyboard up. */}
+            <FitBox align={keyboard > 0 ? 'top' : 'center'} minContentH={fixedH} style={{ width: railW }}>
+              <View style={{ gap }}>
                 {head}
                 {primary}
                 {secondaryRow.length ? (
