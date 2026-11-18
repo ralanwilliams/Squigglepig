@@ -31,6 +31,10 @@ import { useThemedStyles } from '../theme/theme';
 // (MenuDrawer.tsx), across from the sound and dark-mode switches; the band
 // already keeps clear of both corners.
 //
+// `overlay` goes over the whole screen, edge to edge (safe areas too), above
+// everything else on it: a celebration such as the Pig Off's fireworks. It
+// should let touches through (pointerEvents="none").
+//
 // When a keyboard opens, nothing scrolls. Held upright, the whole screen slides
 // up with the keyboard until the text boxes, and the controls under them when
 // there's room (Join's Lobby button, Create's Create), sit just above it
@@ -45,6 +49,7 @@ export function Stage({
   actionsAlign = 'center',
   actionsFill,
   menu,
+  overlay,
 }: {
   header?: React.ReactNode;
   focus: React.ReactNode;
@@ -53,6 +58,7 @@ export function Stage({
   actionsAlign?: 'center' | 'top';
   actionsFill?: boolean;
   menu?: boolean;
+  overlay?: React.ReactNode;
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
@@ -123,6 +129,11 @@ export function Stage({
         </KeyboardLift>
       </KeyboardAvoidingView>
       {menu ? <MenuButton /> : null}
+      {overlay ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          {overlay}
+        </View>
+      ) : null}
     </View>
   );
 }

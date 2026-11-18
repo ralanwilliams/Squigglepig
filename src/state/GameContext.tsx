@@ -277,6 +277,9 @@ type Game = {
   pigOff: PigOff | null;
   stageStart: number;
   submitPigOff: (strokes: string[]) => void;
+  // Dev builds only (undefined otherwise): from the lobby, straight into a
+  // Pig Off between this player and `name` (devTieWith).
+  devTieWith?: (name: string) => void;
 };
 
 const GameCtx = createContext<Game | null>(null);
@@ -1115,6 +1118,35 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     send('pigoff-drawing', { round: roundRef.current, attempt: po.attempt, name: usernameRef.current, strokes });
     touchRoom(roomRef.current);
   };
+
+  // Dev builds only (the ghost players' panel, src/dev/local): straight from
+  // the lobby into a Pig Off between this player (the host) and `name`, both
+  // on the points to win, to test it without playing a whole game. The room
+  // is closed to newcomers as a real start does. This phone opens the Pig
+  // Off itself rather than waiting for its own message back, which a phone
+  // in the lobby would take as a game it missed the start of; when the echo
+  // does come, it's already there and ignores it.
+  const devTieWith = __DEV__
+    ? async (name: string) => {
+        const code = roomRef.current;
+        const me = usernameRef.current;
+        // From the lobby, or back in it after a game (still 'gameover' there, as startGame allows).
+        const p = phaseRef.current;
+        if (!code || (p !== 'lobby' && p !== 'gameover') || !actsForClock() || !orderedNames().includes(name)) return;
+        if (!(await startGameOnServer(code))) {
+          showToast('Couldn’t start the Pig Off. Check your connection and try again.', 3000);
+          return;
+        }
+        if (code !== roomRef.current) return;
+        dbPhaseRef.current = 'playing';
+        scoresRef.current = { [me]: targetRef.current, [name]: targetRef.current };
+        setScores({ ...scoresRef.current });
+        const players = [me, name];
+        const entry = pigOffEntry(pigOffUsedRef.current);
+        send('pigoff', { round: roundRef.current, attempt: 1, players, entry });
+        onPigOff(1, players, entry);
+      }
+    : undefined;
 
   // Who is responsible for chain c this stage (the inverse of chainForStage).
   const assignedPlayer = (c: number, s: number) => playerForChain(rosterRef.current, c, s);
@@ -2363,6 +2395,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         pigOff,
         stageStart,
         submitPigOff,
+        devTieWith,
       }}
     >
       {children}

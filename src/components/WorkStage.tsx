@@ -27,8 +27,10 @@ import { useThemedStyles } from '../theme/theme';
 // In one column the same header sits above the focus, and the secondary buttons
 // share a row with the primary so the button row stays at the same height too.
 
-// Height of the top-element slot, in base dp (scaled by the UI scale).
-export const TOP_H = 60;
+// Height of the top-element slot, in base dp (scaled by the UI scale): the
+// standard input height (PigInput's minHeight), so the prompt and guess boxes
+// match every other input and the drawing screen's card matches them.
+export const TOP_H = 44;
 // The pig's share of the rail width (after the left inset).
 const PIG_SHARE = 0.55;
 // How far (base dp) the pig's hooves overlap the element below.
@@ -107,13 +109,9 @@ export function WorkStage({
   const slotH = ui.sp(TOP_H);
   const gap = ui.sp(12);
 
-  // Two-pane: the rail starts a little below the row's top so the pig's ears
-  // sit level with the top edge of the canvas / drawing beside it.
-  const railTop = ui.sp(16);
-
-  // Height of the TALLER variant (with secondary buttons). Handing it to both
-  // rails makes FitBox pick the same scale on both screens, so nothing shifts.
-  const fixedH = railTop + rowH + slotH + gap + ui.sp(44) + gap + ui.sp(44) + gap + ui.sp(36);
+  // Height of the TALLER variant (with secondary buttons). Handing it to every
+  // rail makes FitBox pick the same scale on each screen, so nothing shifts.
+  const fixedH = rowH + slotH + gap + ui.sp(44) + gap + ui.sp(44) + gap + ui.sp(36);
 
   const head = (
     <View>
@@ -142,8 +140,9 @@ export function WorkStage({
         <KeyboardLift enabled={!ui.landscape} gap={gap}>
           <View style={[styles.row, { padding: ui.pad, gap: ui.gap }]}>
             <View style={styles.focus}>{focus}</View>
-            <FitBox align="top" minContentH={fixedH} style={{ width: railW }}>
-              <View style={{ gap, paddingTop: railTop }}>
+            {/* The rail's items are centred in its column. */}
+            <FitBox minContentH={fixedH} style={{ width: railW }}>
+              <View style={{ gap }}>
                 {head}
                 {primary}
                 {secondaryRow.length ? (
