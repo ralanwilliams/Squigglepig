@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { UNLOCKABLE, type ArtName, type Placement, type Skin } from '../theme/skins';
 import { cleanBubbleText, useInventory } from '../rewards/inventory';
-import { oneEach, slotOf } from '../rewards/catalog';
+import { oneEach, rewardById, slotOf } from '../rewards/catalog';
 import { useSkin, useThemeMode } from '../theme/theme';
 import { onHead, parsePart, partOf, placementsOf } from './themeParts';
 import { OUTFITS, outfitOn } from './outfits';
@@ -24,9 +24,23 @@ import { BUBBLES, BUBBLE_AT, DEFAULT_SAY, underBubble } from './bubbles';
 // bubble's length. An app from before avatars sends none, and its player's
 // pig is undressed; one from before slots sends a single `outfit`, and one
 // from before theme parts wears and hides none.
-export type Avatar = { outfits: string[]; bubble: string | null; say: string; theme: string[]; hide: string[] };
+//
+// `celebrate` is the celebration they chose (catalog.ts CELEBRATIONS), played
+// over the scoreboard for everyone when they win outright, or null. One this
+// app doesn't know is dropped, so an app from before celebrations (which
+// sends none, and drops this one's) simply has none to play. `cheer` is
+// what the Balloon celebration's balloon says (cleaned like `say`).
+export type Avatar = {
+  outfits: string[];
+  bubble: string | null;
+  say: string;
+  theme: string[];
+  hide: string[];
+  celebrate: string | null;
+  cheer: string;
+};
 
-export const NO_AVATAR: Avatar = { outfits: [], bubble: null, say: '', theme: [], hide: [] };
+export const NO_AVATAR: Avatar = { outfits: [], bubble: null, say: '', theme: [], hide: [], celebrate: null, cheer: '' };
 
 // A part's key (themeParts.ts partOf): a word, and there are only a few.
 const PART = /^[A-Za-z]{1,32}$/;
@@ -52,7 +66,9 @@ export function cleanAvatar(raw: unknown): Avatar {
     })
     .slice(0, MAX_PARTS);
   const hide = strings(a.hide).filter((k) => PART.test(k)).slice(0, MAX_PARTS);
-  return { outfits, bubble, say, theme, hide };
+  const celebrate = typeof a.celebrate === 'string' && rewardById(a.celebrate)?.kind === 'celebration' ? a.celebrate : null;
+  const cheer = typeof a.cheer === 'string' ? cleanBubbleText(a.cheer) : '';
+  return { outfits, bubble, say, theme, hide, celebrate, cheer };
 }
 
 // An avatar as it's sent: `outfits` for this app, and `outfit`, the first of
@@ -74,10 +90,11 @@ export function useThemeSkins(): Skin[] {
 // This player's own avatar: what they've won and put on, and what they've
 // taken off the theme showing now.
 export function useMyAvatar(): Avatar {
-  const { worn, chosen, bubbleText, parts, hiddenFor } = useInventory();
+  const { worn, chosen, bubbleText, balloonText, parts, hiddenFor } = useInventory();
   const showing = useSkin();
   const usable = useThemeSkins();
   const bubble = chosen('bubble');
+  const celebrate = chosen('celebration');
   // Joined, so the memo below only reruns when they change.
   const theme = parts.filter((id) => usable.some((s) => id.startsWith(`${s.id}:`) && s !== showing)).join(' ');
   const hide = (showing ? hiddenFor(showing.id) : []).join(' ');
@@ -89,8 +106,10 @@ export function useMyAvatar(): Avatar {
         say: bubbleText,
         theme: theme ? theme.split(' ') : [],
         hide: hide ? hide.split(' ') : [],
+        celebrate,
+        cheer: balloonText,
       }),
-    [worn, bubble, bubbleText, theme, hide]
+    [worn, bubble, bubbleText, theme, hide, celebrate, balloonText]
   );
 }
 
@@ -113,7 +132,7 @@ export function avatarDecor(
 ): { extra: Placement[]; omit?: (p: Placement) => boolean } {
   const wanted = (key: string) => !headOnly || onHead(key);
   const worn = a.outfits.filter((id) => wanted(slotOf(id) ?? ''));
-  const outfits = worn.map((id) => outfitOn(id, art)).filter((p) => !!p);
+  const outfits = worn.flatMap((id) => outfitOn(id, art));
   const bubble = a.bubble && art === 'winner' && !headOnly ? BUBBLES[a.bubble] : undefined;
   const parts = a.theme.map(parsePart).filter((p) => !!p && wanted(p.key)) as { skin: Skin; key: string }[];
   const hide = a.hide.filter(wanted);

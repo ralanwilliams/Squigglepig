@@ -1132,19 +1132,24 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         const me = usernameRef.current;
         // From the lobby, or back in it after a game (still 'gameover' there, as startGame allows).
         const p = phaseRef.current;
-        if (!code || (p !== 'lobby' && p !== 'gameover') || !actsForClock() || !orderedNames().includes(name)) return;
-        if (!(await startGameOnServer(code))) {
-          showToast('Couldn’t start the Pig Off. Check your connection and try again.', 3000);
-          return;
+        if (!code || startingRef.current || (p !== 'lobby' && p !== 'gameover') || !actsForClock() || !orderedNames().includes(name)) return;
+        startingRef.current = true; // a second tap while this one's on its way does nothing
+        try {
+          if (!(await startGameOnServer(code))) {
+            showToast('Couldn’t start the Pig Off. Check your connection and try again.', 3000);
+            return;
+          }
+          if (code !== roomRef.current) return;
+          dbPhaseRef.current = 'playing';
+          scoresRef.current = { [me]: targetRef.current, [name]: targetRef.current };
+          setScores({ ...scoresRef.current });
+          const players = [me, name];
+          const entry = pigOffEntry(pigOffUsedRef.current);
+          send('pigoff', { round: roundRef.current, attempt: 1, players, entry });
+          onPigOff(1, players, entry);
+        } finally {
+          startingRef.current = false;
         }
-        if (code !== roomRef.current) return;
-        dbPhaseRef.current = 'playing';
-        scoresRef.current = { [me]: targetRef.current, [name]: targetRef.current };
-        setScores({ ...scoresRef.current });
-        const players = [me, name];
-        const entry = pigOffEntry(pigOffUsedRef.current);
-        send('pigoff', { round: roundRef.current, attempt: 1, players, entry });
-        onPigOff(1, players, entry);
       }
     : undefined;
 

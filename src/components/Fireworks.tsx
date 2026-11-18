@@ -202,7 +202,16 @@ const hex = (hue: number, s: number, l: number) => {
   return `#${f(0)}${f(8)}${f(4)}`;
 };
 
+// Gradient ids of its own for each drawing: on the web every <svg> shares one
+// document, and the Pig Off fading into the scoreboard shows two nights at once.
+let nextId = 0;
+function useSvgId() {
+  const [id] = useState(() => `fireworks-${++nextId}`);
+  return id;
+}
+
 export function NightSky({ t, w, h, opacity }: { t: number; w: number; h: number; opacity: number }) {
+  const id = useSvgId();
   if (opacity <= 0.01 || w <= 0 || h <= 0) return null;
   const pools = [0, 1, 2].map((i) => ({
     cx: w * (0.5 + 0.38 * Math.sin(t / 2600 + i * 2.1)),
@@ -215,14 +224,14 @@ export function NightSky({ t, w, h, opacity }: { t: number; w: number; h: number
       <Svg width={w} height={h}>
         <Defs>
           {pools.map((p, i) => (
-            <RadialGradient key={i} id={`pool${i}`} cx="50%" cy="50%" r="50%">
+            <RadialGradient key={i} id={`${id}-pool${i}`} cx="50%" cy="50%" r="50%">
               <Stop offset="0" stopColor={p.color} stopOpacity={0.32} />
               <Stop offset="1" stopColor={p.color} stopOpacity={0} />
             </RadialGradient>
           ))}
         </Defs>
         {pools.map((p, i) => (
-          <Ellipse key={i} cx={p.cx} cy={p.cy} rx={r} ry={r * 0.75} fill={`url(#pool${i})`} />
+          <Ellipse key={i} cx={p.cx} cy={p.cy} rx={r} ry={r * 0.75} fill={`url(#${id}-pool${i})`} />
         ))}
       </Svg>
     </View>
@@ -308,20 +317,21 @@ const SPOTS = [
 // `lights` as fireworkLights gives them; `at` is where the pig's middle is
 // across the same box (0..1), so each burst lights the side facing it.
 export function PigShine({ w, h, lights, at }: { w: number; h: number; lights: Light[]; at: number }) {
+  const id = useSvgId();
   if (!lights.length) return null;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { width: w, height: h }]}>
       <Svg width={w} height={h} viewBox={VIEW} preserveAspectRatio="none">
         <Defs>
           {lights.map((l, i) => (
-            <RadialGradient key={i} id={`wash${i}`} cx="50%" cy="45%" r="50%" fx={`${50 + 28 * Math.sign(l.x - at)}%`} fy="30%">
+            <RadialGradient key={i} id={`${id}-wash${i}`} cx="50%" cy="45%" r="50%" fx={`${50 + 28 * Math.sign(l.x - at)}%`} fy="30%">
               <Stop offset="0" stopColor={l.color} stopOpacity={0.55 * l.strength} />
               <Stop offset="0.7" stopColor={l.color} stopOpacity={0.22 * l.strength} />
               <Stop offset="1" stopColor={l.color} stopOpacity={0} />
             </RadialGradient>
           ))}
           {lights.map((l, i) => (
-            <RadialGradient key={`g${i}`} id={`glint${i}`} cx="50%" cy="50%" r="50%">
+            <RadialGradient key={`g${i}`} id={`${id}-glint${i}`} cx="50%" cy="50%" r="50%">
               <Stop offset="0" stopColor="#FFFFFF" stopOpacity={1} />
               <Stop offset="0.45" stopColor={l.color} stopOpacity={0.9} />
               <Stop offset="1" stopColor={l.color} stopOpacity={0} />
@@ -332,8 +342,8 @@ export function PigShine({ w, h, lights, at }: { w: number; h: number; lights: L
           const side = Math.max(-1, Math.min(1, (l.x - at) * 3)); // −1 well to the left … 1 well to the right
           return (
             <React.Fragment key={i}>
-              <Ellipse {...HEAD} fill={`url(#wash${i})`} />
-              <Ellipse {...BODY} fill={`url(#wash${i})`} />
+              <Ellipse {...HEAD} fill={`url(#${id}-wash${i})`} />
+              <Ellipse {...BODY} fill={`url(#${id}-wash${i})`} />
               {SPOTS.map((s, j) => {
                 const facing = 0.35 + 0.65 * Math.max(0, side * s.side);
                 return (
@@ -344,7 +354,7 @@ export function PigShine({ w, h, lights, at }: { w: number; h: number; lights: L
                     rx={s.rx * 1.6}
                     ry={s.ry * 1.3}
                     transform={`rotate(${s.rot} ${s.cx} ${s.cy})`}
-                    fill={`url(#glint${i})`}
+                    fill={`url(#${id}-glint${i})`}
                     opacity={Math.min(1, l.strength * facing * 1.2)}
                   />
                 );

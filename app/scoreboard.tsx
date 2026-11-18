@@ -7,6 +7,7 @@ import { AvatarRow } from '../src/components/AvatarRow';
 import { NO_AVATAR } from '../src/avatar/avatar';
 import { Heading } from '../src/components/Heading';
 import { FireworksLayer, ENCORE_BURSTS, ENCORE_PERIOD } from '../src/components/Fireworks';
+import { CelebrationLayer } from '../src/components/Celebration';
 import { PigButton } from '../src/components/PigButton';
 import { SOUNDS } from '../src/assets/assets';
 import { playSound } from '../src/lib/sound';
@@ -144,16 +145,18 @@ export default function Scoreboard() {
   );
 
   // Won in a Pig Off: the screen comes in from under the night the Pig Off
-  // ended in, and the fireworks keep going until everyone's left it.
-  const fireworks = !!pigOff?.winner && winners.includes(pigOff.winner);
-  return (
-    <Stage
-      header={header}
-      focus={focus}
-      actions={actions}
-      overlay={fireworks ? <FireworksLayer from={openedAt} bursts={ENCORE_BURSTS} period={ENCORE_PERIOD} night="lift" /> : null}
-    />
-  );
+  // ended in, and the fireworks keep going until everyone's left it. The
+  // winner's own celebration (Your pig) has no say in that, nor after a
+  // shared win: it plays only for a game won outright at the end of the
+  // regular game (Fireworks, Disco: CelebrationLayer), with no fall to black.
+  const pigOffWin = !!pigOff?.winner && winners.includes(pigOff.winner);
+  const celebrate = !pigOff && winners.length === 1 ? avatars[winners[0]]?.celebrate : null;
+  const overlay = pigOffWin ? (
+    <FireworksLayer from={openedAt} bursts={ENCORE_BURSTS} period={ENCORE_PERIOD} night="lift" />
+  ) : celebrate ? (
+    <CelebrationLayer id={celebrate} from={openedAt} say={avatars[winners[0]]?.cheer} />
+  ) : null;
+  return <Stage header={header} focus={focus} actions={actions} overlay={overlay} />;
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({

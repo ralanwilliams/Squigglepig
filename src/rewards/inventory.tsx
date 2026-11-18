@@ -30,9 +30,10 @@ type State = {
   parts: string[];
   hidden: string[];
   bubbleText: string;
+  balloonText: string;
 };
 
-const EMPTY: State = { owned: new Set(), chosen: {}, worn: [], parts: [], hidden: [], bubbleText: '' };
+const EMPTY: State = { owned: new Set(), chosen: {}, worn: [], parts: [], hidden: [], bubbleText: '', balloonText: '' };
 
 const keyOf = (part: string) => part.slice(part.indexOf(':') + 1);
 
@@ -61,7 +62,8 @@ function parse(raw: string | null): State {
     const parts = strings(saved?.parts);
     const hidden = strings(saved?.hidden);
     const bubbleText = typeof saved?.bubbleText === 'string' ? cleanBubbleText(saved.bubbleText) : '';
-    return { owned, chosen, worn, parts, hidden, bubbleText };
+    const balloonText = typeof saved?.balloonText === 'string' ? cleanBubbleText(saved.balloonText) : '';
+    return { owned, chosen, worn, parts, hidden, bubbleText, balloonText };
   } catch {
     return EMPTY;
   }
@@ -104,6 +106,10 @@ type InventoryCtx = {
   // even while no bubble is chosen, so switching bubbles keeps the words.
   bubbleText: string;
   setBubbleText: (text: string) => void;
+  // What the Balloon celebration's balloon says (catalog.ts BALLOON), cleaned
+  // the same way as the bubble's, and kept the same way.
+  balloonText: string;
+  setBalloonText: (text: string) => void;
   // Forget everything (the Rewards screen offers it in development builds).
   reset: () => void;
 };
@@ -139,6 +145,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         parts: next.parts,
         hidden: next.hidden,
         bubbleText: next.bubbleText,
+        balloonText: next.balloonText,
       })
     ).catch(() => {});
   }, []);
@@ -219,6 +226,15 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     [commit]
   );
 
+  const setBalloonText = useCallback(
+    (text: string) => {
+      const s = latest.current;
+      const balloonText = cleanBubbleText(text);
+      if (balloonText !== s.balloonText) commit({ ...s, balloonText });
+    },
+    [commit]
+  );
+
   const reset = useCallback(() => commit(EMPTY), [commit]);
 
   const value = useMemo<InventoryCtx>(
@@ -245,9 +261,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       resetLook,
       bubbleText: state.bubbleText,
       setBubbleText,
+      balloonText: state.balloonText,
+      setBalloonText,
       reset,
     }),
-    [state, grant, choose, wear, setPart, showPart, resetLook, setBubbleText, reset]
+    [state, grant, choose, wear, setPart, showPart, resetLook, setBubbleText, setBalloonText, reset]
   );
 
   return <Ctx.Provider value={value}>{loaded ? children : null}</Ctx.Provider>;

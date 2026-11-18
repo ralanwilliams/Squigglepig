@@ -32,8 +32,9 @@ const SWAP_MS = 700; // the rows trading places
 const CROWN_AT = 3900; // the winner bursts out (or the tie shakes)
 const POP_MS = 500;
 export const PIG_OFF_SHOW_MS = CROWN_AT + POP_MS;
-// The fireworks for a winner start with the crown (the screen draws them in
-// its big pane: PigOffFireworks; their light falls on the winner's pig here).
+// The fireworks for a winner start with the crown (the screen draws them over
+// everything: FireworksLayer in app/pigoff.tsx; their light falls on the
+// winner's pig here).
 export const PIG_OFF_FIREWORKS_AT = CROWN_AT;
 
 type Ease = (p: number) => number;

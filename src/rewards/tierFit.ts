@@ -5,7 +5,8 @@
 // width, as many to a row as fit, and when a tab has more than the card holds,
 // the cards themselves shrink (`scale`), more to a row each time, to MIN_SCALE
 // at the least. Every tab of a screen gets the same size, its tallest tab's,
-// so the cards don't change size from tab to tab.
+// so the cards don't change size from tab to tab. Past that (`fits` false)
+// they stay at MIN_SCALE and the tab scrolls (TierPages.tsx).
 //
 // Plain arithmetic on the layout's own measures (dp), so it can be tested; the
 // component hands them in from the UI scale (TierPages.tsx).

@@ -29,7 +29,9 @@ export type Tier = 'common' | 'rare' | 'premium';
 // An outfit and a speech bubble dress the player's own pig: when they win a
 // game, everyone sees it on the scoreboard (a tie lines up every winner's
 // pig), saying what they wrote in the bubble (inventory.tsx bubbleText). No
-// bubble is free: a player without one won shows none.
+// bubble is free: a player without one won shows none. A celebration plays
+// over the scoreboard when this player wins a game outright (CELEBRATIONS,
+// below).
 export const KINDS = {
   theme: { label: 'Themes', glyph: 'palette', pick: 'one', none: 'Classic' },
   brush: { label: 'Brushes', glyph: 'brush', pick: 'any' },
@@ -37,13 +39,15 @@ export const KINDS = {
   tool: { label: 'Tools', glyph: 'slider', pick: 'any' },
   outfit: { label: 'Outfits', glyph: 'hat', pick: 'one', none: 'No outfit' },
   bubble: { label: 'Speech bubbles', glyph: 'bubble', pick: 'one', none: 'No bubble' },
+  celebration: { label: 'Celebrations', glyph: 'fireworks', pick: 'one', none: 'No celebration' },
 } as const satisfies Record<string, { label: string; glyph: GlyphName; pick: 'one' | 'any'; none?: string }>;
 
 export type Kind = keyof typeof KINDS;
 
 // The menu's Rewards rows that open a Rewards screen, each with just these
 // kinds' tabs (app/rewards.tsx ?group=), named in the menu by the label.
-// Outfits and speech bubbles are the menu's third row, Your pig (app/pig.tsx).
+// Outfits, speech bubbles and celebrations are the menu's third row, Your pig
+// (app/pig.tsx).
 // `go` names a button that opens the screen (homeOf, below). `show` is what
 // fills the art pane, beside the cards: a drawing canvas to try out the
 // brushes and stickers won ('canvas'), or the home screen's pig, dressed as
@@ -84,13 +88,16 @@ export type BrushReward = Base & { kind: 'brush'; color: string }; // ink on the
 export type StickerReward = Base & { kind: 'sticker' };
 export type ToolReward = Base & { kind: 'tool' };
 // Where an outfit goes on the pig. It wears one in each slot at once (a hat,
-// sunglasses and a bow tie), not two hats (inventory.tsx wear).
-export const OUTFIT_SLOTS = ['head', 'eyes', 'neck'] as const;
+// sunglasses, a bow tie and something in its hoof), not two hats
+// (inventory.tsx wear). 'hold' is a theme's held part's place too: one held
+// takes the other's place, as a hat and a theme's hat do.
+export const OUTFIT_SLOTS = ['head', 'eyes', 'neck', 'hold'] as const;
 export type OutfitSlot = (typeof OUTFIT_SLOTS)[number];
 
 export type OutfitReward = Base & { kind: 'outfit'; slot: OutfitSlot };
 export type BubbleReward = Base & { kind: 'bubble' };
-export type Reward = ThemeReward | BrushReward | StickerReward | ToolReward | OutfitReward | BubbleReward;
+export type CelebrationReward = Base & { kind: 'celebration' };
+export type Reward = ThemeReward | BrushReward | StickerReward | ToolReward | OutfitReward | BubbleReward | CelebrationReward;
 
 // The most a pig's speech bubble may say, in characters: about what fits on
 // one line of the bubble on the scoreboard (the same cap as a name on the
@@ -150,6 +157,7 @@ const OUTFITS: Entry<OutfitReward>[] = [
   { id: 'outfit.chefHat', label: "Chef's hat", tier: 'common', slot: 'head' },
   { id: 'outfit.shades', label: 'Sunglasses', tier: 'common', slot: 'eyes' },
   { id: 'outfit.bowTie', label: 'Bow tie', tier: 'common', slot: 'neck' },
+  { id: 'outfit.magicWand', label: 'Magic wand', tier: 'common', slot: 'hold' },
 ];
 
 // The shape of the pig's speech bubble; the words in it are the player's own.
@@ -162,6 +170,41 @@ const BUBBLES: Entry<BubbleReward>[] = [
   { id: 'bubble.scroll', label: 'Royal scroll', tier: 'rare' },
 ];
 
+// What plays over the scoreboard, for everyone in the room, when this player
+// wins a game outright: on their own, at the end of the regular game. Not
+// after a tie, settled by a Pig Off or shared: the Pig Off has its own
+// fireworks, and a shared win has no one winner. The player chooses one on
+// Your pig; it travels with their pig (src/avatar avatar.ts `celebrate`).
+//   Fireworks: the win's fireworks over the whole scoreboard, then an encore
+//              on a loop until everyone's left it (src/components/Fireworks.tsx);
+//              no fall to black, unlike the Pig Off's.
+//   Disco:     a mirror ball drops in from the top, turning, with beams of
+//              colored light swinging across the screen and its spots sliding
+//              over everything, until everyone's left (src/components/Disco.tsx).
+//   Rave:      neon laser fans from the four corners sweeping on a beat, the
+//              screen's edges glowing on it, glow sticks tumbling down; no
+//              strobe (src/components/Rave.tsx).
+//   Balloon:   a trap door opens in the top of the screen and a balloon drops
+//              out with the player's own words on it (like the speech
+//              bubble's: inventory.tsx balloonText), drifting down and away
+//              (src/components/Balloon.tsx).
+//   Doves:     a box in the bottom corner of the screen pops its lid and white
+//              doves fly out of it, up and away off the top of the screen
+//              (src/components/Doves.tsx).
+// Each is drawn by src/components/Celebration.tsx.
+export const BALLOON = 'celebration.balloon';
+export const DOVES = 'celebration.doves';
+export const FIREWORKS = 'celebration.fireworks';
+export const DISCO = 'celebration.disco';
+export const RAVE = 'celebration.rave';
+const CELEBRATIONS: Entry<CelebrationReward>[] = [
+  { id: BALLOON, label: 'Balloon', tier: 'common' },
+  { id: DOVES, label: 'Doves', tier: 'rare' },
+  { id: FIREWORKS, label: 'Fireworks', tier: 'premium' },
+  { id: DISCO, label: 'Disco', tier: 'premium' },
+  { id: RAVE, label: 'Rave', tier: 'premium' },
+];
+
 const tag = <R extends Reward>(kind: R['kind'], list: Entry<R>[]): R[] => list.map((r) => ({ ...r, kind }) as R);
 
 // Every reward, grouped by kind in KINDS order.
@@ -172,6 +215,7 @@ export const REWARDS: Reward[] = [
   ...tag<ToolReward>('tool', TOOLS),
   ...tag<OutfitReward>('outfit', OUTFITS),
   ...tag<BubbleReward>('bubble', BUBBLES),
+  ...tag<CelebrationReward>('celebration', CELEBRATIONS),
 ];
 
 const BY_ID = new Map(REWARDS.map((r) => [r.id, r]));

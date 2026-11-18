@@ -3,18 +3,20 @@ import { StyleSheet, View } from 'react-native';
 import { Countdown, useDeadline } from './Countdown';
 import { FitBox } from './FitBox';
 import { Backdrop } from './Backdrop';
-import { KeyboardLift } from './KeyboardLift';
+import { KeyboardLift, useKeyboardInset } from './KeyboardLift';
 import { PeekPig, peekPigHeight } from './PeekPig';
 import { useUi } from '../theme/responsive';
 import { type Theme } from '../theme/tokens';
 import { useThemedStyles } from '../theme/theme';
 
-// The layout shared by the two "work" screens — drawing and guessing — so that
-// moving from one to the other doesn't feel like a jump. The rail is pinned to
-// the top, every slot has a fixed height, and both screens scale by the same
-// factor (see `fixedH`), so the pig, the timer, the top element and the primary
-// button sit on exactly the same pixels on both; only what comes after them
-// (Leave) differs.
+// The layout shared by the "work" screens — prompts, drawing and guessing — so
+// that moving from one to the next doesn't feel like a jump. The rail is
+// centred in its column, every slot has a fixed height, and every screen scales
+// by the same factor (see `fixedH`), so the pig, the timer, the top element and
+// the primary button sit on exactly the same pixels on each; only what comes
+// after them (Leave) differs. With a keyboard up the rail goes to the top
+// instead, so the text box stays clear of it (on its side, an iPhone doesn't
+// shrink the screen for the keyboard, and nothing slides it up).
 //
 // Rail, top to bottom:
 //   [ pig ........ ][ timer ]   the pig peeks up from BEHIND the element below,
@@ -66,6 +68,7 @@ export function WorkStage({
 }) {
   const ui = useUi();
   const styles = useThemedStyles(makeStyles);
+  const keyboard = useKeyboardInset();
 
   // The deadline is kept here (useDeadline): the rail below is rebuilt (and
   // the Countdown remounted) whenever the layout flips between one and two
@@ -140,8 +143,8 @@ export function WorkStage({
         <KeyboardLift enabled={!ui.landscape} gap={gap}>
           <View style={[styles.row, { padding: ui.pad, gap: ui.gap }]}>
             <View style={styles.focus}>{focus}</View>
-            {/* The rail's items are centred in its column. */}
-            <FitBox minContentH={fixedH} style={{ width: railW }}>
+            {/* The rail's items are centred in its column, or at its top with a keyboard up. */}
+            <FitBox align={keyboard > 0 ? 'top' : 'center'} minContentH={fixedH} style={{ width: railW }}>
               <View style={{ gap }}>
                 {head}
                 {primary}

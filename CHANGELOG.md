@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0]
+
+### Added
+- Celebrations: prizes that play over the final scores, for everyone in the room, when you win a game outright. Choose one on Your pig, under a new Celebrate tab, and putting one on plays a taste of it. A game won in a Pig Off keeps the Pig Off's own fireworks, and a shared win has none. Players on an older version don't see yours. There are five:
+  - Balloon (common): trap doors swing open at the top of the screen and a balloon drops out with your own words on it, then drifts down and away. Type what it says on the Celebrate tab, as you do for your speech bubble
+  - Doves (rare): a box in the corner of the screen pops its lid and doves fly out of it and away
+  - Fireworks (premium): fireworks fill the screen, and keep going until everyone leaves the scores
+  - Disco (premium): a mirror ball drops in and turns, swinging beams of colored light across the screen
+  - Rave (premium): neon lasers sweep from the corners of the screen on a beat, with glow sticks tumbling down. There's no strobe
+- A magic wand (common) for your pig to hold, a classic black wand with a white tip, under Your pig's Holding tab. It takes the place of anything a theme puts in your pig's hoof, and the other way round
+- A Pig Off now opens with PIG and OFF! charging in from either side of the screen and butting heads, and the title stays at the top of the Pig Off in the same style
+- Winning a Pig Off sets off fireworks over the whole screen, lighting up the winner's pig. The screen then fades to black, and the final scores fade in under fireworks that keep going until everyone leaves
+
+### Changed
+- Before a Pig Off starts, "Get ready…" is now a countdown: "Starts in 5", 4, 3…
+- On the prompt, drawing and guessing screens, with your phone on its side (and on the web), the timer, the box under the pig and Submit sit in the middle of the right-hand side, instead of at its top. They go back to the top while the keyboard is up, so you can see what you're typing
+- The prompt and guess boxes are the same size as every other text box in the app, and the drawing screen's prompt sits in a card the same size. A long prompt shrinks to fit, so all 60 characters stay readable
+- When there are more rewards than fit on a tab at a readable size, the tab scrolls, instead of everything shrinking. What your pig or your balloon says stays in view under the cards
+- Help & FAQ explains celebrations, and the Privacy Policy and Terms of Service cover what your balloon says and the celebration you choose
+
 ## [2.12.0]
 
 ### Added

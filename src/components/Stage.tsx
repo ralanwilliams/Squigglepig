@@ -33,7 +33,7 @@ import { useThemedStyles } from '../theme/theme';
 //
 // `overlay` goes over the whole screen, edge to edge (safe areas too), above
 // everything else on it: a celebration such as the Pig Off's fireworks. It
-// should let touches through (pointerEvents="none").
+// lets touches through, and screen readers don't see it: it's decoration.
 //
 // When a keyboard opens, nothing scrolls. Held upright, the whole screen slides
 // up with the keyboard until the text boxes, and the controls under them when
@@ -130,7 +130,14 @@ export function Stage({
       </KeyboardAvoidingView>
       {menu ? <MenuButton /> : null}
       {overlay ? (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        // Decoration only: out of a screen reader's way too (the balloon's
+        // words, or anything drawn, would be read out over the screen's own).
+        <View
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
           {overlay}
         </View>
       ) : null}
