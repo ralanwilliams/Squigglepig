@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, AppState, Easing, Platform, StyleSheet, Vi
 import { captureRef } from 'react-native-view-shot';
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { animatedSvg } from '../lib/animatedSvg';
 import { themes, type Theme } from './tokens';
 import { UNLOCKABLE, dayKey, paletteFor, seasonEnd, skinFor, type Birthday, type Skin } from './skins';
 import { BIRTHDAYS_KEY, fetchBirthdays, parseBirthdays } from '../lib/birthdays';
@@ -481,7 +482,7 @@ export function ThemeSnapshotTarget({ children }: { children: React.ReactNode })
   );
 }
 
-const AnimatedRect = Animated.createAnimatedComponent(Rect);
+const AnimatedRect = animatedSvg(Rect);
 
 // The wipe. Mount it once, above the snapshot target and BELOW the toggle
 // (app/_layout.tsx), so the glyph keeps morphing on top while the old screen

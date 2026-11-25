@@ -31,7 +31,7 @@ const at = (p: Partial<Position>): Position => ({
 });
 
 // A game as every phone sees it, message by message, moving `pos` on as
-// GameContext's handlers do. Every message of a real game must apply.
+// the channel's handlers do (src/state/game/channel.ts). Every message of a real game must apply.
 function playGame(players: number, rounds: number) {
   const log: string[] = [];
   let pos = at({ phase: 'prompts', chains: players });

@@ -10,7 +10,7 @@ import { FONT_CAP, useUi } from '../theme/responsive';
 // unsubscribes; mid-game the player is taken out of the rotation, or, if that
 // would leave fewer than 3, their turns run out the clock until the round
 // ends (their pooled prompts simply go unused), and the home screen it was
-// opened from comes back (GameContext leaveRoom). There's no coming back into
+// opened from comes back (state/game/room.ts leaveRoom). There's no coming back into
 // the game, so it asks first (ConfirmDialog.tsx).
 // Visually a quiet text link, but padded + hit-slopped to a full 44dp target.
 export function LeaveButton({ label = 'Leave game' }: { label?: string }) {

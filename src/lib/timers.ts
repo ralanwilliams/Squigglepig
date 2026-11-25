@@ -30,7 +30,7 @@ export const HOST_GRACE = 2;
 // else judges it in their place.
 export const JUDGE_WAIT = 15;
 
-// The clock's backup (GameContext): when the game is this many seconds past
+// The clock's backup (state/game/clock.ts): when the game is this many seconds past
 // due to move on and hasn't, a phone that isn't keeping the clock moves it on
 // itself, the next phone in line BACKUP_STAGGER seconds after that one.
 export const BACKUP_AFTER = 5;

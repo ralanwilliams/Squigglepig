@@ -109,7 +109,7 @@ export function parseDrawing(data: string): Drawing | null {
 // A drawing with nothing on it: no data at all (the clock ran out before it
 // was handed in), an empty canvas submitted, or one too broken to draw. A
 // drawing of only stickers isn't blank. Each blank drawing costs its artist a
-// point (GameContext).
+// point (src/state/rules.ts tallyRulings).
 export function isBlankDrawing(data: string): boolean {
   const d = data ? parseDrawing(data) : null;
   return !d || (d.strokes.length === 0 && !d.stickers?.length);

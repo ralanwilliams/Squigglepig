@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Insets, View } from 'react-native';
 import Svg, { Circle, G, Mask, Path, Rect } from 'react-native-svg';
+import { animatedSvg } from '../lib/animatedSvg';
 import { GlyphSwitch } from './GlyphSwitch';
 import { glyphPop } from './glyphPop';
 import { useReducedMotion, useTheme, useThemeMode } from '../theme/theme';
@@ -16,8 +17,8 @@ import { useUi } from '../theme/responsive';
 // link color like the menu's ☰, so it shows on every palette and seasonal
 // theme. Sized from the UI scale, 44dp hit target. With reduced motion it
 // jumps straight to the other glyph.
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedG = Animated.createAnimatedComponent(G);
+const AnimatedCircle = animatedSvg(Circle);
+const AnimatedG = animatedSvg(G);
 
 const RAY = 'M10.6 5.4 L13.4 5.4 L12 1.4 Z';
 const RAYS = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -76,11 +77,17 @@ export function ThemeToggle({ size = 26, hitSlop, color }: { size?: number; hitS
             <Rect width="24" height="24" fill="#fff" />
             <AnimatedCircle cx={holeX} cy={holeY} r={7.2} fill="#000" />
           </Mask>
-          <AnimatedG opacity={rays} rotation={raySpin} scale={rayScale} originX={12} originY={12}>
-            {RAYS.map((deg) => (
-              <Path key={deg} d={RAY} fill={ink} transform={`rotate(${deg} 12 12)`} />
-            ))}
-          </AnimatedG>
+          {/* The rays spin and shrink about the centre: between a move to it and
+              back (not originX/originY, which the web build can't take: animatedSvg). */}
+          <G transform="translate(12 12)">
+            <AnimatedG opacity={rays} rotation={raySpin} scale={rayScale}>
+              <G transform="translate(-12 -12)">
+                {RAYS.map((deg) => (
+                  <Path key={deg} d={RAY} fill={ink} transform={`rotate(${deg} 12 12)`} />
+                ))}
+              </G>
+            </AnimatedG>
+          </G>
           <AnimatedCircle cx={discX} cy={12} r={disc} fill={ink} mask="url(#moon-hole)" />
           {/* Position with a transform on a plain group, scale on an inner one:
               react-native-svg drops x/y from a group on a normal render (they are

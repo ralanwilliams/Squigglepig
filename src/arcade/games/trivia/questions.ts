@@ -2,6 +2,8 @@
 // Database's answers, and choosing a run's ten. No storage or network here
 // (store.ts does that), so it can be checked on its own.
 
+import { shuffle } from '../../../lib/shuffle';
+
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export type Question = {
@@ -111,10 +113,6 @@ export function pickRun(pool: Question[], pack: Question[], rand: () => number =
 
 // The four answers in a random order, and where the right one landed.
 export function shuffleAnswers(q: Question, rand: () => number = Math.random): { answers: string[]; correct: number } {
-  const answers = [q.correct, ...q.wrong];
-  for (let i = answers.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [answers[i], answers[j]] = [answers[j], answers[i]];
-  }
+  const answers = shuffle([q.correct, ...q.wrong], rand);
   return { answers, correct: answers.indexOf(q.correct) };
 }
