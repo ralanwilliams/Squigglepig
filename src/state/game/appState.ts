@@ -58,6 +58,7 @@ export function installAppState(e: Engine) {
     if (!code) return;
     clearRoomNotifications();
     checkConnection();
+    e.ensureChannel(); // closed while off screen (its sign-in token ran out): a new one
     void awayCallRef.current.finally(() => {
       if (roomRef.current === code) touchRoom(code, true);
     });
@@ -65,5 +66,20 @@ export function installAppState(e: Engine) {
     e.refreshMembers();
   };
 
-  Object.assign(e, { goAway, comeBack } satisfies Partial<EngineFns>);
+  // The app's comings and goings (React Native's AppState), and in dev builds
+  // a stand-in for them (src/dev: a test player stepping away). Only a real
+  // trip to the background counts: a moment in 'inactive' (an iPhone's
+  // Control Center, a Face ID prompt) never left, and nothing changes.
+  const onAppStateChange = (s: string) => {
+    if (s === 'background') {
+      if (!e.awakeRef.current) return;
+      e.awakeRef.current = false;
+      goAway();
+    } else if (s === 'active' && !e.awakeRef.current) {
+      e.awakeRef.current = true;
+      comeBack();
+    }
+  };
+
+  Object.assign(e, { goAway, comeBack, onAppStateChange } satisfies Partial<EngineFns>);
 }

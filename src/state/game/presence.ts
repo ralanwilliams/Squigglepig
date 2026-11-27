@@ -8,6 +8,7 @@ import {
   electKeeper as electKeeperOf,
   isGameOn,
   presentNames as presentOf,
+  readyNames as readyOf,
 } from '../rules';
 import type { Engine, EngineFns } from './engine';
 import { closedMessage } from './messages';
@@ -45,6 +46,8 @@ export function installPresence(e: Engine) {
   const orderedNames = () => activeMembers().map((m) => m.name);
   // The ones with the app open right now.
   const presentNames = () => presentOf(membersRef.current, presenceRef.current);
+  // The ones here and caught up: who can judge (../rules readyNames).
+  const readyNames = () => readyOf(membersRef.current, presenceRef.current);
   // User ids of players still in the room but away, optionally only those
   // named (this round's roster) — who gets a "your turn" notification.
   const awayIds = (names?: string[]) => {
@@ -157,6 +160,7 @@ export function installPresence(e: Engine) {
     track,
     orderedNames,
     presentNames,
+    readyNames,
     awayIds,
     hasLeft,
     clockRank,

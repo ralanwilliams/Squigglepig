@@ -25,6 +25,7 @@ export function installRoom(e: Engine) {
     advanceTimerRef,
     snapTimerRef,
     judgeTimerRef,
+    reopenTimerRef,
     heldRef,
     dueRef,
     rulesRef,
@@ -51,6 +52,7 @@ export function installRoom(e: Engine) {
     setRound,
     setMembersState,
     setPresentIds,
+    setReadyIds,
     setGameNames,
     setAvatars,
     setChains,
@@ -148,6 +150,8 @@ export function installRoom(e: Engine) {
     snapTimerRef.current = null;
     if (judgeTimerRef.current) clearTimeout(judgeTimerRef.current);
     judgeTimerRef.current = null;
+    if (reopenTimerRef.current) clearTimeout(reopenTimerRef.current);
+    reopenTimerRef.current = null;
     e.forgetTurns();
     e.forgetDocks();
     heldRef.current = null;
@@ -180,6 +184,7 @@ export function installRoom(e: Engine) {
     setPhase('lobby');
     setMembersState([]);
     setPresentIds([]);
+    setReadyIds([]);
     setGameNames([]);
     setAvatars({});
     setRoom('');

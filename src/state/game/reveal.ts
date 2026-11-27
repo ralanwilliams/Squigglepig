@@ -60,7 +60,8 @@ export function installReveal(e: Engine) {
   const waitFor = () => (waitingForJudge() ? e.orderedNames() : []);
   const updateJudgeWait = () => {
     const owner = chainOwner(chainsRef.current[revealIndexRef.current]);
-    const waiting = !!owner && waitingForJudge() && !e.presentNames().includes(owner) && e.orderedNames().includes(owner);
+    // Back on screen but still catching up counts as not back yet: they can't judge until they are (isJudgeNow).
+    const waiting = !!owner && waitingForJudge() && !e.readyNames().includes(owner) && e.orderedNames().includes(owner);
     setJudgeWait(waiting ? owner : '');
   };
   // Whenever a stage begins (a chain coming up, at the reveal), or this phone
@@ -204,9 +205,33 @@ export function installReveal(e: Engine) {
     e.changed();
   };
 
-  // Not until this phone has caught up: what it would rule on may be out of date.
+  // Not until this phone has caught up: what it would rule on may be out of
+  // date. Every phone picks the judge from who's here and caught up as
+  // presence says (readyNames), so they all agree on one, and one just back
+  // on screen takes the judging over only once it can use it.
   const isJudgeNow = () =>
-    syncedRef.current && usernameRef.current === judgeForChain(revealIndexRef.current, e.presentNames());
+    syncedRef.current && usernameRef.current === judgeForChain(revealIndexRef.current, e.readyNames());
+
+  // Still at this turn of this chain of this round's reveal.
+  const stillAt = (round: number, chainIdx: number, step: number) =>
+    phaseRef.current === 'reveal' &&
+    roundRef.current === round &&
+    revealIndexRef.current === chainIdx &&
+    revealStepRef.current === step;
+
+  // Move the reveal on from a ruled turn: to the next turn shown, or, after
+  // the chain's last, commit the chain's scores.
+  const stepOn = (round: number, chainIdx: number, step: number, rulings: Record<number, boolean>) => {
+    const chain = chainsRef.current[chainIdx];
+    if (!chain) return;
+    const nextStep = nextShown(chain, step);
+    const by = usernameRef.current;
+    if (nextStep >= chain.cells.length) {
+      e.send('chain-scored', { round, chain: chainIdx, rulings, by, missed: missedJudging(false) });
+    } else {
+      e.send('reveal-state', { round, chain: chainIdx, step: nextStep, rulings, by });
+    }
+  };
 
   // Judge votes on the cell currently at the frontier (does it match the original
   // prompt?). Two-phase so everyone sees a ✓/✗ beat: first broadcast the ruling
@@ -221,20 +246,17 @@ export function installReveal(e: Engine) {
     const chain = chainsRef.current[chainIdx];
     if (!chain || rulingsRef.current[step] !== undefined) return;
     const rulings = { ...rulingsRef.current, [step]: correct };
-    const nextStep = nextShown(chain, step);
     const round = roundRef.current;
-    const by = usernameRef.current;
-    e.send('reveal-state', { round, chain: chainIdx, step, rulings, by }); // phase 1: the mark
+    e.send('reveal-state', { round, chain: chainIdx, step, rulings, by: usernameRef.current }); // phase 1: the mark
     if (byHand) touchRoom(roomRef.current);
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     advanceTimerRef.current = setTimeout(() => {
-      // Chain (or round) already moved on.
-      if (revealIndexRef.current !== chainIdx || roundRef.current !== round || phaseRef.current !== 'reveal') return;
-      if (nextStep >= chain.cells.length) {
-        e.send('chain-scored', { round, chain: chainIdx, rulings, by, missed: missedJudging(false) });
-      } else {
-        e.send('reveal-state', { round, chain: chainIdx, step: nextStep, rulings, by });
-      }
+      advanceTimerRef.current = null;
+      // The reveal already moved on; or this phone went off screen (or
+      // started catching up) since the mark, so what it has may be out of
+      // date: whoever judges now moves it on instead (maybeAutoRule).
+      if (!stillAt(round, chainIdx, step) || !syncedRef.current) return;
+      stepOn(round, chainIdx, step, rulings);
     }, 900);
   };
 
@@ -260,9 +282,23 @@ export function installReveal(e: Engine) {
       });
       return;
     }
-    if (rulingsRef.current[step] !== undefined || !isEmptyTurn(chain.cells[step])) return;
-    autoRuleRef.current = key;
     const round = roundRef.current;
+    if (rulingsRef.current[step] !== undefined) {
+      // Ruled but not moved on: the judge's phone does that a moment after its
+      // mark (vote), unless it went off screen, or handed the judging over,
+      // first. Then the one judging now does it, after a longer beat.
+      const on = `${key}:on`;
+      if (autoRuleRef.current === on) return;
+      autoRuleRef.current = on;
+      setTimeout(() => {
+        if (!stillAt(round, ci, step) || rulingsRef.current[step] === undefined) return;
+        if (isJudgeNow()) stepOn(round, ci, step, rulingsRef.current);
+        else autoRuleRef.current = ''; // not this phone's after all: free to try again
+      }, AUTO_RULE_MS);
+      return;
+    }
+    if (!isEmptyTurn(chain.cells[step])) return;
+    autoRuleRef.current = key;
     setTimeout(() => {
       if (roundRef.current !== round || revealIndexRef.current !== ci || revealStepRef.current !== step) return;
       // Still empty: it wasn't mended meanwhile (onCell).

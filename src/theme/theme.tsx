@@ -349,15 +349,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         apply();
         return;
       }
+      // No photo, no sweep: just change. Web can't take the photo
+      // (react-native-view-shot needs html2canvas-pro there), so it doesn't try.
+      const instead = () => {
+        sweeping.current = false;
+        apply();
+        setPending(null);
+      };
+      if (Platform.OS === 'web') {
+        instead();
+        return;
+      }
       sweeping.current = true;
       captureRef(shotRef, { format: 'jpg', quality: 0.95, result: 'tmpfile' })
         .then((uri) => setWipe({ uri, up, apply }))
-        .catch(() => {
-          // No photo (e.g. web): just change.
-          sweeping.current = false;
-          apply();
-          setPending(null);
-        });
+        .catch(instead);
     },
     [reducedMotion]
   );

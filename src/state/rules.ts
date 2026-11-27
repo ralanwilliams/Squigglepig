@@ -452,6 +452,17 @@ export function presentNames(members: Member[], presence: Presence[]): string[] 
     .map((m) => m.name);
 }
 
+// The ones with the app open AND caught up (their presence says `synced`):
+// who can judge. A phone just back on screen is here before it has caught
+// up, and until it has it can't rule (it may be looking at an old turn), so
+// the judging stays with whoever has it until then.
+export function readyNames(members: Member[], presence: Presence[]): string[] {
+  const ready = new Set(presence.filter((p) => p.synced).map((p) => p.id));
+  return activeMembers(members)
+    .filter((m) => ready.has(m.id))
+    .map((m) => m.name);
+}
+
 // The HOST: the player in the room longest, whether or not they have the app
 // open. It's the room's server-side list, so closing the app or losing signal
 // never moves it; tapping Leave game does, to whoever has been in longest

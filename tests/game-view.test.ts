@@ -7,7 +7,9 @@ import { chain, drawing, members, prompt } from './helpers/game';
 
 const ids = (names: string[]) => names.map((n) => `id-${n}`);
 
+// Everyone here is caught up, unless a test says otherwise (readyIds).
 const input = (over: Partial<ViewInput> = {}): ViewInput => ({
+  readyIds: over.presentIds ?? ids(['Ann', 'Bob', 'Cat']),
   username: 'Ann',
   members: members(['Ann', 'Bob', 'Cat']),
   presentIds: ids(['Ann', 'Bob', 'Cat']),
@@ -85,6 +87,22 @@ describe('the judge', () => {
     assert.equal(v.leader, 'Ann');
     assert.equal(v.judge, 'Ann');
     assert.equal(v.isJudge, true);
+  });
+
+  test("an owner back on screen judges only once they've caught up; until then whoever had it keeps it", () => {
+    const back = { phase: 'reveal' as const, chains, leader: 'Ann' };
+    // Bob is here again but still catching up: Ann, the leader, carries on.
+    const catchingUp = deriveView(input({ ...back, readyIds: ids(['Ann', 'Cat']) }));
+    assert.equal(catchingUp.judge, 'Ann');
+    assert.equal(catchingUp.isJudge, true);
+    assert.equal(deriveView(input({ ...back, username: 'Bob', readyIds: ids(['Ann', 'Cat']) })).isJudge, false);
+    // Caught up: it's his again.
+    assert.equal(deriveView(input(back)).judge, 'Bob');
+  });
+
+  test('a leader still catching up hands the judging to the first one here who has', () => {
+    const v = deriveView(input({ phase: 'reveal', chains, presentIds: ids(['Ann', 'Cat']), readyIds: ids(['Cat']), leader: 'Ann' }));
+    assert.equal(v.judge, 'Cat');
   });
 });
 

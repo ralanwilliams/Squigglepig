@@ -101,4 +101,16 @@ export type Game = {
   // Dev builds only (undefined otherwise): from the lobby, straight into a
   // Pig Off between this player and `name` (devTieWith).
   devTieWith?: (name: string) => void;
+  // Dev builds only (undefined otherwise), for the test players in src/dev:
+  // act as if the app went to the background ('background') or came back
+  // ('active'), leave the room at once, without "Are you sure?", and send
+  // and hear messages between the room's dev tools (./channel.ts).
+  dev?: DevControls;
+};
+
+export type DevControls = {
+  setAppState: (state: 'background' | 'active') => void;
+  leaveNow: () => void;
+  tell: (payload: object) => void;
+  listen: (listener: (payload: Record<string, unknown>) => void) => () => void;
 };

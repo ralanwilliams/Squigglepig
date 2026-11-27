@@ -18,6 +18,10 @@ export const ANSWER_STAGGER_MS = 700;
 // Back on screen (appState.ts checkConnection): how long a heartbeat has to be
 // answered before the connection counts as dead.
 export const PROBE_MS = 3000;
+// The room's channel closed for good (channel.ts ensureChannel): a new one
+// opens this long after, so a channel the server keeps closing (a token it
+// won't take) is retried calmly rather than in a tight loop.
+export const REOPEN_MS = 2000;
 
 // Stand-ins for a prompt nobody wrote (its owner was away, or the clock ran
 // out on them), so a chain never stalls for want of one.

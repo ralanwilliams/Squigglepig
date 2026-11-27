@@ -35,6 +35,8 @@ function createRefs(path: string, avatar: Avatar) {
     // ---- The room and the channel ----
     channelRef: ref<RealtimeChannel | null>(null),
     subscribedRef: ref(false),
+    // A new channel on its way in place of one that closed for good (channel.ts ensureChannel).
+    reopenTimerRef: ref<Timer | null>(null),
     roomRef: ref(''),
     usernameRef: ref(''),
     userIdRef: ref(''),
@@ -153,6 +155,7 @@ export type Setters = {
   setRoom: Setter<string>;
   setMembersState: Setter<Member[]>;
   setPresentIds: Setter<string[]>;
+  setReadyIds: Setter<string[]>;
   setGameNames: Setter<string[]>;
   setAvatars: Setter<Record<string, Avatar>>;
   setStatus: Setter<ConnStatus>;
@@ -213,6 +216,7 @@ export type EngineFns = {
   track: () => void;
   orderedNames: () => string[];
   presentNames: () => string[];
+  readyNames: () => string[];
   awayIds: (names?: string[]) => string[];
   hasLeft: (name: string) => boolean;
   clockRank: () => number;
@@ -245,6 +249,7 @@ export type EngineFns = {
   // appState.ts
   goAway: () => void;
   comeBack: () => void;
+  onAppStateChange: (state: string) => void;
   // turns.ts
   routeForStage: (s: number) => void;
   currentTurn: () => Turn | null;
@@ -289,6 +294,7 @@ export type EngineFns = {
   devTieWith: ((name: string) => Promise<void>) | undefined;
   // channel.ts
   openChannel: (code: string, userId: string) => void;
+  ensureChannel: () => void;
   // room.ts
   enterRoom: (roomCode: string | null, name: string, rejoin?: boolean) => Promise<EntryStatus>;
   resetLocal: () => void;

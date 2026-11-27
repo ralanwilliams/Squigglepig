@@ -19,6 +19,7 @@ import {
   phaseForStage,
   playerForChain,
   presentNames,
+  readyNames,
   prevFor,
   roomHost,
   stillToGo,
@@ -229,6 +230,13 @@ describe('who judges', () => {
     assert.equal(judgeFor(c, names, 'Bo'), 'Cy');
     assert.equal(judgeFor(c, ['Ann', 'Bo'], 'Bo'), 'Bo');
     assert.equal(judgeFor(c, ['Ann', 'Bo'], 'Di'), 'Ann');
+  });
+
+  test('only those here and caught up can judge', () => {
+    // Cy is back on screen but still catching up: not yet; and Bo isn't here.
+    assert.deepEqual(readyNames(room, here(['Ann', 'Cy'], ['Ann'])), ['Ann']);
+    assert.deepEqual(readyNames(room, here(['Ann', 'Cy'])), ['Ann', 'Cy']);
+    assert.deepEqual(readyNames(members(['Ann', 'Bo', 'Cy'], { Ann: 1 }), here(['Ann', 'Cy'])), ['Cy']); // left the room
   });
 
   test('an owner who is away is waited for while the chain has only just come up', () => {

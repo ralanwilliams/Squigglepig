@@ -21,7 +21,7 @@ import { installTurns } from './game/turns';
 import { installRounds } from './game/rounds';
 import { installReveal } from './game/reveal';
 import { installPigOff } from './game/pigOff';
-import { installChannel } from './game/channel';
+import { installChannel, listenForDev } from './game/channel';
 import { installRoom } from './game/room';
 import { deriveView } from './game/view';
 import type { ConnStatus, Game, Turn } from './game/types';
@@ -96,6 +96,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [room, setRoom] = useState('');
   const [members, setMembersState] = useState<Member[]>([]);
   const [presentIds, setPresentIds] = useState<string[]>([]);
+  const [readyIds, setReadyIds] = useState<string[]>([]);
   const [gameNames, setGameNames] = useState<string[]>([]);
   const [avatars, setAvatars] = useState<Record<string, Avatar>>({});
   const [status, setStatus] = useState<ConnStatus>('connecting');
@@ -135,6 +136,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setRoom,
         setMembersState,
         setPresentIds,
+        setReadyIds,
         setGameNames,
         setAvatars,
         setStatus,
@@ -206,20 +208,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Off screen, the phone leaves presence and stops keeping the clock
-  // (goAway); back on screen it catches up (comeBack). Only a real trip to the
-  // background counts: a moment in 'inactive' (an iPhone's Control Center, a
-  // Face ID prompt) never left, and nothing changes.
+  // (goAway); back on screen it catches up (comeBack): ./game/appState.ts.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'background') {
-        if (!e.awakeRef.current) return;
-        e.awakeRef.current = false;
-        e.goAway();
-      } else if (s === 'active' && !e.awakeRef.current) {
-        e.awakeRef.current = true;
-        e.comeBack();
-      }
-    });
+    const sub = AppState.addEventListener('change', e.onAppStateChange);
     return () => sub.remove();
   }, []);
 
@@ -254,11 +245,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (status === 'connected') e.track();
   }, [myAvatar]);
 
+  // Dev builds only: the test players (src/dev) step away and leave the way
+  // the app's own comings and goings do, without the OS or a confirm dialog,
+  // and talk to each other over the room's channel (./game/channel.ts).
+  const dev = __DEV__
+    ? { setAppState: e.onAppStateChange, leaveNow: e.leaveRoom, tell: (payload: object) => e.send('dev', payload), listen: listenForDev }
+    : undefined;
+
   // What the screens see.
   const view = deriveView({
     username,
     members,
     presentIds,
+    readyIds,
     status,
     gameNames,
     phase,
@@ -317,6 +316,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         stageStart,
         submitPigOff: e.submitPigOff,
         devTieWith: e.devTieWith,
+        dev,
       }}
     >
       {children}

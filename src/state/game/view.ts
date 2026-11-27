@@ -18,6 +18,7 @@ export type ViewInput = {
   username: string;
   members: Member[];
   presentIds: string[];
+  readyIds: string[]; // present and caught up: who can judge
   status: ConnStatus;
   gameNames: string[];
   phase: Phase;
@@ -68,11 +69,15 @@ export function deriveView(v: ViewInput): View {
   // The round leader judges the reveal, but if they don't have the app open
   // the role falls to the first one here (the longest in) so it never stalls.
   const leader = effectiveLeader(v.leader, present);
+  // Only a phone that's here AND caught up can judge (../rules readyNames):
+  // one just back on screen gets the judging once it has caught up.
+  const readySet = new Set(v.readyIds);
+  const ready = active.filter((m) => readySet.has(m.id)).map((m) => m.name);
   const judge = (() => {
     const owner = chainOwner(v.chains[v.revealIndex]);
-    if (owner && present.includes(owner)) return owner;
+    if (owner && ready.includes(owner)) return owner;
     if (v.judgeWait) return ''; // waiting for the owner to come back
-    return leader;
+    return effectiveLeader(v.leader, ready);
   })();
   return {
     players,

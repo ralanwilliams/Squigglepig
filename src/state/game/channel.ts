@@ -40,8 +40,23 @@ import {
   asStrokes,
   asTarget,
 } from '../wire';
+import { REOPEN_MS } from './constants';
 import type { Engine, EngineFns } from './engine';
 import { closedMessage } from './messages';
+
+// Dev builds only: messages between the test tools (src/dev) on the room's
+// phones, e.g. the host telling every autopilot phone which scenario it's
+// playing. They ride the room's channel as 'dev'; a release build neither
+// sends nor listens for them.
+type DevListener = (payload: Record<string, unknown>) => void;
+const devListeners = new Set<DevListener>();
+export const listenForDev = (listener: DevListener) => {
+  devListeners.add(listener);
+  return () => {
+    devListeners.delete(listener);
+  };
+};
+const DEV = typeof __DEV__ !== 'undefined' && __DEV__;
 
 /**
  * The room's LIVE CHANNEL: one Supabase Realtime channel per room, members
@@ -53,6 +68,10 @@ export function installChannel(e: Engine) {
   const {
     channelRef,
     subscribedRef,
+    reopenTimerRef,
+    roomRef,
+    userIdRef,
+    awakeRef,
     phaseRef,
     roundRef,
     stageRef,
@@ -64,6 +83,7 @@ export function installChannel(e: Engine) {
     versionsRef,
     keeperRef,
     setPresentIds,
+    setReadyIds,
     setAvatars,
     setStatus,
     setStatusDetail,
@@ -201,6 +221,7 @@ export function installChannel(e: Engine) {
       if (who) e.onRequestState(who);
     });
     on('state', (p) => e.onState(asState(p)));
+    if (DEV) on('dev', (p) => devListeners.forEach((listener) => listener(p)));
     // From the server: the room's list changed, or the room closed.
     on('members', () => e.refreshMembers());
     on('room-closed', (p) => e.closeLocally(closedMessage(code, asClosedReason(p.reason))));
@@ -216,6 +237,7 @@ export function installChannel(e: Engine) {
           synced: !!m.synced,
         }));
         setPresentIds(presenceRef.current.map((p) => p.id));
+        setReadyIds(presenceRef.current.filter((p) => p.synced).map((p) => p.id));
         const seen: Record<string, Avatar> = {};
         for (const m of latest) {
           const who = cleanName(m.username);
@@ -255,11 +277,41 @@ export function installChannel(e: Engine) {
         // game will have moved on without it by the time it's back. It stands
         // down until it's back in and caught up (SUBSCRIBED).
         e.standDown();
+        // A dropped connection rejoins by itself; a channel the server closed never does.
+        if (s === 'CLOSED') ensureChannel();
       } else {
         setStatus('connecting');
       }
     });
   };
 
-  Object.assign(e, { openChannel } satisfies Partial<EngineFns>);
+  // The room's channel, if it has closed for good, opened again. A dropped
+  // connection rejoins by itself, but a channel the server has closed is gone:
+  // most often because the sign-in token ran out while the app was off screen,
+  // where it isn't refreshed (src/lib/supabase.ts; a hidden browser tab is the
+  // same). Without this, a phone back on screen would stay cut off from the
+  // room, on whatever screen it last had, while the others played on. Only on
+  // screen (comeBack calls it on the way back), where the token can be
+  // refreshed: setAuth asks for a fresh one first. Once back in, SUBSCRIBED
+  // catches the phone up.
+  const ensureChannel = () => {
+    if (!roomRef.current || !awakeRef.current || reopenTimerRef.current) return;
+    if (channelRef.current && channelRef.current.state !== 'closed') return;
+    reopenTimerRef.current = setTimeout(async () => {
+      reopenTimerRef.current = null;
+      const code = roomRef.current;
+      const userId = userIdRef.current;
+      const old = channelRef.current;
+      if (!code || !awakeRef.current || (old && old.state !== 'closed')) return;
+      console.log("[realtime] the room's channel closed: opening it again");
+      channelRef.current = null; // its CLOSED, as it goes, is no longer this phone's
+      subscribedRef.current = false;
+      if (old) void supabase.removeChannel(old);
+      await supabase.realtime.setAuth();
+      if (roomRef.current !== code || channelRef.current) return;
+      openChannel(code, userId);
+    }, REOPEN_MS);
+  };
+
+  Object.assign(e, { openChannel, ensureChannel } satisfies Partial<EngineFns>);
 }
