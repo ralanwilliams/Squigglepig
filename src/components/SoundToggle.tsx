@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Insets, View } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
+import { animatedSvg } from '../lib/animatedSvg';
 import { GlyphSwitch } from './GlyphSwitch';
 import { glyphPop } from './glyphPop';
 import { useReducedMotion, useTheme } from '../theme/theme';
@@ -16,13 +17,16 @@ import { setSoundOn, useSoundOn } from '../lib/sound';
 // by default the theme's link color like the menu's ☰. Sized from the UI
 // scale, 44dp hit target. With reduced motion it jumps straight to the other
 // glyph.
-const AnimatedG = Animated.createAnimatedComponent(G);
+const AnimatedG = animatedSvg(G);
 
 const SPEAKER = 'M3.4 9.4h3.5l4.7-4v13.2l-4.7-4H3.4z';
 const WAVE_A = 'M14.6 9.4a3.6 3.6 0 0 1 0 5.2';
 const WAVE_B = 'M17.4 6.6a7.4 7.4 0 0 1 0 10.8';
 const CROSS = 'M-2.3 -2.3L2.3 2.3M2.3 -2.3L-2.3 2.3';
-const MOUTH = { originX: 11.6, originY: 12 }; // the waves grow out of the speaker
+// The waves grow out of the speaker's mouth: each is scaled between a move to
+// it and back (not originX/originY, which the web build can't take: animatedSvg).
+const TO_MOUTH = 'translate(11.6 12)';
+const FROM_MOUTH = 'translate(-11.6 -12)';
 
 const NO_NATIVE = { useNativeDriver: false }; // SVG attributes can't go through the native driver
 
@@ -69,12 +73,16 @@ function SpeakerGlyph({ on, px, ink }: { on: boolean; px: number; ink: string })
       <Svg width={px} height={px} viewBox="0 0 24 24">
         <Path d={SPEAKER} fill={ink} stroke={ink} strokeWidth={1.4} strokeLinejoin="round" />
         <G fill="none" stroke={ink} strokeWidth={2.2} strokeLinecap="round">
-          <AnimatedG opacity={waveA} scale={waveA} {...MOUTH}>
-            <Path d={WAVE_A} />
-          </AnimatedG>
-          <AnimatedG opacity={waveB} scale={waveB} {...MOUTH}>
-            <Path d={WAVE_B} />
-          </AnimatedG>
+          <G transform={TO_MOUTH}>
+            <AnimatedG opacity={waveA} scale={waveA}>
+              <Path d={WAVE_A} transform={FROM_MOUTH} />
+            </AnimatedG>
+          </G>
+          <G transform={TO_MOUTH}>
+            <AnimatedG opacity={waveB} scale={waveB}>
+              <Path d={WAVE_B} transform={FROM_MOUTH} />
+            </AnimatedG>
+          </G>
           {/* Position on a plain group, scale on an inner one (see ThemeToggle's stars). */}
           <G transform="translate(18.2 12)">
             <AnimatedG {...glyphPop(cross)}>

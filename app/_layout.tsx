@@ -21,6 +21,7 @@ import { ToastOverlay } from '../src/components/Toast';
 import { WalkthroughOverlay } from '../src/components/Walkthrough';
 import { playMusic, preloadSounds, stopMusic } from '../src/lib/sound';
 import { useAppFrame } from '../src/theme/responsive';
+import { DevOverlay } from '../src/dev'; // local-only tooling (src/dev/local is gitignored)
 
 // Screens with the theme playing: everything from launch up to the moment the
 // round starts (plus /licenses and /rewards, which open from the menu, the
@@ -142,6 +143,7 @@ function Shell() {
         <ThemeTransition />
         <CornerControlsOverlay />
         <ToastOverlay />
+        <DevOverlay />
         <WalkthroughOverlay />
         <ConfirmOverlay />
       </View>

@@ -8,7 +8,7 @@ import { cleanName, cleanPhrase } from '../lib/text';
 // takes whatever came and gives back something of the right shape, with
 // names and phrases cleaned (src/lib/text.ts) and numbers kept in sensible
 // bounds, or null when there's nothing usable, which the handler ignores.
-// GameContext wraps every handler too, so even a message these don't foresee
+// The channel (./game/channel.ts) wraps every handler too, so even a message these don't foresee
 // can't throw and close the app.
 
 // Generous ceilings, far past any real game, so nothing real is cut.

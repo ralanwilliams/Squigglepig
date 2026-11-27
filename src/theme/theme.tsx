@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, AppState, Easing, Platform, StyleSheet, Vi
 import { captureRef } from 'react-native-view-shot';
 import Svg, { Defs, Image as SvgImage, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { animatedSvg } from '../lib/animatedSvg';
 import { themes, type Theme } from './tokens';
 import { UNLOCKABLE, dayKey, paletteFor, seasonEnd, skinFor, type Birthday, type Skin } from './skins';
 import { BIRTHDAYS_KEY, fetchBirthdays, parseBirthdays } from '../lib/birthdays';
@@ -348,15 +349,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         apply();
         return;
       }
+      // No photo, no sweep: just change. Web can't take the photo
+      // (react-native-view-shot needs html2canvas-pro there), so it doesn't try.
+      const instead = () => {
+        sweeping.current = false;
+        apply();
+        setPending(null);
+      };
+      if (Platform.OS === 'web') {
+        instead();
+        return;
+      }
       sweeping.current = true;
       captureRef(shotRef, { format: 'jpg', quality: 0.95, result: 'tmpfile' })
         .then((uri) => setWipe({ uri, up, apply }))
-        .catch(() => {
-          // No photo (e.g. web): just change.
-          sweeping.current = false;
-          apply();
-          setPending(null);
-        });
+        .catch(instead);
     },
     [reducedMotion]
   );
@@ -481,7 +488,7 @@ export function ThemeSnapshotTarget({ children }: { children: React.ReactNode })
   );
 }
 
-const AnimatedRect = Animated.createAnimatedComponent(Rect);
+const AnimatedRect = animatedSvg(Rect);
 
 // The wipe. Mount it once, above the snapshot target and BELOW the toggle
 // (app/_layout.tsx), so the glyph keeps morphing on top while the old screen

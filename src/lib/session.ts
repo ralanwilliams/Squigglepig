@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // the room code and the player's chosen username. The server remembers that
 // the player is in the room (supabase/rooms.sql); this is how the phone
 // remembers which room to go back to. Host status is NOT stored — it is
-// derived live from who has been in the room longest (see GameContext), so it
+// derived live from who has been in the room longest (see src/state/game/view.ts), so it
 // survives drops and reconnects automatically.
 const KEY = 'squigglepig.session';
 // A Leave game the server hasn't heard about yet (tapped while offline).

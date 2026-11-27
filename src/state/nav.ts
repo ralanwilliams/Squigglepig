@@ -1,7 +1,7 @@
 import { isGameOn, type Phase } from './rules';
 
 // Where a room's game takes the player, apart from the router so it can be
-// tested (tests/nav.test.ts). GameContext's `go` and its Back handling ask
+// tested (tests/nav.test.ts). ./game/navigation.ts `go` and GameContext's Back handling ask
 // these, and do what they say.
 
 // The screens a room is played on. The rest of the app — home, solo games,
@@ -32,7 +32,7 @@ export function navFor(here: string, path: string, force = false): Nav {
 // in its lobby: does it go there? Not if it's already in the lobby — going
 // again would swap the screen for a fresh copy, the jump every time a phone
 // joined or reconnected. Yes if its game ended while it was away, or it's on
-// the waiting screen it reconnected to (GameContext connect).
+// the waiting screen it reconnected to (./game/room.ts connect).
 export const lobbyOnCatchUp = (was: Phase, here: string) => isGameOn(was) || here === '/waiting';
 
 // Whether Back is held (src/lib/backGuard.ts): during a game, on its screens.

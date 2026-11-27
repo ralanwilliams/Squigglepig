@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { animatedSvg } from '../lib/animatedSvg';
 import { font } from '../theme/tokens';
 import { FONT_CAP, useUi } from '../theme/responsive';
 import { useFieldColors } from './fieldColors';
@@ -11,7 +12,7 @@ import { useFieldColors } from './fieldColors';
 // it; let go sooner and the ring empties and it stays locked. A child can tap
 // it all they like.
 export const HOLD_MS = 3000;
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedCircle = animatedSvg(Circle);
 
 export function Padlock({ locked, onLock, onUnlock }: { locked: boolean; onLock: () => void; onUnlock: () => void }) {
   const ui = useUi();

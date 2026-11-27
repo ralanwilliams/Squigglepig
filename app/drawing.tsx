@@ -12,7 +12,7 @@ import { useUi } from '../src/theme/responsive';
 // Everyone draws simultaneously, each illustrating the text (a pooled prompt on
 // the first pass, or the previous player's caption after that) they were handed.
 // The screen keeps the turn it opened on, so the drawing goes to that turn
-// whenever it's handed in (GameContext submitCell), and its clock is the
+// whenever it's handed in (state/game/turns.ts submitCell), and its clock is the
 // game's (turnEndsAt), held while the phone catches up after a trip out of
 // the app (`resuming`).
 export default function Drawing() {

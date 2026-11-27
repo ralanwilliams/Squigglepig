@@ -12,7 +12,7 @@ import { BUBBLES, BUBBLE_AT, DEFAULT_SAY, underBubble } from './bubbles';
 // what it says (all from what they've won, src/rewards/inventory.tsx), the
 // parts of themes they've put on it, and the parts of the showing theme
 // they've taken off (themeParts.ts). It travels with them into a room, in
-// their presence (src/state/GameContext.tsx, as wireAvatar), and the
+// their presence (src/state/game/presence.ts, as wireAvatar), and the
 // scoreboard dresses the winner pig with it. On their own phone every pig is
 // theirs (Logo.tsx, PeekPig.tsx): it wears their avatar everywhere, all of it
 // on a pig with its hooves free, only what's on its head on one holding

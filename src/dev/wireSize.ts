@@ -25,7 +25,7 @@ export function utf8Bytes(s: string): number {
 }
 
 // A drawing (its JSON, as DrawingBoard's drawingData makes it) in the 'cell'
-// message that hands it in (GameContext handIn): the payload's size in
+// message that hands it in (state/game/turns.ts handIn): the payload's size in
 // bytes, and how many pieces it goes in (src/lib/chunks.ts; 1 = whole).
 // The round, chain, stage and name are stand-ins: they change the size by
 // a few bytes at most.

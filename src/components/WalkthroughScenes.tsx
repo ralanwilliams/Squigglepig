@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { animatedSvg } from '../lib/animatedSvg';
 import { canvas, font, verdict, type Theme } from '../theme/tokens';
 import { useReducedMotion, useTheme, useThemedStyles } from '../theme/theme';
 
@@ -174,7 +175,7 @@ const SKETCH = {
   crown: [...HEAD, ['M62 38 L64 18 L72 28 L80 14 L88 28 L96 18 L98 38 Z', 134]] as [string, number][],
 };
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedPath = animatedSvg(Path);
 
 // A drawing on the white canvas. With `draw` (0 → 1) it sketches itself one
 // stroke after another; without it, it's finished.

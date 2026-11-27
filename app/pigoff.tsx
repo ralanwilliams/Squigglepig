@@ -145,7 +145,7 @@ export default function PigOffScreen() {
   const matches = pigOff.matches ?? {};
   const top = Math.max(0, ...pigOff.players.map((n) => matches[n] ?? 0));
   // Still tied, as the game will see it: only those still in the room go
-  // again (GameContext pigOffNext). With one left, they win; once the tries
+  // again (state/game/pigOff.ts pigOffNext). With one left, they win; once the tries
   // run out, they share it.
   const still = pigOff.players.filter((n) => (matches[n] ?? 0) === top && inRoom.includes(n));
   const verdict = pigOff.winner

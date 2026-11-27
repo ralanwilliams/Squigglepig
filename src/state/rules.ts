@@ -3,7 +3,7 @@ import { HOST_GRACE } from '../lib/timers';
 import type { Member } from '../lib/rooms';
 
 // The game's rules, apart from React, the router and the network, so they
-// can be tested on their own (tests/rules.test.ts). GameContext holds the
+// can be tested on their own (tests/rules.test.ts). The live game (./game) holds the
 // game and calls these; nothing here changes anything it isn't handed.
 
 // ---- Game model: the "telephone" chain (a Telestrations booklet) ----
@@ -209,7 +209,7 @@ export function computeSkips(phase: Phase, roster: string[], members: Member[]):
 // (stage 0), with no shared pool and no Round 1 view. A phone that knows only
 // 2 or less plays a different game (it waits on a trough nobody fills), so a
 // game can't be started while one is in the room (outdatedPlayers), and a
-// game started by one is refused (GameContext to-prompts).
+// game started by one is refused (./game/channel.ts to-prompts).
 export const PROTOCOL = 3;
 export const ROUND_FLOW = 3;
 
@@ -355,7 +355,7 @@ export function verdictForToReveal(at: Position, round: number | null): Verdict 
 }
 
 // 'cell': a turn handed in (or handed in again, see mergeCell). In the reveal
-// only one not shown yet, or the one on screen, can still change (GameContext
+// only one not shown yet, or the one on screen, can still change (./game/turns.ts onCell
 // leaves one that's already been ruled alone). A prompt only while the round's
 // prompts are still open: once the drawing has started, a stand-in has taken
 // its place (one that came too late), and the drawing is of that.
@@ -452,11 +452,22 @@ export function presentNames(members: Member[], presence: Presence[]): string[] 
     .map((m) => m.name);
 }
 
+// The ones with the app open AND caught up (their presence says `synced`):
+// who can judge. A phone just back on screen is here before it has caught
+// up, and until it has it can't rule (it may be looking at an old turn), so
+// the judging stays with whoever has it until then.
+export function readyNames(members: Member[], presence: Presence[]): string[] {
+  const ready = new Set(presence.filter((p) => p.synced).map((p) => p.id));
+  return activeMembers(members)
+    .filter((m) => ready.has(m.id))
+    .map((m) => m.name);
+}
+
 // The HOST: the player in the room longest, whether or not they have the app
 // open. It's the room's server-side list, so closing the app or losing signal
 // never moves it; tapping Leave game does, to whoever has been in longest
 // after them. (While the host is away, anyone here can start the game:
-// GameContext canStart.)
+// ./game/view.ts canStart.)
 export const roomHost = (members: Member[]) => activeMembers(members)[0]?.name ?? '';
 
 // The KEEPER of the game's clock, apart from the host: one phone that has to

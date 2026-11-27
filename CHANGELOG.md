@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.1]
+
+### Fixed
+- PIG OFF! is no longer cut off with your phone upright, both as the words charge in and in the title at the top of the Pig Off. It shrinks to fit across the screen and stays centered
+- Coming back to a game after the app had been closed for a while (long enough for your sign-in to run out) could leave you cut off from the room, stuck on the screen you left while everyone else played on. Your phone now reconnects to the room and catches up
+- When a chain's owner came back to the app at the reveal, they could be handed the judging before their phone had caught up, and rule on a turn that had already moved on. The judging now waits until they've caught up
+- If the judge left the app just after marking a turn ✓ or ✗, the reveal could stall on that turn. Whoever judges next now moves it on
+
 ## [2.13.0]
 
 ### Added

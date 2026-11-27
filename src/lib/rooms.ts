@@ -2,7 +2,7 @@ import { currentUserId, signIn, supabase } from './supabase';
 
 // The server's side of a room (supabase/rooms.sql): who is in it, whether a
 // game is on, and the host's snapshot of that game. The game itself still runs
-// over the room's live channel (src/state/GameContext.tsx); these calls are
+// over the room's live channel (src/state/game/channel.ts); these calls are
 // the parts that have to outlast a closed app.
 
 // How long a room may go without anyone doing anything in it before the
